@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Program extends Model
 {
@@ -20,6 +20,13 @@ class Program extends Model
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);
+    }
+
+    public function assignedChair(): HasOne
+    {
+        return $this->hasOne(Teacher::class, 'program_id')
+            ->where('is_deleted', 0)
+            ->where('role', 'like', '%Chair%');
     }
 
     public function yearLevels(): HasMany

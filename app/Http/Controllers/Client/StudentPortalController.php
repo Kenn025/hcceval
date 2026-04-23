@@ -69,11 +69,12 @@ class StudentPortalController extends Controller
                 ->join('subjects as subj', 'subj.id', '=', 'ss.subject_id')
                 ->leftJoin('employee as e', 'e.id', '=', 'ss.teacher_employee_id')
                 ->leftJoin('evaluation_submissions as es', function ($join) use ($studentId, $schoolYear, $termA, $termB) {
-                    $join->on('es.student_id', '=', DB::raw($studentId))
+                    $join->on('es.evaluator_id', '=', DB::raw($studentId))
                          ->on('es.subject_section_id', '=', 'ss.id')
+                         ->where('es.evaluator_type', 'student')
+                         ->where('es.category', 'teacher_subject')
                          ->whereIn('es.term', [$termA, $termB])
-                         ->where('es.school_year', $schoolYear)
-                         ->where('es.status', 'submitted');
+                         ->where('es.school_year', $schoolYear);
                 })
                 ->select(
                     'ss.id as section_id',
@@ -117,8 +118,9 @@ class StudentPortalController extends Controller
                     'subj.name as course_name',
                     DB::raw("TRIM(CONCAT(e.firstname, ' ', COALESCE(e.middlename, ''), ' ', e.lastname)) as teacher_name")
                 )
-                ->where('es.student_id', $studentId)
-                ->where('es.status', 'submitted')
+                ->where('es.evaluator_id', $studentId)
+                ->where('es.evaluator_type', 'student')
+                ->where('es.category', 'teacher_subject')
                 ->where('es.school_year', $schoolYear)
                 ->whereIn('es.term', [$termA, $termB])
                 ->orderByDesc('es.submitted_at')
@@ -141,8 +143,9 @@ class StudentPortalController extends Controller
                     'subj.name as course_name',
                     DB::raw("TRIM(CONCAT(e.firstname, ' ', COALESCE(e.middlename, ''), ' ', e.lastname)) as teacher_name")
                 )
-                ->where('es.student_id', $studentId)
-                ->where('es.status', 'submitted')
+                ->where('es.evaluator_id', $studentId)
+                ->where('es.evaluator_type', 'student')
+                ->where('es.category', 'teacher_subject')
                 ->where(fn ($q) => $q->where('es.school_year', '!=', $schoolYear)
                     ->orWhereNotIn('es.term', [$termA, $termB]))
                 ->orderByDesc('es.submitted_at')
