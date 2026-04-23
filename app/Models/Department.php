@@ -9,13 +9,11 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Department extends Model
 {
-    use SoftDeletes;
+    protected $table = 'department';
 
-    protected $table = 'departments';
+    protected $fillable = ['name', 'branch_id', 'is_activated', 'is_deleted'];
 
-    protected $fillable = ['code', 'name', 'branch_id', 'education_level_id', 'is_active'];
-
-    protected $casts = ['is_active' => 'boolean'];
+    protected $casts = ['is_activated' => 'boolean', 'is_deleted' => 'boolean'];
 
     public function branch(): BelongsTo
     {
@@ -24,7 +22,7 @@ class Department extends Model
 
     public function educationLevel(): BelongsTo
     {
-        return $this->belongsTo(EducationLevel::class);
+        return $this->belongsTo(EducationLevel::class, 'education_level_id');
     }
 
     public function programs(): HasMany

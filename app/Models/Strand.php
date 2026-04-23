@@ -9,16 +9,13 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Strand extends Model
 {
-    use SoftDeletes;
-
-    protected $table = 'strands';
+    protected $table = 'strand';
 
     protected $fillable = [
-        'department_id', 'code', 'name', 'description',
-        'duration_years', 'adviser_employee_id', 'is_active',
+        'department_id', 'name', 'is_activated', 'is_deleted',
     ];
 
-    protected $casts = ['is_active' => 'boolean'];
+    protected $casts = ['is_activated' => 'boolean', 'is_deleted' => 'boolean'];
 
     public function department(): BelongsTo
     {

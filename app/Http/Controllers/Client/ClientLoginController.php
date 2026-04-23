@@ -7,7 +7,6 @@ use App\Models\Employee;
 use App\Models\Student;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -40,13 +39,13 @@ class ClientLoginController extends Controller
         $identifier = trim($request->input('identifier'));
         $password   = $request->input('password');
 
-        // Try students table
+        // Try legacy student table
         $student = Student::with('branch')
             ->where(fn ($q) => $q->where('student_no', $identifier)->orWhere('email', $identifier))
-            ->whereNull('deleted_at')
+            ->where('is_deleted', 0)
             ->first();
 
-        if ($student && Hash::check($password, $student->password)) {
+        if ($student && $student->password === md5($password)) {
             $request->session()->regenerate();
             session([
                 'client_type'   => 'student',
@@ -58,13 +57,13 @@ class ClientLoginController extends Controller
             return redirect()->route('portal.student.dashboard');
         }
 
-        // Try employees table
+        // Try legacy employee table
         $employee = Employee::with('branch')
             ->where(fn ($q) => $q->where('employee_no', $identifier)->orWhere('email', $identifier))
-            ->whereNull('deleted_at')
+            ->where('is_deleted', 0)
             ->first();
 
-        if ($employee && Hash::check($password, $employee->password)) {
+        if ($employee && $employee->password === md5($password)) {
             $request->session()->regenerate();
             session([
                 'client_type'   => 'faculty',

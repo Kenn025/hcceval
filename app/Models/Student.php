@@ -8,20 +8,18 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Student extends Model
 {
-    use SoftDeletes;
-
-    protected $table = 'students';
+    protected $table = 'student';
 
     protected $fillable = [
-        'student_no', 'branch_id', 'department_id', 'program_id',
-        'strand_id', 'year_level_id',
-        'first_name', 'middle_name', 'last_name', 'suffix_name',
-        'email', 'password', 'status', 'is_active',
+        'branch_id', 'department_id', 'program_id',
+        'strand_id', 'education_level_id',
+        'firstname', 'middlename', 'lastname',
+        'email', 'password', 'is_activated', 'is_deleted',
     ];
 
     protected $hidden = ['password'];
 
-    protected $casts = ['is_active' => 'boolean'];
+    protected $casts = ['is_activated' => 'boolean', 'is_deleted' => 'boolean'];
 
     public function branch(): BelongsTo
     {
@@ -45,11 +43,16 @@ class Student extends Model
 
     public function yearLevel(): BelongsTo
     {
-        return $this->belongsTo(YearLevel::class);
+        return $this->belongsTo(EducationLevel::class, 'education_level_id');
     }
 
     public function getFullNameAttribute(): string
     {
-        return trim("{$this->first_name} {$this->middle_name} {$this->last_name} {$this->suffix_name}");
+        return trim("{$this->firstname} {$this->middlename} {$this->lastname}");
+    }
+
+    public function getStudentNoAttribute(): string
+    {
+        return 'STU-' . str_pad((string) $this->id, 4, '0', STR_PAD_LEFT);
     }
 }

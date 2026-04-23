@@ -4,20 +4,17 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Branch extends Model
 {
-    use SoftDeletes;
-
-    protected $table = 'branches';
+    protected $table = 'branch';
 
     protected $fillable = [
-        'code', 'name', 'highest_department', 'custom_settings',
-        'address', 'is_main', 'is_active',
+        'name', 'highest_department', 'custom_settings',
+        'address', 'is_main', 'is_activated', 'is_deleted',
     ];
 
-    protected $casts = ['is_main' => 'boolean', 'is_active' => 'boolean'];
+    protected $casts = ['is_main' => 'boolean', 'is_activated' => 'boolean', 'is_deleted' => 'boolean'];
 
     public function departments(): HasMany
     {

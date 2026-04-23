@@ -8,11 +8,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class EducationLevel extends Model
 {
-    use SoftDeletes;
+    protected $table = 'education_level';
 
-    protected $table = 'education_levels';
-
-    protected $fillable = ['code', 'name', 'description', 'is_active'];
+    protected $fillable = [
+        'department_id', 'program_id', 'year_level', 'section',
+        'teacher_id', 'subject_id', 'is_activated', 'is_deleted',
+    ];
 
     public function departments(): HasMany
     {

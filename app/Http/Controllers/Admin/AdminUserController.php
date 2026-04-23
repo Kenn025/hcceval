@@ -17,9 +17,9 @@ class AdminUserController extends Controller
         $admins = Admin::query()
             ->with(['branch:id,name'])
             ->where('is_deleted', 0)
-            ->when($search, fn ($q) => $q->where('admin_name', 'like', "%{$search}%")
-                ->orWhere('admin_email', 'like', "%{$search}%"))
-            ->orderBy('admin_name')
+            ->when($search, fn ($q) => $q->where('name', 'like', "%{$search}%")
+                ->orWhere('email', 'like', "%{$search}%"))
+            ->orderBy('name')
             ->paginate(15)
             ->withQueryString();
 
@@ -33,18 +33,18 @@ class AdminUserController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'admin_name'     => 'required|string|max:150',
-            'admin_email'    => 'required|email|max:150|unique:admins,admin_email',
-            'admin_password' => 'required|string|min:6',
-            'role'           => 'required|in:superadmin,overalladmin,admin',
-            'branch_id'      => 'nullable|exists:branches,id',
+            'name' => 'required|string|max:150',
+            'email' => 'required|email|max:150|unique:admin,email',
+            'password' => 'required|string|min:6',
+            'role' => 'required|in:superadmin,overalladmin,admin',
+            'branch_id' => 'nullable|exists:branch,id',
         ]);
 
         if ($validated['role'] === 'admin' && empty($validated['branch_id'])) {
             return back()->withErrors(['branch_id' => 'Branch is required for a branch admin.']);
         }
 
-        $validated['admin_password'] = md5($validated['admin_password']);
+        $validated['password'] = md5($validated['password']);
 
         Admin::create($validated);
 
@@ -56,21 +56,21 @@ class AdminUserController extends Controller
         $pk = $admin->getKey();
 
         $validated = $request->validate([
-            'admin_name'     => 'required|string|max:150',
-            'admin_email'    => "required|email|max:150|unique:admins,admin_email,{$pk},admin_id",
-            'admin_password' => 'nullable|string|min:6',
-            'role'           => 'required|in:superadmin,overalladmin,admin',
-            'branch_id'      => 'nullable|exists:branches,id',
+            'name' => 'required|string|max:150',
+            'email' => "required|email|max:150|unique:admin,email,{$pk},id",
+            'password' => 'nullable|string|min:6',
+            'role' => 'required|in:superadmin,overalladmin,admin',
+            'branch_id' => 'nullable|exists:branch,id',
         ]);
 
         if ($validated['role'] === 'admin' && empty($validated['branch_id'])) {
             return back()->withErrors(['branch_id' => 'Branch is required for a branch admin.']);
         }
 
-        if (! empty($validated['admin_password'])) {
-            $validated['admin_password'] = md5($validated['admin_password']);
+        if (! empty($validated['password'])) {
+            $validated['password'] = md5($validated['password']);
         } else {
-            unset($validated['admin_password']);
+            unset($validated['password']);
         }
 
         $admin->update($validated);
