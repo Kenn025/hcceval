@@ -16,6 +16,7 @@ return new class extends Migration
         // Legacy admin/user tables
         Schema::create('branch', function (Blueprint $table) {
             $table->id();
+            $table->string('code', 50)->unique();
             $table->string('name', 150);
             $table->string('highest_department', 50)->nullable();
             $table->text('custom_settings')->nullable();
@@ -28,6 +29,7 @@ return new class extends Migration
 
         Schema::create('admin', function (Blueprint $table) {
             $table->id();
+            $table->string('code', 50)->unique();
             $table->string('name', 150);
             $table->string('role', 100);
             $table->unsignedBigInteger('branch_id')->nullable();
@@ -43,6 +45,7 @@ return new class extends Migration
 
         Schema::create('department', function (Blueprint $table) {
             $table->id();
+            $table->string('code', 50)->unique();
             $table->string('name', 150);
             $table->unsignedBigInteger('branch_id')->nullable();
             $table->boolean('is_activated')->default(true);
@@ -54,6 +57,7 @@ return new class extends Migration
 
         Schema::create('program', function (Blueprint $table) {
             $table->id();
+            $table->string('code', 50)->unique();
             $table->string('name', 150);
             $table->unsignedBigInteger('department_id')->nullable();
             $table->integer('duration_years');
@@ -66,6 +70,7 @@ return new class extends Migration
 
         Schema::create('strand', function (Blueprint $table) {
             $table->id();
+            $table->string('code', 50)->unique();
             $table->string('name', 150);
             $table->unsignedBigInteger('department_id')->nullable();
             $table->boolean('is_activated')->default(true);
@@ -77,6 +82,7 @@ return new class extends Migration
 
         Schema::create('education_level', function (Blueprint $table) {
             $table->id();
+            $table->string('code', 50)->unique();
             $table->unsignedBigInteger('department_id')->nullable();
             $table->unsignedBigInteger('program_id')->nullable();
             $table->string('year_level', 50);
@@ -94,6 +100,7 @@ return new class extends Migration
 
         Schema::create('teacher', function (Blueprint $table) {
             $table->id();
+            $table->string('code', 50)->unique();
             $table->string('firstname', 100);
             $table->string('middlename', 100)->nullable();
             $table->string('lastname', 100);
@@ -120,6 +127,7 @@ return new class extends Migration
 
         Schema::create('employee', function (Blueprint $table) {
             $table->id();
+            $table->string('code', 50)->unique();
             $table->string('firstname', 100);
             $table->string('middlename', 100)->nullable();
             $table->string('lastname', 100);
@@ -146,6 +154,7 @@ return new class extends Migration
 
         Schema::create('student', function (Blueprint $table) {
             $table->id();
+            $table->string('code', 50)->unique();
             $table->string('firstname', 100);
             $table->string('middlename', 100)->nullable();
             $table->string('lastname', 100);
@@ -175,6 +184,7 @@ return new class extends Migration
 
         Schema::create('subject', function (Blueprint $table) {
             $table->id();
+            $table->string('code', 50)->unique();
             $table->string('name', 150);
             $table->string('type', 100);
             $table->unsignedBigInteger('department_id')->nullable();
@@ -207,6 +217,7 @@ return new class extends Migration
         // Questionnaire system
         Schema::create('question_type', function (Blueprint $table) {
             $table->id();
+            $table->string('code', 50)->unique();
             $table->string('name', 150);
             $table->boolean('is_activated')->default(true);
             $table->boolean('is_deleted')->default(false);
@@ -215,6 +226,7 @@ return new class extends Migration
 
         Schema::create('question_class', function (Blueprint $table) {
             $table->id();
+            $table->string('code', 50)->unique();
             $table->string('name', 150);
             $table->boolean('is_activated')->default(true);
             $table->boolean('is_deleted')->default(false);
@@ -223,6 +235,7 @@ return new class extends Migration
 
         Schema::create('question_choices', function (Blueprint $table) {
             $table->id();
+            $table->string('code', 50)->unique();
             $table->integer('quantity');
             $table->json('verbal_interpretation')->nullable();
             $table->boolean('is_activated')->default(true);
@@ -232,6 +245,7 @@ return new class extends Migration
 
         Schema::create('question', function (Blueprint $table) {
             $table->id();
+            $table->string('code', 50)->unique();
             $table->text('description');
             $table->unsignedBigInteger('question_type_id')->nullable();
             $table->boolean('is_required')->default(true);
@@ -244,6 +258,7 @@ return new class extends Migration
 
         Schema::create('questionnaire_type', function (Blueprint $table) {
             $table->id();
+            $table->string('code', 50)->unique();
             $table->string('name', 150);
             $table->boolean('is_activated')->default(true);
             $table->boolean('is_deleted')->default(false);
@@ -252,6 +267,7 @@ return new class extends Migration
 
         Schema::create('questionnaires', function (Blueprint $table) {
             $table->id();
+            $table->string('code', 50)->unique();
             $table->unsignedBigInteger('questionnaire_type_id')->nullable();
             $table->unsignedBigInteger('question_choices_id')->nullable();
             $table->json('items')->nullable();
@@ -267,6 +283,7 @@ return new class extends Migration
 
         Schema::create('questionnaire_distribution', function (Blueprint $table) {
             $table->id();
+            $table->string('code', 50)->unique();
             $table->unsignedBigInteger('questionnaire_id')->nullable();
             $table->unsignedBigInteger('academic_year_id')->nullable();
             $table->json('items')->nullable();
@@ -281,6 +298,7 @@ return new class extends Migration
 
         Schema::create('answer_questionnaires', function (Blueprint $table) {
             $table->id();
+            $table->string('code', 50)->unique();
             $table->unsignedBigInteger('academic_year_id')->nullable();
             $table->unsignedBigInteger('questionnaire_id')->nullable();
             $table->unsignedBigInteger('teacher_id')->nullable();
@@ -397,6 +415,7 @@ return new class extends Migration
         DB::table('branch')->insert([
             [
                 'id' => 1,
+                'code' => 'OVERALL',
                 'name' => 'Overall Branch',
                 'highest_department' => null,
                 'custom_settings' => null,
@@ -409,6 +428,7 @@ return new class extends Migration
             ],
             [
                 'id' => 2,
+                'code' => 'HCC-SR',
                 'name' => 'Holy Cross College Santa Rosa Nueva Ecija',
                 'highest_department' => null,
                 'custom_settings' => null,
@@ -421,6 +441,7 @@ return new class extends Migration
             ],
             [
                 'id' => 3,
+                'code' => 'CHCC',
                 'name' => 'Concepcion Holy Cross College',
                 'highest_department' => null,
                 'custom_settings' => null,

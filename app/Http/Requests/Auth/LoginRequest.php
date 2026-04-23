@@ -2,6 +2,9 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Models\Employee;
+use App\Models\Student;
+use App\Models\Teacher;
 use App\Models\User;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Foundation\Http\FormRequest;
@@ -35,7 +38,10 @@ class LoginRequest extends FormRequest
 
         // Check legacy admin table; passwords are stored as MD5.
         $admin = DB::table('admin')
-            ->where('email', $identifier)
+            ->where(function ($query) use ($identifier) {
+                $query->where('email', $identifier)
+                    ->orWhere('code', $identifier);
+            })
             ->where('is_deleted', 0)
             ->first();
 
@@ -55,11 +61,89 @@ class LoginRequest extends FormRequest
 
             RateLimiter::clear($this->throttleKey());
 
+            $this->merge(['login_destination' => 'admin']);
+
+            return;
+        }
+
+        $student = Student::with('branch')
+            ->where(function ($query) use ($identifier) {
+                $query->where('email', $identifier)
+                    ->orWhere('code', $identifier);
+            })
+            ->where('is_deleted', 0)
+            ->first();
+
+        if ($student && $student->password === md5($password)) {
+            session([
+                'client_type' => 'student',
+                'client_source' => 'student',
+                'client_id' => $student->id,
+                'client_name' => $student->full_name,
+                'client_branch' => $student->branch?->name ?? '',
+            ]);
+
+            RateLimiter::clear($this->throttleKey());
+
+            $this->merge(['login_destination' => 'student']);
+
+            return;
+        }
+
+        $teacher = Teacher::with('branch')
+            ->where(function ($query) use ($identifier) {
+                $query->where('email', $identifier)
+                    ->orWhere('code', $identifier);
+            })
+            ->where('is_deleted', 0)
+            ->first();
+
+        if ($teacher && $teacher->password === md5($password)) {
+            session([
+                'client_type' => 'faculty',
+                'client_source' => 'teacher',
+                'client_id' => $teacher->id,
+                'client_name' => $teacher->full_name,
+                'client_branch' => $teacher->branch?->name ?? '',
+                'client_role' => $teacher->role ?? 'teacher',
+            ]);
+
+            RateLimiter::clear($this->throttleKey());
+
+            $this->merge(['login_destination' => 'teacher']);
+
+            return;
+        }
+
+        $employee = Employee::with('branch')
+            ->where(function ($query) use ($identifier) {
+                $query->where('email', $identifier)
+                    ->orWhere('code', $identifier);
+            })
+            ->where('is_deleted', 0)
+            ->first();
+
+        if ($employee && $employee->password === md5($password)) {
+            session([
+                'client_type' => 'faculty',
+                'client_source' => 'employee',
+                'client_id' => $employee->id,
+                'client_name' => $employee->full_name,
+                'client_branch' => $employee->branch?->name ?? '',
+                'client_role' => $employee->role ?? 'faculty',
+            ]);
+
+            RateLimiter::clear($this->throttleKey());
+
+            $this->merge(['login_destination' => 'employee']);
+
             return;
         }
 
         if (Auth::attempt(['email' => $identifier, 'password' => $password], $this->boolean('remember'))) {
             RateLimiter::clear($this->throttleKey());
+
+            $this->merge(['login_destination' => 'admin']);
 
             return;
         }

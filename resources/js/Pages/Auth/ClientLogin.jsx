@@ -47,14 +47,14 @@ export default function ClientLogin({ status, error }) {
           <form onSubmit={submit} autoComplete="off">
             <div className="mb-4">
               <label className="block text-xs uppercase tracking-wider text-[#2a5a38] mb-1" htmlFor="identifier">
-                Student No. / Employee No. / Email
+                Code or Email
               </label>
               <input
                 className="w-full bg-[#eef8f2] border border-[#c8e8d4] rounded px-4 py-3 text-base text-[#0d2a18] focus:bg-white focus:border-[#3d9a60] focus:outline-none focus:ring-2 focus:ring-[#3d9a60]/20 transition placeholder:text-[#6aaa84]"
                 type="text"
                 id="identifier"
                 name="identifier"
-                placeholder="Enter your ID or email"
+                placeholder="Enter your code or email"
                 required
                 autoComplete="username"
                 value={data.identifier}

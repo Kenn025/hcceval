@@ -17,6 +17,7 @@ use App\Http\Controllers\Admin\YearLevelController;
 use App\Http\Controllers\Client\ClientLoginController;
 use App\Http\Controllers\Client\StudentPortalController;
 use App\Http\Controllers\Client\TeacherPortalController;
+use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -135,9 +136,9 @@ Route::middleware('auth')->group(function () {
 // ─── Client (Student / Teacher) Portal ───────────────────────────────────────
 
 Route::prefix('portal')->name('portal.')->group(function () {
-    // Login
-    Route::get('/login', [ClientLoginController::class, 'showLogin'])->name('login');
-    Route::post('/login', [ClientLoginController::class, 'login'])->name('login.submit');
+    // Unified login entry point
+    Route::redirect('/login', '/login')->name('login');
+    Route::post('/login', [AuthenticatedSessionController::class, 'store'])->name('login.submit');
     Route::post('/logout', [ClientLoginController::class, 'logout'])->name('logout');
 
     // Student portal

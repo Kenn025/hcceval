@@ -12,7 +12,7 @@ class Program extends Model
     protected $table = 'program';
 
     protected $fillable = [
-        'department_id', 'name', 'duration_years', 'is_activated', 'is_deleted',
+        'department_id', 'code', 'name', 'duration_years', 'is_activated', 'is_deleted',
     ];
 
     protected $casts = ['is_activated' => 'boolean', 'is_deleted' => 'boolean'];

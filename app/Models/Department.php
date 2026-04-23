@@ -11,7 +11,7 @@ class Department extends Model
 {
     protected $table = 'department';
 
-    protected $fillable = ['name', 'branch_id', 'is_activated', 'is_deleted'];
+    protected $fillable = ['code', 'name', 'branch_id', 'education_level_id', 'is_activated', 'is_deleted'];
 
     protected $casts = ['is_activated' => 'boolean', 'is_deleted' => 'boolean'];
 

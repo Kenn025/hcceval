@@ -23,6 +23,7 @@ class StudentController extends Controller
 
         $students = Student::query()
             ->with(['branch:id,name', 'department:id,name', 'program:id,name', 'yearLevel:id,name'])
+            ->where('is_deleted', 0)
             ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
             ->when($search, fn ($q) => $q->where(function ($sub) use ($search) {
                 $sub->where('first_name', 'like', "%{$search}%")
@@ -106,7 +107,7 @@ class StudentController extends Controller
 
     public function destroy(Student $student)
     {
-        $student->delete();
+        $student->update(['is_deleted' => 1]);
 
         return back()->with('success', 'Student deleted.');
     }

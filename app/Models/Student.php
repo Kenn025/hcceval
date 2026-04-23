@@ -4,14 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Student extends Model
 {
     protected $table = 'student';
 
     protected $fillable = [
-        'branch_id', 'department_id', 'program_id',
+        'code', 'branch_id', 'department_id', 'program_id',
         'strand_id', 'education_level_id',
         'firstname', 'middlename', 'lastname',
         'email', 'password', 'is_activated', 'is_deleted',
@@ -53,6 +52,6 @@ class Student extends Model
 
     public function getStudentNoAttribute(): string
     {
-        return 'STU-' . str_pad((string) $this->id, 4, '0', STR_PAD_LEFT);
+        return $this->code ?: ('STU-' . str_pad((string) $this->id, 4, '0', STR_PAD_LEFT));
     }
 }

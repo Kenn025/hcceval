@@ -11,7 +11,7 @@ class EnsureTeacherAuth
     public function handle(Request $request, Closure $next): Response
     {
         if (session('client_type') !== 'faculty' || ! session('client_id')) {
-            return redirect()->route('portal.login');
+            return redirect()->route('login');
         }
 
         return $next($request);

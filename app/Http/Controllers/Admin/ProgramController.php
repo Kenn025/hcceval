@@ -15,9 +15,9 @@ class ProgramController extends Controller
         $search = $request->input('search', '');
 
         $programs = Program::query()
-            ->with(['department:id,name,code'])
-            ->when($search, fn ($q) => $q->where('name', 'like', "%{$search}%")
-                ->orWhere('code', 'like', "%{$search}%"))
+            ->with(['department:id,name'])
+            ->where('is_deleted', 0)
+            ->when($search, fn ($q) => $q->where('name', 'like', "%{$search}%"))
             ->orderBy('name')
             ->paginate(15)
             ->withQueryString();
@@ -25,21 +25,21 @@ class ProgramController extends Controller
         return Inertia::render('Admin/Programs', [
             'programs' => $programs,
             'filters' => ['search' => $search],
-            'departments' => Department::select('id', 'name', 'code')->orderBy('name')->get(),
+            'departments' => Department::query()
+                ->select('id', 'name')
+                ->where('is_deleted', 0)
+                ->orderBy('name')
+                ->get(),
         ]);
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'department_id' => 'required|exists:departments,id',
-            'code' => 'required|string|max:50|unique:programs,code',
+            'department_id' => 'required|exists:department,id',
             'name' => 'required|string|max:150',
-            'description' => 'nullable|string',
-            'program_type' => 'nullable|string|max:50',
-            'duration_years' => 'nullable|integer|min:1',
-            'total_units' => 'nullable|numeric|min:0',
-            'is_active' => 'boolean',
+            'duration_years' => 'required|integer|min:1',
+            'is_activated' => 'boolean',
         ]);
 
         Program::create($validated);
@@ -50,14 +50,10 @@ class ProgramController extends Controller
     public function update(Request $request, Program $program)
     {
         $validated = $request->validate([
-            'department_id' => 'required|exists:departments,id',
-            'code' => "required|string|max:50|unique:programs,code,{$program->id}",
+            'department_id' => 'required|exists:department,id',
             'name' => 'required|string|max:150',
-            'description' => 'nullable|string',
-            'program_type' => 'nullable|string|max:50',
-            'duration_years' => 'nullable|integer|min:1',
-            'total_units' => 'nullable|numeric|min:0',
-            'is_active' => 'boolean',
+            'duration_years' => 'required|integer|min:1',
+            'is_activated' => 'boolean',
         ]);
 
         $program->update($validated);
@@ -67,7 +63,7 @@ class ProgramController extends Controller
 
     public function destroy(Program $program)
     {
-        $program->delete();
+        $program->update(['is_deleted' => 1]);
 
         return back()->with('success', 'Program deleted.');
     }

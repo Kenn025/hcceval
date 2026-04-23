@@ -16,6 +16,7 @@ class StrandController extends Controller
 
         $strands = Strand::query()
             ->with(['department:id,name,code'])
+            ->where('is_deleted', 0)
             ->when($search, fn ($q) => $q->where('name', 'like', "%{$search}%")
                 ->orWhere('code', 'like', "%{$search}%"))
             ->orderBy('name')
@@ -63,7 +64,7 @@ class StrandController extends Controller
 
     public function destroy(Strand $strand)
     {
-        $strand->delete();
+        $strand->update(['is_deleted' => 1]);
 
         return back()->with('success', 'Strand deleted.');
     }

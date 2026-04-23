@@ -11,7 +11,7 @@ class EducationLevel extends Model
     protected $table = 'education_level';
 
     protected $fillable = [
-        'department_id', 'program_id', 'year_level', 'section',
+        'code', 'department_id', 'program_id', 'year_level', 'section',
         'teacher_id', 'subject_id', 'is_activated', 'is_deleted',
     ];
 

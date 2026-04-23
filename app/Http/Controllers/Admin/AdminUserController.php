@@ -81,7 +81,6 @@ class AdminUserController extends Controller
     public function destroy(Admin $admin)
     {
         $admin->update(['is_deleted' => 1]);
-        $admin->delete();
 
         return back()->with('success', 'Admin user deleted.');
     }

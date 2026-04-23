@@ -4,14 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Employee extends Model
 {
     protected $table = 'employee';
 
     protected $fillable = [
-        'branch_id', 'department_id', 'program_id', 'strand_id',
+        'code', 'branch_id', 'department_id', 'program_id', 'strand_id',
         'firstname', 'middlename', 'lastname',
         'email', 'password', 'role', 'is_activated', 'is_deleted',
     ];
@@ -47,6 +46,6 @@ class Employee extends Model
 
     public function getEmployeeNoAttribute(): string
     {
-        return 'EMP-' . str_pad((string) $this->id, 4, '0', STR_PAD_LEFT);
+        return $this->code ?: ('EMP-' . str_pad((string) $this->id, 4, '0', STR_PAD_LEFT));
     }
 }

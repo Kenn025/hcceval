@@ -10,7 +10,7 @@ class Branch extends Model
     protected $table = 'branch';
 
     protected $fillable = [
-        'name', 'highest_department', 'custom_settings',
+        'code', 'name', 'highest_department', 'custom_settings',
         'address', 'is_main', 'is_activated', 'is_deleted',
     ];
 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Client;
 use App\Http\Controllers\Controller;
 use App\Models\Student;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -13,7 +14,8 @@ class StudentPortalController extends Controller
     private function activeCycle(): ?object
     {
         return DB::table('academic_year')
-            ->where('is_open', 1)
+            ->where('is_deleted', 0)
+            ->where('is_activated', 1)
             ->orderByDesc('from_year')
             ->first();
     }
@@ -49,7 +51,14 @@ class StudentPortalController extends Controller
         $evaluations  = [];
         $archive      = [];
 
-        if ($cycle) {
+        if (
+            $cycle &&
+            Schema::hasTable('student_enrollments') &&
+            Schema::hasTable('subject_sections') &&
+            Schema::hasTable('sections') &&
+            Schema::hasTable('subjects') &&
+            Schema::hasTable('evaluation_submissions')
+        ) {
             [$termA, $termB] = $this->termOptions($cycle->term ?? null);
             $schoolYear      = trim("{$cycle->from_year}-{$cycle->to_year}");
 
@@ -58,7 +67,7 @@ class StudentPortalController extends Controller
                 ->join('subject_sections as ss', 'ss.id', '=', 'se.subject_section_id')
                 ->join('sections as sec', 'sec.id', '=', 'ss.section_id')
                 ->join('subjects as subj', 'subj.id', '=', 'ss.subject_id')
-                ->leftJoin('employees as e', 'e.id', '=', 'ss.teacher_employee_id')
+                ->leftJoin('employee as e', 'e.id', '=', 'ss.teacher_employee_id')
                 ->leftJoin('evaluation_submissions as es', function ($join) use ($studentId, $schoolYear, $termA, $termB) {
                     $join->on('es.student_id', '=', DB::raw($studentId))
                          ->on('es.subject_section_id', '=', 'ss.id')
@@ -76,7 +85,7 @@ class StudentPortalController extends Controller
                     'subj.id as course_id',
                     'subj.code as course_code',
                     'subj.name as course_name',
-                    DB::raw("TRIM(CONCAT(e.first_name, ' ', COALESCE(e.middle_name, ''), ' ', e.last_name)) as teacher_name"),
+                    DB::raw("TRIM(CONCAT(e.firstname, ' ', COALESCE(e.middlename, ''), ' ', e.lastname)) as teacher_name"),
                     DB::raw("COALESCE(e.role, 'teacher') as teacher_role"),
                     DB::raw('CASE WHEN es.id IS NOT NULL THEN 1 ELSE 0 END as already_evaluated')
                 )
@@ -96,7 +105,7 @@ class StudentPortalController extends Controller
                 ->join('subject_sections as ss', 'ss.id', '=', 'es.subject_section_id')
                 ->join('sections as sec', 'sec.id', '=', 'ss.section_id')
                 ->join('subjects as subj', 'subj.id', '=', 'ss.subject_id')
-                ->leftJoin('employees as e', 'e.id', '=', 'ss.teacher_employee_id')
+                ->leftJoin('employee as e', 'e.id', '=', 'ss.teacher_employee_id')
                 ->select(
                     'es.id as submission_id',
                     'es.subject_section_id as section_id',
@@ -106,7 +115,7 @@ class StudentPortalController extends Controller
                     'sec.name as section_name',
                     'subj.code as course_code',
                     'subj.name as course_name',
-                    DB::raw("TRIM(CONCAT(e.first_name, ' ', COALESCE(e.middle_name, ''), ' ', e.last_name)) as teacher_name")
+                    DB::raw("TRIM(CONCAT(e.firstname, ' ', COALESCE(e.middlename, ''), ' ', e.lastname)) as teacher_name")
                 )
                 ->where('es.student_id', $studentId)
                 ->where('es.status', 'submitted')
@@ -122,7 +131,7 @@ class StudentPortalController extends Controller
                 ->join('subject_sections as ss', 'ss.id', '=', 'es.subject_section_id')
                 ->join('sections as sec', 'sec.id', '=', 'ss.section_id')
                 ->join('subjects as subj', 'subj.id', '=', 'ss.subject_id')
-                ->leftJoin('employees as e', 'e.id', '=', 'ss.teacher_employee_id')
+                ->leftJoin('employee as e', 'e.id', '=', 'ss.teacher_employee_id')
                 ->select(
                     'es.id as submission_id',
                     'es.school_year',
@@ -130,7 +139,7 @@ class StudentPortalController extends Controller
                     'es.submitted_at',
                     'subj.code as course_code',
                     'subj.name as course_name',
-                    DB::raw("TRIM(CONCAT(e.first_name, ' ', COALESCE(e.middle_name, ''), ' ', e.last_name)) as teacher_name")
+                    DB::raw("TRIM(CONCAT(e.firstname, ' ', COALESCE(e.middlename, ''), ' ', e.lastname)) as teacher_name")
                 )
                 ->where('es.student_id', $studentId)
                 ->where('es.status', 'submitted')
@@ -155,7 +164,7 @@ class StudentPortalController extends Controller
             'cycle'       => $cycle ? [
                 'school_year' => "{$cycle->from_year}-{$cycle->to_year}",
                 'semester'    => $this->semesterLabel($cycle->term ?? null),
-                'is_open'     => (bool) $cycle->is_open,
+                'is_open'     => (bool) $cycle->is_activated,
             ] : null,
             'subjects'    => $subjects,
             'evaluations' => $evaluations,

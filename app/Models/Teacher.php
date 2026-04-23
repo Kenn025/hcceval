@@ -1,0 +1,51 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+class Teacher extends Model
+{
+    protected $table = 'teacher';
+
+    protected $fillable = [
+        'code', 'branch_id', 'department_id', 'program_id', 'strand_id',
+        'firstname', 'middlename', 'lastname',
+        'email', 'password', 'role', 'is_activated', 'is_deleted',
+    ];
+
+    protected $hidden = ['password'];
+
+    protected $casts = ['is_activated' => 'boolean', 'is_deleted' => 'boolean'];
+
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class);
+    }
+
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(Department::class);
+    }
+
+    public function program(): BelongsTo
+    {
+        return $this->belongsTo(Program::class);
+    }
+
+    public function strand(): BelongsTo
+    {
+        return $this->belongsTo(Strand::class);
+    }
+
+    public function getFullNameAttribute(): string
+    {
+        return trim("{$this->firstname} {$this->middlename} {$this->lastname}");
+    }
+
+    public function getEmployeeNoAttribute(): string
+    {
+        return $this->code ?: ('TCH-' . str_pad((string) $this->id, 4, '0', STR_PAD_LEFT));
+    }
+}

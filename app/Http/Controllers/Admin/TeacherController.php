@@ -22,6 +22,7 @@ class TeacherController extends Controller
 
         $teachers = Employee::query()
             ->with(['branch:id,name', 'department:id,name', 'program:id,name'])
+            ->where('is_deleted', 0)
             ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
             ->when($search, fn ($q) => $q->where(function ($sub) use ($search) {
                 $sub->where('first_name', 'like', "%{$search}%")
@@ -98,7 +99,7 @@ class TeacherController extends Controller
 
     public function destroy(Employee $employee)
     {
-        $employee->delete();
+        $employee->update(['is_deleted' => 1]);
 
         return back()->with('success', 'Teacher deleted.');
     }

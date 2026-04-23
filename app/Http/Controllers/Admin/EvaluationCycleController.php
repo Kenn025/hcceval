@@ -86,7 +86,11 @@ class EvaluationCycleController extends Controller
 
     public function destroy(int $id)
     {
-        DB::table('academic_year')->where('id', $id)->delete();
+        DB::table('academic_year')->where('id', $id)->update([
+            'is_deleted' => 1,
+            'is_activated' => 0,
+            'updated_at' => now(),
+        ]);
         return back()->with('success', 'Evaluation cycle deleted.');
     }
 }

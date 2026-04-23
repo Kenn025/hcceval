@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Client;
 
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
+use App\Models\Teacher;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -13,7 +15,8 @@ class TeacherPortalController extends Controller
     private function activeCycle(): ?object
     {
         return DB::table('academic_year')
-            ->where('is_open', 1)
+            ->where('is_deleted', 0)
+            ->where('is_activated', 1)
             ->orderByDesc('from_year')
             ->first();
     }
@@ -41,31 +44,38 @@ class TeacherPortalController extends Controller
     public function dashboard(): Response
     {
         $employeeId = (int) session('client_id');
-        $employee   = Employee::with(['branch', 'department', 'program'])
-            ->findOrFail($employeeId);
+        $clientSource = session('client_source', 'employee');
+        $employee = $clientSource === 'teacher'
+            ? Teacher::with(['branch', 'department', 'program'])->findOrFail($employeeId)
+            : Employee::with(['branch', 'department', 'program'])->findOrFail($employeeId);
 
         $cycle   = $this->activeCycle();
         $classes = [];
 
-        if ($cycle) {
+        if (
+            $cycle &&
+            Schema::hasTable('subject_sections') &&
+            Schema::hasTable('sections') &&
+            Schema::hasTable('subjects')
+        ) {
             [$termA, $termB] = $this->termOptions($cycle->term ?? null);
             $schoolYear      = trim("{$cycle->from_year}-{$cycle->to_year}");
 
             $classes = DB::table('subject_sections as ss')
                 ->join('sections as sec', 'sec.id', '=', 'ss.section_id')
                 ->join('subjects as subj', 'subj.id', '=', 'ss.subject_id')
-                ->leftJoin('departments as d', 'd.id', '=', 'subj.department_id')
+                ->leftJoin('department as d', 'd.id', '=', 'subj.department_id')
                 ->select(
                     'ss.id as section_id',
                     'sec.name as section_name',
                     'ss.school_year',
                     'ss.term',
-                    'ss.schedule',
-                    'ss.room',
+                    DB::raw('NULL as schedule'),
+                    DB::raw('NULL as room'),
                     'subj.code as course_code',
                     'subj.name as course_name',
                     'd.name as department_name',
-                    DB::raw('(SELECT COUNT(*) FROM student_enrollments WHERE subject_section_id = ss.id AND status = \'enrolled\') as enrolled_count')
+                    DB::raw('0 as enrolled_count')
                 )
                 ->where('ss.teacher_employee_id', $employeeId)
                 ->where('ss.school_year', $schoolYear)
@@ -93,7 +103,7 @@ class TeacherPortalController extends Controller
             'cycle'   => $cycle ? [
                 'school_year' => "{$cycle->from_year}-{$cycle->to_year}",
                 'semester'    => $this->semesterLabel($cycle->term ?? null),
-                'is_open'     => (bool) $cycle->is_open,
+                'is_open'     => (bool) $cycle->is_activated,
             ] : null,
             'classes' => $classes,
         ]);

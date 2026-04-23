@@ -10,7 +10,7 @@ class Admin extends Model
     protected $table = 'admin';
 
     protected $fillable = [
-        'name', 'email', 'password',
+        'code', 'name', 'email', 'password',
         'role', 'branch_id', 'is_deleted',
     ];
 

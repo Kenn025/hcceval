@@ -14,6 +14,7 @@ class BranchController extends Controller
         $search = $request->input('search', '');
 
         $branches = Branch::query()
+            ->where('is_deleted', 0)
             ->when($search, fn ($q) => $q->where('name', 'like', "%{$search}%")
                 ->orWhere('code', 'like', "%{$search}%"))
             ->withCount('departments')
@@ -61,7 +62,7 @@ class BranchController extends Controller
 
     public function destroy(Branch $branch)
     {
-        $branch->delete();
+        $branch->update(['is_deleted' => 1]);
 
         return back()->with('success', 'Branch deleted.');
     }

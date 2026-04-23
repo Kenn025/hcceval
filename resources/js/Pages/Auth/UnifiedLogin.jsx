@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@inertiajs/react';
 
 export default function UnifiedLogin({ status, error }) {
   const { data, setData, post, processing, errors } = useForm({
@@ -15,7 +15,7 @@ export default function UnifiedLogin({ status, error }) {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#060f1e] via-[#0a1f3c] to-[#0e2d5a] p-4">
-      <Head title="Holy Cross College - Login" />
+      <Head title="Holy Cross College - Unified Login" />
 
       <div className="relative z-10 bg-white/95 rounded-xl w-full max-w-md shadow-2xl overflow-hidden">
         {/* Header */}
@@ -31,7 +31,7 @@ export default function UnifiedLogin({ status, error }) {
           <h1 className="font-serif text-2xl font-light text-white tracking-wide mb-1">
             Holy Cross <span className="italic text-[#a8c8f0]">College</span>
           </h1>
-          <p className="text-xs uppercase tracking-wider text-[#a8c8f099] mt-1">Admin Portal</p>
+          <p className="text-xs uppercase tracking-wider text-[#a8c8f099] mt-1">Unified Login</p>
           <div className="w-12 h-px bg-gradient-to-r from-transparent via-[#c8a96e] to-transparent mx-auto mt-3" />
         </div>
 
@@ -47,20 +47,23 @@ export default function UnifiedLogin({ status, error }) {
           <form onSubmit={submit} autoComplete="off">
             <div className="mb-4">
               <label className="block text-xs uppercase tracking-wider text-[#3a5278] mb-1" htmlFor="identifier">
-                ID or Email
+                Code or Email
               </label>
               <input
                 className="w-full bg-[#eef5ff] border border-[#ddeeff] rounded px-4 py-3 text-base text-[#0d1f35] focus:bg-white focus:border-[#4a90d9] focus:outline-none focus:ring-2 focus:ring-[#4a90d9]/20 transition placeholder:text-[#6a8aaa]"
                 type="text"
                 id="identifier"
                 name="identifier"
-                placeholder="Admin email"
+                placeholder="Admin, student, teacher, or employee code/email"
                 required
                 autoComplete="username"
                 value={data.identifier}
                 onChange={e => setData('identifier', e.target.value)}
               />
               {errors.identifier && <div className="text-red-600 text-xs mt-1">{errors.identifier}</div>}
+              <div className="text-[#6a8aaa] text-xs mt-2">
+                Use one login for admin, student, teacher, and employee accounts.
+              </div>
             </div>
 
             <div className="mb-4">

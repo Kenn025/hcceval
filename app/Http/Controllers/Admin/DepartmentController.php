@@ -16,9 +16,9 @@ class DepartmentController extends Controller
         $search = $request->input('search', '');
 
         $departments = Department::query()
-            ->with(['branch:id,name,code', 'educationLevel:id,name,code'])
-            ->when($search, fn ($q) => $q->where('name', 'like', "%{$search}%")
-                ->orWhere('code', 'like', "%{$search}%"))
+            ->with(['branch:id,name', 'educationLevel:id,year_level,section'])
+            ->where('is_deleted', 0)
+            ->when($search, fn ($q) => $q->where('name', 'like', "%{$search}%"))
             ->orderBy('name')
             ->paginate(15)
             ->withQueryString();
@@ -26,19 +26,24 @@ class DepartmentController extends Controller
         return Inertia::render('Admin/Departments', [
             'departments' => $departments,
             'filters' => ['search' => $search],
-            'branches' => Branch::select('id', 'name', 'code')->orderBy('name')->get(),
-            'educationLevels' => EducationLevel::select('id', 'name', 'code')->where('is_active', 1)->orderBy('name')->get(),
+            'branches' => Branch::query()->select('id', 'name')->where('is_deleted', 0)->orderBy('name')->get(),
+            'educationLevels' => EducationLevel::query()
+                ->select('id', 'year_level', 'section')
+                ->where('is_deleted', 0)
+                ->where('is_activated', 1)
+                ->orderBy('year_level')
+                ->orderBy('section')
+                ->get(),
         ]);
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'code' => 'required|string|max:50|unique:departments,code',
             'name' => 'required|string|max:150',
-            'branch_id' => 'required|exists:branches,id',
-            'education_level_id' => 'required|exists:education_levels,id',
-            'is_active' => 'boolean',
+            'branch_id' => 'required|exists:branch,id',
+            'education_level_id' => 'nullable|exists:education_level,id',
+            'is_activated' => 'boolean',
         ]);
 
         Department::create($validated);
@@ -49,11 +54,10 @@ class DepartmentController extends Controller
     public function update(Request $request, Department $department)
     {
         $validated = $request->validate([
-            'code' => "required|string|max:50|unique:departments,code,{$department->id}",
             'name' => 'required|string|max:150',
-            'branch_id' => 'required|exists:branches,id',
-            'education_level_id' => 'required|exists:education_levels,id',
-            'is_active' => 'boolean',
+            'branch_id' => 'required|exists:branch,id',
+            'education_level_id' => 'nullable|exists:education_level,id',
+            'is_activated' => 'boolean',
         ]);
 
         $department->update($validated);
@@ -63,7 +67,7 @@ class DepartmentController extends Controller
 
     public function destroy(Department $department)
     {
-        $department->delete();
+        $department->update(['is_deleted' => 1]);
 
         return back()->with('success', 'Department deleted.');
     }
