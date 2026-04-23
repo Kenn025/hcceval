@@ -1,0 +1,60 @@
+const iconPaths = {
+    dashboard: ['M4 5h7v6H4z', 'M13 5h7v4h-7z', 'M13 11h7v8h-7z', 'M4 13h7v6H4z'],
+    graduation: ['M3 8l9-4 9 4-9 4-9-4Z', 'M7 10.5v4.5c0 1.5 2.5 3 5 3s5-1.5 5-3v-4.5'],
+    building: ['M5 20V8l7-4 7 4v12', 'M9 12h.01', 'M15 12h.01', 'M9 16h.01', 'M15 16h.01'],
+    academy: ['M4 18h16', 'M6 18V8l6-4 6 4v10', 'M10 12h4', 'M10 15h4'],
+    school: ['M4 20h16', 'M6 20V9l6-4 6 4v11', 'M9 13h6', 'M12 9v8'],
+    programs: ['M5 6h14', 'M5 12h14', 'M5 18h14', 'M3 6h.01', 'M3 12h.01', 'M3 18h.01'],
+    subjects: ['M6 5h10a2 2 0 0 1 2 2v11H8a2 2 0 0 0-2 2V5Z', 'M18 18H8a2 2 0 0 0-2 2'],
+    layers: ['M12 4 20 8 12 12 4 8 12 4Z', 'm4 12 8 4 8-4', 'm4 16 8 4 8-4'],
+    network: ['M6 6h4v4H6z', 'M14 6h4v4h-4z', 'M10 14h4v4h-4z', 'M10 8h4', 'M8 10v4', 'M16 10v4'],
+    students: ['M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z', 'M4 20a4 4 0 0 1 8 0', 'M17 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4', 'M14 20a4 4 0 0 1 6-3.5'],
+    teachers: ['M12 6 4 10l8 4 8-4-8-4Z', 'M8 12v4.5c0 1.5 2 2.5 4 2.5s4-1 4-2.5V12', 'M20 11v4'],
+    assignments: ['M7 4h10', 'M7 8h10', 'M7 12h6', 'M7 16h4', 'M4 4h.01', 'M4 8h.01', 'M4 12h.01', 'M4 16h.01'],
+    'assignment-alt': ['M8 4h8', 'M6 6h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z', 'M8 11h8', 'M8 15h5'],
+    questions: ['M12 18h.01', 'M9.1 9a3 3 0 1 1 5.8 1c0 2-3 2.5-3 4'],
+    peer: ['M8 7a2.5 2.5 0 1 0 0-.01', 'M16 7a2.5 2.5 0 1 0 0-.01', 'M4 19a4 4 0 0 1 8 0', 'M12 19a4 4 0 0 1 8 0'],
+    chat: ['M5 7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H11l-4 4v-4H7a2 2 0 0 1-2-2Z'],
+    ratings: ['M12 3l2.6 5.3 5.8.9-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.6 9.2l5.8-.9L12 3Z'],
+    group: ['M8 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z', 'M16 11a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z', 'M3 20a5 5 0 0 1 10 0', 'M13 20a4 4 0 0 1 8 0'],
+    archive: ['M4 7h16', 'M6 7V5h12v2', 'M6 7v11h12V7', 'M10 11h4'],
+    departments: ['M12 4v4', 'M6 10h12', 'M6 10v6', 'M12 10v6', 'M18 10v6'],
+    branches: ['M5 20V8l7-4 7 4v12', 'M9 20v-4h6v4', 'M9 11h.01', 'M15 11h.01'],
+    calendar: ['M7 3v3', 'M17 3v3', 'M4 8h16', 'M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z'],
+    shield: ['M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z'],
+    menu: ['M4 7h16', 'M4 12h16', 'M4 17h16'],
+    close: ['M6 6l12 12', 'M18 6 6 18'],
+    chevronDown: ['m6 9 6 6 6-6'],
+    logout: ['M10 17l5-5-5-5', 'M15 12H4', 'M20 4v16'],
+    briefcase: ['M7 7h10a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2Z', 'M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2'],
+    'check-circle': ['M22 11.08V12a10 10 0 1 1-5.93-9.14', 'M22 4 12 14.01l-3-3'],
+    edit: ['M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7', 'M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5Z'],
+    trash: ['M3 6h18', 'M8 6V4h8v2', 'M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6'],
+    plus: ['M12 5v14', 'M5 12h14'],
+    search: ['M21 21l-5.2-5.2', 'M15.5 10.5a5 5 0 1 1-10 0 5 5 0 0 1 10 0Z'],
+};
+
+export default function AppIcon({
+    name,
+    className = 'h-5 w-5',
+    strokeWidth = 1.8,
+}) {
+    const paths = iconPaths[name] ?? iconPaths.dashboard;
+
+    return (
+        <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={className}
+            aria-hidden="true"
+        >
+            {paths.map((path) => (
+                <path key={path} d={path} />
+            ))}
+        </svg>
+    );
+}
