@@ -65,12 +65,7 @@ return [
             'items' => [
                 ['label' => 'Questions', 'route' => 'admin.questions', 'icon' => 'questions'],
                 ['label' => 'Questionnaires', 'route' => 'admin.questionnaires', 'icon' => 'assignments'],
-                ['label' => 'Subject Assignments', 'route' => 'admin.subject-assignments', 'icon' => 'assignments'],
-                ['label' => 'Subject Questions', 'route' => 'admin.subject-questions', 'icon' => 'questions'],
-                ['label' => 'Peer Assignments', 'route' => 'admin.peer-assignments', 'icon' => 'peer'],
-                ['label' => 'Peer Questions', 'route' => 'admin.peer-questions', 'icon' => 'chat'],
-                ['label' => 'Employee Assignments', 'route' => 'admin.employee-assignments', 'icon' => 'assignment-alt'],
-                ['label' => 'Employee Questions', 'route' => 'admin.employee-questions', 'icon' => 'briefcase'],
+                ['label' => 'Questionnaire Distribution', 'route' => 'admin.questionnaire-distribution', 'icon' => 'assignments'],
             ],
         ],
         [
@@ -186,12 +181,16 @@ return [
             'icon' => 'briefcase',
             'source' => ['admin/user_management.php', 'Client/employee_dashboard.php'],
         ],
-        'admin.subject-assignments' => [
-            'title' => 'Subject Assignments',
-            'description' => 'Subject questionnaire assignment builder for courses, sections, and current evaluation cycle rules.',
+        'admin.questionnaire-distribution' => [
+            'title' => 'Questionnaire Distribution',
+            'description' => 'Tabbed distribution workspace for student-to-teacher, peer, head, and employee questionnaires.',
             'eyebrow' => 'Question Bank',
             'icon' => 'assignments',
-            'source' => ['admin/subject_question_assignment.php', 'admin/subject_assignment.php'],
+            'source' => [
+                'admin/subject_question_assignment.php',
+                'admin/peer_question_assignment.php',
+                'admin/employee_question_assignment.php',
+            ],
         ],
         'admin.questions' => [
             'title' => 'Questions',
@@ -207,13 +206,6 @@ return [
             'icon' => 'assignments',
             'source' => ['admin/questionnaire_management.php'],
         ],
-        'admin.subject-questions' => [
-            'title' => 'Subject Questions',
-            'description' => 'Question bank for subject evaluations with reusable question classes, types, and choices.',
-            'eyebrow' => 'Question Bank',
-            'icon' => 'questions',
-            'source' => ['admin/subject_questions.php', 'admin/question_management.php'],
-        ],
         'admin.peer-assignments' => [
             'title' => 'Peer Assignments',
             'description' => 'Peer evaluation assignment rules for faculty-to-faculty evaluation targets and question sets.',
@@ -221,12 +213,12 @@ return [
             'icon' => 'peer',
             'source' => ['admin/peer_question_assignment.php'],
         ],
-        'admin.peer-questions' => [
-            'title' => 'Peer Questions',
-            'description' => 'Peer evaluation question bank for department and branch-based peer review workflows.',
+        'admin.head-assignments' => [
+            'title' => 'Head Questionnaires',
+            'description' => 'Head evaluation questionnaire distribution for leadership and supervisory review coverage.',
             'eyebrow' => 'Question Bank',
-            'icon' => 'chat',
-            'source' => ['admin/peer_questions.php'],
+            'icon' => 'assignment-alt',
+            'source' => ['admin/employee_question_assignment.php'],
         ],
         'admin.employee-assignments' => [
             'title' => 'Employee Assignments',
@@ -234,13 +226,6 @@ return [
             'eyebrow' => 'Question Bank',
             'icon' => 'assignment-alt',
             'source' => ['admin/employee_question_assignment.php'],
-        ],
-        'admin.employee-questions' => [
-            'title' => 'Employee Questions',
-            'description' => 'Question bank for employee and chair evaluations with migration room for unified v3 schemas.',
-            'eyebrow' => 'Question Bank',
-            'icon' => 'briefcase',
-            'source' => ['admin/employee_questions.php'],
         ],
         'admin.subject-ratings' => [
             'title' => 'Subject Ratings',

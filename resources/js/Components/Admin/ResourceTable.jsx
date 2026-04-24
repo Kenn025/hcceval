@@ -6,8 +6,10 @@ export default function ResourceTable({
     columns,
     data,
     onEdit,
+    editLabel = 'Edit',
     onDelete,
-    searchPlaceholder = 'Search…',
+    showRowNumbers = true,
+    searchPlaceholder = 'Search...',
     filters = {},
     routeName,
     extraHeaderActions,
@@ -27,6 +29,10 @@ export default function ResourceTable({
             }, 400);
         },
         [routeName, filters],
+    );
+
+    const pageStart = data?.from ?? (
+        ((data?.current_page ?? 1) - 1) * (data?.per_page ?? data?.data?.length ?? 0) + 1
     );
 
     return (
@@ -54,6 +60,11 @@ export default function ResourceTable({
                 <table className="min-w-full divide-y divide-slate-100">
                     <thead>
                         <tr className="bg-slate-50">
+                            {showRowNumbers && (
+                                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                    #
+                                </th>
+                            )}
                             {columns.map((col) => (
                                 <th
                                     key={col.key}
@@ -73,7 +84,7 @@ export default function ResourceTable({
                         {data.data?.length === 0 && (
                             <tr>
                                 <td
-                                    colSpan={columns.length + 1}
+                                    colSpan={columns.length + (showRowNumbers ? 1 : 0) + ((onEdit || onDelete) ? 1 : 0)}
                                     className="px-4 py-10 text-center text-sm text-slate-500"
                                 >
                                     No records found.
@@ -82,9 +93,14 @@ export default function ResourceTable({
                         )}
                         {data.data?.map((row, i) => (
                             <tr key={row.id ?? i} className="hover:bg-slate-50/70">
+                                {showRowNumbers && (
+                                    <td className="px-4 py-3 text-sm font-medium text-slate-500">
+                                        {pageStart + i}
+                                    </td>
+                                )}
                                 {columns.map((col) => (
                                     <td key={col.key} className="px-4 py-3 text-sm text-slate-800">
-                                        {col.render ? col.render(row) : row[col.key] ?? '—'}
+                                        {col.render ? col.render(row) : row[col.key] ?? '-'}
                                     </td>
                                 ))}
                                 {(onEdit || onDelete) && (
@@ -96,7 +112,7 @@ export default function ResourceTable({
                                                     onClick={() => onEdit(row)}
                                                     className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
                                                 >
-                                                    Edit
+                                                    {editLabel}
                                                 </button>
                                             )}
                                             {onDelete && (

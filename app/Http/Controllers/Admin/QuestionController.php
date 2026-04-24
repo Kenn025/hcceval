@@ -68,21 +68,6 @@ class QuestionController extends Controller
         );
     }
 
-    public function subjectQuestions(Request $request)
-    {
-        return $this->renderQuestionPage($request, 'admin.subject-questions', 'Subject Questions', 'Question bank for subject evaluations.');
-    }
-
-    public function peerQuestions(Request $request)
-    {
-        return $this->renderQuestionPage($request, 'admin.peer-questions', 'Peer Questions', 'Question bank for peer evaluations.');
-    }
-
-    public function employeeQuestions(Request $request)
-    {
-        return $this->renderQuestionPage($request, 'admin.employee-questions', 'Employee Questions', 'Question bank for employee evaluations.');
-    }
-
     public function store(Request $request)
     {
         $validated = $request->validate([
