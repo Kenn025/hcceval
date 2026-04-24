@@ -41,33 +41,6 @@ class DatabaseSeeder extends Seeder
         DB::table('academic_year')->delete();
         DB::table('branch')->delete();
 
-        DB::statement('ALTER TABLE ratings_employee AUTO_INCREMENT = 1');
-        DB::statement('ALTER TABLE ratings_head AUTO_INCREMENT = 1');
-        DB::statement('ALTER TABLE ratings_peer AUTO_INCREMENT = 1');
-        DB::statement('ALTER TABLE ratings_subject AUTO_INCREMENT = 1');
-        DB::statement('ALTER TABLE ratings_branch AUTO_INCREMENT = 1');
-        DB::statement('ALTER TABLE answer_questionnaires AUTO_INCREMENT = 1');
-        DB::statement('ALTER TABLE questionnaire_distribution AUTO_INCREMENT = 1');
-        DB::statement('ALTER TABLE questionnaires AUTO_INCREMENT = 1');
-        DB::statement('ALTER TABLE questionnaire_type AUTO_INCREMENT = 1');
-        DB::statement('ALTER TABLE question AUTO_INCREMENT = 1');
-        DB::statement('ALTER TABLE question_choices AUTO_INCREMENT = 1');
-        DB::statement('ALTER TABLE question_type AUTO_INCREMENT = 1');
-        DB::statement('ALTER TABLE question_class AUTO_INCREMENT = 1');
-        DB::statement('ALTER TABLE overall_ratings AUTO_INCREMENT = 1');
-
-        DB::statement('ALTER TABLE student AUTO_INCREMENT = 1');
-        DB::statement('ALTER TABLE employee AUTO_INCREMENT = 1');
-        DB::statement('ALTER TABLE teacher AUTO_INCREMENT = 1');
-        DB::statement('ALTER TABLE admin AUTO_INCREMENT = 1');
-        DB::statement('ALTER TABLE education_level AUTO_INCREMENT = 1');
-        DB::statement('ALTER TABLE subject AUTO_INCREMENT = 1');
-        DB::statement('ALTER TABLE strand AUTO_INCREMENT = 1');
-        DB::statement('ALTER TABLE program AUTO_INCREMENT = 1');
-        DB::statement('ALTER TABLE department AUTO_INCREMENT = 1');
-        DB::statement('ALTER TABLE academic_year AUTO_INCREMENT = 1');
-        DB::statement('ALTER TABLE branch AUTO_INCREMENT = 1');
-
         DB::statement('SET FOREIGN_KEY_CHECKS=1');
 
         DB::table('branch')->insert([
@@ -127,10 +100,10 @@ class DatabaseSeeder extends Seeder
         ]);
 
         DB::table('education_level')->insert([
-            ['id' => 1, 'code' => 'BSIT1-A-SR', 'department_id' => 1, 'program_id' => 1, 'year_level' => '1', 'section' => 'A', 'teacher_id' => json_encode([]), 'subject_id' => json_encode([]), 'is_activated' => 1, 'is_deleted' => 0],
-            ['id' => 2, 'code' => 'BSBA1-A-SR', 'department_id' => 1, 'program_id' => 2, 'year_level' => '1', 'section' => 'A', 'teacher_id' => json_encode([]), 'subject_id' => json_encode([]), 'is_activated' => 1, 'is_deleted' => 0],
-            ['id' => 3, 'code' => 'BSIT1-A-CH', 'department_id' => 3, 'program_id' => 3, 'year_level' => '1', 'section' => 'A', 'teacher_id' => json_encode([]), 'subject_id' => json_encode([]), 'is_activated' => 1, 'is_deleted' => 0],
-            ['id' => 4, 'code' => 'BSBA1-A-CH', 'department_id' => 3, 'program_id' => 4, 'year_level' => '1', 'section' => 'A', 'teacher_id' => json_encode([]), 'subject_id' => json_encode([]), 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 1, 'code' => 'BSIT1-A-SR', 'department_id' => 1, 'program_id' => 1, 'year_level' => '1', 'section' => 'A', 'teacher_id' => json_encode([1]), 'subject_id' => json_encode([1]), 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 2, 'code' => 'BSBA1-A-SR', 'department_id' => 1, 'program_id' => 2, 'year_level' => '1', 'section' => 'A', 'teacher_id' => json_encode([2]), 'subject_id' => json_encode([2]), 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 3, 'code' => 'BSIT1-A-CH', 'department_id' => 3, 'program_id' => 3, 'year_level' => '1', 'section' => 'A', 'teacher_id' => json_encode([5]), 'subject_id' => json_encode([5]), 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 4, 'code' => 'BSBA1-A-CH', 'department_id' => 3, 'program_id' => 4, 'year_level' => '1', 'section' => 'A', 'teacher_id' => json_encode([6]), 'subject_id' => json_encode([6]), 'is_activated' => 1, 'is_deleted' => 0],
         ]);
 
         DB::table('admin')->insert([
@@ -171,11 +144,6 @@ class DatabaseSeeder extends Seeder
             ['id' => 8, 'code' => 'SUB-ABM-CH-01', 'name' => 'Fundamentals of ABM', 'type' => 'shs', 'department_id' => 4, 'program_id' => null, 'strand_id' => 4, 'teacher_id' => json_encode([8]), 'is_gened' => 0, 'is_activated' => 1, 'is_deleted' => 0],
         ]);
 
-        DB::table('education_level')->where('id', 1)->update(['teacher_id' => json_encode([1]), 'subject_id' => json_encode([1])]);
-        DB::table('education_level')->where('id', 2)->update(['teacher_id' => json_encode([2]), 'subject_id' => json_encode([2])]);
-        DB::table('education_level')->where('id', 3)->update(['teacher_id' => json_encode([5]), 'subject_id' => json_encode([5])]);
-        DB::table('education_level')->where('id', 4)->update(['teacher_id' => json_encode([6]), 'subject_id' => json_encode([6])]);
-
         DB::table('student')->insert([
             ['id' => 1, 'code' => 'STU-HCCSR-01', 'firstname' => 'Pedro', 'middlename' => 'A', 'lastname' => 'Penduko', 'personal_info' => json_encode(['year' => '1', 'guardian' => 'Juan Penduko']), 'email' => 's1_sr@mail.com', 'password' => md5('password'), 'branch_id' => 2, 'department_id' => 1, 'program_id' => 1, 'strand_id' => null, 'education_level_id' => 1, 'subject_id' => json_encode([1]), 'is_activated' => 1, 'is_deleted' => 0],
             ['id' => 2, 'code' => 'STU-HCCSR-02', 'firstname' => 'Juan', 'middlename' => 'B', 'lastname' => 'Dela Cruz', 'personal_info' => json_encode(['year' => '1', 'guardian' => 'Maria Dela Cruz']), 'email' => 's2_sr@mail.com', 'password' => md5('password'), 'branch_id' => 2, 'department_id' => 1, 'program_id' => 1, 'strand_id' => null, 'education_level_id' => 1, 'subject_id' => json_encode([1]), 'is_activated' => 1, 'is_deleted' => 0],
@@ -190,8 +158,11 @@ class DatabaseSeeder extends Seeder
         ]);
 
         DB::table('question_class')->insert([
-            ['id' => 1, 'branch_id' => 1, 'code' => 'QC-01', 'name' => 'Teacher Evaluation', 'is_activated' => 1, 'is_deleted' => 0],
-            ['id' => 2, 'branch_id' => 1, 'code' => 'QC-02', 'name' => 'Employee Evaluation', 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 1, 'branch_id' => 1, 'code' => 'QC-01', 'name' => 'Professionalism', 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 2, 'branch_id' => 1, 'code' => 'QC-02', 'name' => 'Room Management', 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 3, 'branch_id' => 1, 'code' => 'QC-03', 'name' => 'Attitude', 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 4, 'branch_id' => 1, 'code' => 'QC-04', 'name' => 'Communication', 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 5, 'branch_id' => 1, 'code' => 'QC-05', 'name' => 'Instructional Delivery', 'is_activated' => 1, 'is_deleted' => 0],
         ]);
 
         DB::table('question_type')->insert([
@@ -200,21 +171,54 @@ class DatabaseSeeder extends Seeder
         ]);
 
         DB::table('question_choices')->insert([
-            ['id' => 1, 'branch_id' => 1, 'code' => 'QCH-05', 'quantity' => 5, 'verbal_interpretation' => json_encode(['1' => 'Poor', '2' => 'Fair', '3' => 'Good', '4' => 'Very Good', '5' => 'Excellent']), 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 1, 'branch_id' => 1, 'code' => 'QCH-05', 'name' => '5-Point Likert Scale', 'quantity' => 5, 'verbal_interpretation' => json_encode(['1' => 'Poor', '2' => 'Fair', '3' => 'Good', '4' => 'Very Good', '5' => 'Excellent']), 'is_activated' => 1, 'is_deleted' => 0],
         ]);
 
         DB::table('question')->insert([
-            ['id' => 1, 'branch_id' => 1, 'code' => 'Q-001', 'description' => 'The instructor discusses the lessons clearly.', 'question_type_id' => 1, 'is_required' => 1, 'is_activated' => 1, 'is_deleted' => 0],
-            ['id' => 2, 'branch_id' => 1, 'code' => 'Q-002', 'description' => 'The instructor comes to class prepared.', 'question_type_id' => 1, 'is_required' => 1, 'is_activated' => 1, 'is_deleted' => 0],
-            ['id' => 3, 'branch_id' => 1, 'code' => 'Q-003', 'description' => 'Additional comments or suggestions.', 'question_type_id' => 2, 'is_required' => 0, 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 1, 'branch_id' => 1, 'code' => 'Q-001', 'description' => 'The instructor comes to class prepared.', 'question_class_id' => 1, 'question_type_id' => 1, 'is_required' => 1, 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 2, 'branch_id' => 1, 'code' => 'Q-002', 'description' => 'The instructor discusses the lessons clearly.', 'question_class_id' => 5, 'question_type_id' => 1, 'is_required' => 1, 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 3, 'branch_id' => 1, 'code' => 'Q-003', 'description' => 'Additional comments or suggestions.', 'question_class_id' => 3, 'question_type_id' => 2, 'is_required' => 0, 'is_activated' => 1, 'is_deleted' => 0],
         ]);
 
         DB::table('questionnaire_type')->insert([
-            ['id' => 1, 'branch_id' => 1, 'code' => 'QTYPE-TEACHER', 'name' => 'Teacher Evaluation Form', 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 1, 'branch_id' => 1, 'code' => 'QTYPE-SUBJECT', 'name' => 'Subject Teacher Evaluation Form', 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 2, 'branch_id' => 1, 'code' => 'QTYPE-PEER', 'name' => 'Peer to Peer Evaluation Form', 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 3, 'branch_id' => 1, 'code' => 'QTYPE-HEAD', 'name' => 'School Heads Evaluation Form', 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 4, 'branch_id' => 1, 'code' => 'QTYPE-EMPLOYEE', 'name' => 'Employee Feedback Evaluation Form', 'is_activated' => 1, 'is_deleted' => 0],
         ]);
 
         DB::table('questionnaires')->insert([
-            ['id' => 1, 'branch_id' => 2, 'code' => 'QUES-001', 'questionnaire_type_id' => 1, 'question_choices_id' => 1, 'items' => json_encode([1, 2]), 'comments' => json_encode([3]), 'is_activated' => 1, 'is_deleted' => 0],
+            [
+                'id' => 1,
+                'branch_id' => 2,
+                'code' => 'QUES-001',
+                'title' => 'Teacher Evaluation Form',
+                'questionnaire_type_id' => 1,
+                'question_choices_id' => 1,
+                'items' => json_encode([
+                    'scale_questions' => [
+                        [
+                            'class_name' => 'Professionalism',
+                            'weight_percentage' => 40,
+                            'questions' => [1],
+                        ],
+                        [
+                            'class_name' => 'Instructional Delivery',
+                            'weight_percentage' => 60,
+                            'questions' => [2],
+                        ],
+                    ],
+                    'comment_section' => [
+                        'questions' => [
+                            ['question_id' => 3],
+                        ],
+                    ],
+                ]),
+                'comments' => json_encode([3]),
+                'notes' => 'Default teacher evaluation questionnaire for the current evaluation cycle.',
+                'is_activated' => 1,
+                'is_deleted' => 0,
+            ],
         ]);
 
         DB::table('questionnaire_distribution')->insert([

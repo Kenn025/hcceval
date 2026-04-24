@@ -93,9 +93,6 @@ Route::middleware('auth')->group(function () {
 
     // Questions
     Route::get('/admin/questions', [QuestionController::class, 'index'])->name('admin.questions');
-    Route::get('/admin/subject-questions', [QuestionController::class, 'subjectQuestions'])->name('admin.subject-questions');
-    Route::get('/admin/peer-questions', [QuestionController::class, 'peerQuestions'])->name('admin.peer-questions');
-    Route::get('/admin/employee-questions', [QuestionController::class, 'employeeQuestions'])->name('admin.employee-questions');
     Route::post('/admin/questions', [QuestionController::class, 'store']);
     Route::put('/admin/questions/{id}', [QuestionController::class, 'update']);
     Route::delete('/admin/questions/{id}', [QuestionController::class, 'destroy']);
@@ -107,8 +104,10 @@ Route::middleware('auth')->group(function () {
     Route::delete('/admin/questionnaires/{id}', [QuestionnaireController::class, 'destroy']);
 
     // Assignments
+    Route::get('/admin/questionnaire-distribution', [AssignmentController::class, 'index'])->name('admin.questionnaire-distribution');
     Route::get('/admin/subject-assignments', [AssignmentController::class, 'subjectAssignments'])->name('admin.subject-assignments');
     Route::get('/admin/peer-assignments', [AssignmentController::class, 'peerAssignments'])->name('admin.peer-assignments');
+    Route::get('/admin/head-assignments', [AssignmentController::class, 'headAssignments'])->name('admin.head-assignments');
     Route::get('/admin/employee-assignments', [AssignmentController::class, 'employeeAssignments'])->name('admin.employee-assignments');
     Route::post('/admin/assignments', [AssignmentController::class, 'store']);
     Route::delete('/admin/assignments/{id}', [AssignmentController::class, 'destroy']);

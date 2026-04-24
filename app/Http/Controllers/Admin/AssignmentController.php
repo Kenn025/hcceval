@@ -9,79 +9,91 @@ use Inertia\Inertia;
 
 class AssignmentController extends Controller
 {
-    private function baseQuery(string $search = '')
+    private const TYPE_CODE_MAP = [
+        'student-teacher' => 'QTYPE-SUBJECT',
+        'peer' => 'QTYPE-PEER',
+        'head' => 'QTYPE-HEAD',
+        'employee' => 'QTYPE-EMPLOYEE',
+    ];
+
+    private function baseQuery(?string $search = '')
     {
+        $search = $search ?? '';
+
         return DB::table('questionnaire_distribution as qd')
             ->leftJoin('questionnaires as q', 'qd.questionnaire_id', '=', 'q.id')
+            ->leftJoin('questionnaire_type as qt', 'q.questionnaire_type_id', '=', 'qt.id')
             ->leftJoin('academic_year as ay', 'qd.academic_year_id', '=', 'ay.id')
             ->select(
                 'qd.id as distribution_id',
-                'q.code as questionnaire_title',
+                'qd.code as distribution_code',
+                'q.title as questionnaire_title',
+                'qt.name as questionnaire_type_name',
                 DB::raw("CONCAT(ay.from_year, '-', ay.to_year) as school_year"),
                 'ay.term as semester',
                 'qd.items',
                 'qd.is_activated'
             )
-            ->when($search, fn ($query) => $query->where('q.code', 'like', "%{$search}%"))
+            ->when($search, fn ($query) => $query->where(function ($sub) use ($search) {
+                $sub->where('qd.code', 'like', "%{$search}%")
+                    ->orWhere('q.code', 'like', "%{$search}%")
+                    ->orWhere('q.title', 'like', "%{$search}%")
+                    ->orWhere('qt.name', 'like', "%{$search}%");
+            }))
             ->where('qd.is_deleted', 0);
     }
 
-    public function subjectAssignments(Request $request)
+    private function renderAssignmentsPage(Request $request, string $assignmentType)
     {
-        $search = $request->input('search', '');
+        $search = (string) ($request->input('search') ?? '');
+        $typeCode = self::TYPE_CODE_MAP[$assignmentType] ?? self::TYPE_CODE_MAP['student-teacher'];
 
         $assignments = $this->baseQuery($search)
+            ->where('qt.code', $typeCode)
             ->orderByDesc('qd.id')
             ->paginate(15)
             ->withQueryString();
 
-        $questionnaires = DB::table('questionnaires')->select('id as questionnaire_id', 'code as title')->where('is_deleted', 0)->get();
+        $questionnaires = DB::table('questionnaires as q')
+            ->leftJoin('questionnaire_type as qt', 'q.questionnaire_type_id', '=', 'qt.id')
+            ->select('q.id as questionnaire_id', 'q.title')
+            ->where('q.is_deleted', 0)
+            ->where('qt.code', $typeCode)
+            ->orderBy('q.title')
+            ->get();
 
         return Inertia::render('Admin/Assignments', [
             'assignments'    => $assignments,
-            'assignmentType' => 'subject',
+            'assignmentType' => $assignmentType,
             'filters'        => ['search' => $search],
             'questionnaires' => $questionnaires,
             'subjects'       => [],
         ]);
     }
 
+    public function index(Request $request)
+    {
+        return $this->renderAssignmentsPage($request, 'student-teacher');
+    }
+
+    public function subjectAssignments(Request $request)
+    {
+        return $this->renderAssignmentsPage($request, 'student-teacher');
+    }
+
     public function peerAssignments(Request $request)
     {
-        $search = $request->input('search', '');
+        return $this->renderAssignmentsPage($request, 'peer');
+    }
 
-        $assignments = $this->baseQuery($search)
-            ->orderByDesc('qd.id')
-            ->paginate(15)
-            ->withQueryString();
-
-        $questionnaires = DB::table('questionnaires')->select('id as questionnaire_id', 'code as title')->where('is_deleted', 0)->get();
-
-        return Inertia::render('Admin/Assignments', [
-            'assignments'    => $assignments,
-            'assignmentType' => 'peer',
-            'filters'        => ['search' => $search],
-            'questionnaires' => $questionnaires,
-        ]);
+    public function headAssignments(Request $request)
+    {
+        return $this->renderAssignmentsPage($request, 'head');
     }
 
     public function employeeAssignments(Request $request)
     {
-        $search = $request->input('search', '');
-
-        $assignments = $this->baseQuery($search)
-            ->orderByDesc('qd.id')
-            ->paginate(15)
-            ->withQueryString();
-
-        $questionnaires = DB::table('questionnaires')->select('id as questionnaire_id', 'code as title')->where('is_deleted', 0)->get();
-
-        return Inertia::render('Admin/Assignments', [
-            'assignments'    => $assignments,
-            'assignmentType' => 'employee',
-            'filters'        => ['search' => $search],
-            'questionnaires' => $questionnaires,
-        ]);
+        return $this->renderAssignmentsPage($request, 'employee');
     }
 
     public function store(Request $request)

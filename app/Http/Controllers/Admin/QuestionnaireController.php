@@ -19,40 +19,85 @@ class QuestionnaireController extends Controller
             ->select(
                 'q.id as questionnaire_id',
                 'q.code as questionnaire_code',
+                'q.title as questionnaire_title',
                 'q.questionnaire_type_id',
                 'q.question_choices_id',
                 'qt.name as questionnaire_type_name',
                 'qc.code as question_choices_code',
+                'qc.name as question_choices_name',
                 'qc.quantity as question_choices_quantity',
                 'q.items',
                 'q.comments',
+                'q.notes',
                 'q.is_activated as is_active',
                 'q.is_deleted'
             )
             ->where('q.is_deleted', 0)
             ->when($search, fn ($query) => $query->where(function ($sub) use ($search) {
                 $sub->where('q.code', 'like', "%{$search}%")
+                    ->orWhere('q.title', 'like', "%{$search}%")
                     ->orWhere('qt.name', 'like', "%{$search}%")
                     ->orWhere('qc.code', 'like', "%{$search}%");
             }))
             ->orderBy('q.code')
             ->paginate(15)
             ->through(function ($row) {
-                $items = json_decode($row->items ?? '[]', true) ?: [];
-                $comments = json_decode($row->comments ?? '[]', true) ?: [];
+                $payload = json_decode($row->items ?? '{}', true) ?: [];
+                $legacyComments = json_decode($row->comments ?? '[]', true) ?: [];
+
+                $scaleQuestions = is_array($payload['scale_questions'] ?? null) ? $payload['scale_questions'] : [];
+                $commentSection = is_array($payload['comment_section']['questions'] ?? null)
+                    ? $payload['comment_section']['questions']
+                    : [];
+
+                $classGroups = collect($scaleQuestions)
+                    ->map(function ($group) {
+                        return [
+                            'question_class_name' => $group['class_name'] ?? '',
+                            'weight' => (int) ($group['weight_percentage'] ?? 0),
+                            'questions' => array_values($group['questions'] ?? []),
+                        ];
+                    })
+                    ->values()
+                    ->all();
+
+                $commentQuestions = collect($commentSection)
+                    ->map(fn ($question) => (int) ($question['question_id'] ?? 0))
+                    ->filter()
+                    ->values()
+                    ->all();
+
+                if (empty($classGroups) && is_array($payload)) {
+                    $flatItems = array_values(array_filter($payload, fn ($item) => is_int($item) || ctype_digit((string) $item)));
+                    if ($flatItems !== []) {
+                        $classGroups = [[
+                            'question_class_name' => '',
+                            'weight' => 100,
+                            'questions' => $flatItems,
+                        ]];
+                    }
+                }
+
+                if ($commentQuestions === [] && $legacyComments !== []) {
+                    $commentQuestions = array_values($legacyComments);
+                }
 
                 return [
                     'questionnaire_id' => $row->questionnaire_id,
                     'questionnaire_code' => $row->questionnaire_code,
+                    'questionnaire_title' => $row->questionnaire_title,
                     'questionnaire_type_id' => $row->questionnaire_type_id,
                     'question_choices_id' => $row->question_choices_id,
                     'questionnaire_type_name' => $row->questionnaire_type_name,
                     'question_choices_code' => $row->question_choices_code,
+                    'question_choices_name' => $row->question_choices_name,
                     'question_choices_quantity' => $row->question_choices_quantity,
-                    'items' => $items,
-                    'comments' => $comments,
-                    'item_count' => count($items),
-                    'comment_count' => count($comments),
+                    'class_groups' => $classGroups,
+                    'items' => collect($classGroups)->flatMap(fn ($group) => $group['questions'])->values()->all(),
+                    'comments' => $commentQuestions,
+                    'item_count' => collect($classGroups)->sum(fn ($group) => count($group['questions'])),
+                    'comment_count' => count($commentQuestions),
+                    'notes' => $row->notes,
                     'is_active' => (bool) $row->is_active,
                 ];
             })
@@ -66,20 +111,30 @@ class QuestionnaireController extends Controller
             ->get();
 
         $questionChoices = DB::table('question_choices')
-            ->select('id', 'code', 'quantity')
+            ->select('id', 'code', 'name', 'quantity')
             ->where('is_deleted', 0)
             ->where('is_activated', 1)
             ->orderBy('code')
             ->get();
 
+        $questionClasses = DB::table('question_class')
+            ->select('id', 'code', 'name')
+            ->where('is_deleted', 0)
+            ->where('is_activated', 1)
+            ->orderBy('name')
+            ->get();
+
         $questions = DB::table('question')
             ->leftJoin('question_type as qt', 'qt.id', '=', 'question.question_type_id')
+            ->leftJoin('question_class as qc', 'qc.id', '=', 'question.question_class_id')
             ->select(
                 'question.id',
                 'question.code',
                 'question.description',
+                'question.question_class_id',
                 'question.question_type_id',
-                'qt.name as question_type_name'
+                'qt.name as question_type_name',
+                'qc.name as question_class_name'
             )
             ->where('question.is_deleted', 0)
             ->where('question.is_activated', 1)
@@ -90,6 +145,7 @@ class QuestionnaireController extends Controller
             'questionnaires' => $questionnaires,
             'questionnaireTypes' => $questionnaireTypes,
             'questionChoices' => $questionChoices,
+            'questionClasses' => $questionClasses,
             'questions' => $questions,
             'filters' => ['search' => $search],
         ]);
@@ -98,22 +154,49 @@ class QuestionnaireController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'questionnaire_code' => 'required|string|max:50|unique:questionnaires,code',
+            'questionnaire_title' => 'required|string|max:150',
             'questionnaire_type_id' => 'required|exists:questionnaire_type,id',
             'question_choices_id' => 'required|exists:question_choices,id',
-            'items' => 'array',
-            'items.*' => 'integer|exists:question,id',
+            'class_groups' => 'array',
+            'class_groups.*.question_class_name' => 'nullable|string|max:150',
+            'class_groups.*.weight' => 'nullable|integer|min:5|max:100',
+            'class_groups.*.questions' => 'array',
+            'class_groups.*.questions.*' => 'integer|exists:question,id',
             'comments' => 'array',
             'comments.*' => 'integer|exists:question,id',
+            'notes' => 'nullable|string',
             'is_active' => 'boolean',
         ]);
 
+        $count = DB::table('questionnaires')->count() + 1;
+        $classGroups = collect($validated['class_groups'] ?? [])
+            ->filter(fn ($group) => ! empty($group['question_class_name']) || ! empty($group['weight']) || ! empty($group['questions']))
+            ->map(fn ($group) => [
+                'class_name' => $group['question_class_name'] ?? '',
+                'weight_percentage' => (int) ($group['weight'] ?? 0),
+                'questions' => array_values($group['questions'] ?? []),
+            ])
+            ->values()
+            ->all();
+
+        $itemsPayload = [
+            'scale_questions' => $classGroups,
+            'comment_section' => [
+                'questions' => collect($validated['comments'] ?? [])
+                    ->map(fn ($questionId) => ['question_id' => (int) $questionId])
+                    ->values()
+                    ->all(),
+            ],
+        ];
+
         DB::table('questionnaires')->insert([
-            'code' => $validated['questionnaire_code'],
+            'code' => 'QUES-' . str_pad((string) $count, 3, '0', STR_PAD_LEFT),
+            'title' => $validated['questionnaire_title'],
             'questionnaire_type_id' => $validated['questionnaire_type_id'],
             'question_choices_id' => $validated['question_choices_id'],
-            'items' => json_encode(array_values($validated['items'] ?? [])),
+            'items' => json_encode($itemsPayload),
             'comments' => json_encode(array_values($validated['comments'] ?? [])),
+            'notes' => $validated['notes'] ?? null,
             'is_activated' => ! empty($validated['is_active']) ? 1 : 0,
             'is_deleted' => 0,
             'created_at' => now(),
@@ -126,22 +209,47 @@ class QuestionnaireController extends Controller
     public function update(Request $request, int $id)
     {
         $validated = $request->validate([
-            'questionnaire_code' => "required|string|max:50|unique:questionnaires,code,{$id}",
+            'questionnaire_title' => 'required|string|max:150',
             'questionnaire_type_id' => 'required|exists:questionnaire_type,id',
             'question_choices_id' => 'required|exists:question_choices,id',
-            'items' => 'array',
-            'items.*' => 'integer|exists:question,id',
+            'class_groups' => 'array',
+            'class_groups.*.question_class_name' => 'nullable|string|max:150',
+            'class_groups.*.weight' => 'nullable|integer|min:5|max:100',
+            'class_groups.*.questions' => 'array',
+            'class_groups.*.questions.*' => 'integer|exists:question,id',
             'comments' => 'array',
             'comments.*' => 'integer|exists:question,id',
+            'notes' => 'nullable|string',
             'is_active' => 'boolean',
         ]);
 
+        $classGroups = collect($validated['class_groups'] ?? [])
+            ->filter(fn ($group) => ! empty($group['question_class_name']) || ! empty($group['weight']) || ! empty($group['questions']))
+            ->map(fn ($group) => [
+                'class_name' => $group['question_class_name'] ?? '',
+                'weight_percentage' => (int) ($group['weight'] ?? 0),
+                'questions' => array_values($group['questions'] ?? []),
+            ])
+            ->values()
+            ->all();
+
+        $itemsPayload = [
+            'scale_questions' => $classGroups,
+            'comment_section' => [
+                'questions' => collect($validated['comments'] ?? [])
+                    ->map(fn ($questionId) => ['question_id' => (int) $questionId])
+                    ->values()
+                    ->all(),
+            ],
+        ];
+
         DB::table('questionnaires')->where('id', $id)->update([
-            'code' => $validated['questionnaire_code'],
+            'title' => $validated['questionnaire_title'],
             'questionnaire_type_id' => $validated['questionnaire_type_id'],
             'question_choices_id' => $validated['question_choices_id'],
-            'items' => json_encode(array_values($validated['items'] ?? [])),
+            'items' => json_encode($itemsPayload),
             'comments' => json_encode(array_values($validated['comments'] ?? [])),
+            'notes' => $validated['notes'] ?? null,
             'is_activated' => ! empty($validated['is_active']) ? 1 : 0,
             'updated_at' => now(),
         ]);

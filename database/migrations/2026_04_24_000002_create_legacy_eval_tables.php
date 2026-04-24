@@ -243,6 +243,7 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('branch_id')->nullable();
             $table->string('code', 50)->unique();
+            $table->string('name', 150);
             $table->integer('quantity');
             $table->json('verbal_interpretation')->nullable();
             $table->boolean('is_activated')->default(true);
@@ -257,14 +258,17 @@ return new class extends Migration
             $table->unsignedBigInteger('branch_id')->nullable();
             $table->string('code', 50)->unique();
             $table->text('description');
+            $table->unsignedBigInteger('question_class_id')->nullable();
             $table->unsignedBigInteger('question_type_id')->nullable();
             $table->boolean('is_required')->default(true);
             $table->boolean('is_activated')->default(true);
             $table->boolean('is_deleted')->default(false);
             $table->timestamps();
             $table->index('branch_id');
+            $table->index('question_class_id');
             $table->index('question_type_id');
             $table->foreign('branch_id')->references('id')->on('branch')->nullOnDelete()->cascadeOnUpdate();
+            $table->foreign('question_class_id')->references('id')->on('question_class')->nullOnDelete()->cascadeOnUpdate();
             $table->foreign('question_type_id')->references('id')->on('question_type')->nullOnDelete()->cascadeOnUpdate();
         });
 
@@ -284,10 +288,12 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('branch_id')->nullable();
             $table->string('code', 50)->unique();
+            $table->string('title', 150);
             $table->unsignedBigInteger('questionnaire_type_id')->nullable();
             $table->unsignedBigInteger('question_choices_id')->nullable();
             $table->json('items')->nullable();
             $table->json('comments')->nullable();
+            $table->text('notes')->nullable();
             $table->boolean('is_activated')->default(true);
             $table->boolean('is_deleted')->default(false);
             $table->timestamps();

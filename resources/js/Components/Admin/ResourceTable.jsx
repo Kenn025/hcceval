@@ -6,8 +6,9 @@ export default function ResourceTable({
     columns,
     data,
     onEdit,
+    editLabel = 'Edit',
     onDelete,
-    searchPlaceholder = 'Search…',
+    searchPlaceholder = 'Search...',
     filters = {},
     routeName,
     extraHeaderActions,
@@ -84,7 +85,7 @@ export default function ResourceTable({
                             <tr key={row.id ?? i} className="hover:bg-slate-50/70">
                                 {columns.map((col) => (
                                     <td key={col.key} className="px-4 py-3 text-sm text-slate-800">
-                                        {col.render ? col.render(row) : row[col.key] ?? '—'}
+                                        {col.render ? col.render(row) : row[col.key] ?? '-'}
                                     </td>
                                 ))}
                                 {(onEdit || onDelete) && (
@@ -96,7 +97,7 @@ export default function ResourceTable({
                                                     onClick={() => onEdit(row)}
                                                     className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
                                                 >
-                                                    Edit
+                                                    {editLabel}
                                                 </button>
                                             )}
                                             {onDelete && (
