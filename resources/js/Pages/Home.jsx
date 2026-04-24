@@ -1,62 +1,103 @@
 import React from 'react';
 import { Head, Link } from '@inertiajs/react';
+import AppIcon from '@/Components/AppIcon';
 
 export default function Home() {
     return (
         <>
-            <Head title="Holy Cross College — Academic Evaluation" />
-            <div style={{fontFamily: 'DM Sans, sans-serif', background: 'var(--white)', color: 'var(--text-dark)', overflowX: 'hidden'}}>
-                {/* HERO SECTION */}
-                <div className="hero" style={{minHeight: '100vh', background: 'linear-gradient(160deg, #0a1f3c 0%, #0d2d5e 40%, #1a4a8a 75%, #1e6ab0 100%)', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: '2rem'}}>
-                    {/* Decorative elements */}
-                    <div className="ring" style={{position: 'absolute', borderRadius: '50%', border: '1px solid rgba(168, 200, 240, 0.08)', width: 400, height: 400, left: -100, bottom: -100}}></div>
-                    <div className="ring" style={{position: 'absolute', borderRadius: '50%', border: '1px solid rgba(168, 200, 240, 0.08)', width: 600, height: 600, left: -200, bottom: -200}}></div>
-                    <div className="ring" style={{position: 'absolute', borderRadius: '50%', border: '1px solid rgba(168, 200, 240, 0.08)', width: 800, height: 800, left: -300, bottom: -300}}></div>
-                    <div className="hero-cross" style={{position: 'absolute', right: '8%', top: '50%', transform: 'translateY(-50%)', width: 380, height: 380, opacity: 0.04}}>
-                        <div style={{position: 'absolute', background: '#fff', borderRadius: 4, width: 60, height: '100%', left: '50%', transform: 'translateX(-50%)'}}></div>
-                        <div style={{position: 'absolute', background: '#fff', borderRadius: 4, height: 60, width: '100%', top: '30%', transform: 'translateY(-50%)'}}></div>
+            <Head title="Holy Cross College — Evaluation System" />
+            <div className="min-h-screen bg-[#f0f4f9] text-slate-900 selection:bg-blue-100 selection:text-blue-900 overflow-x-hidden">
+                {/* FLOATING NAVBAR */}
+                <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-6xl">
+                    <nav className="bg-white/70 backdrop-blur-xl border border-white/40 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.1)] rounded-[2rem] px-6 py-3 flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-white font-bold text-lg shadow-lg shadow-blue-200">
+                                H
+                            </div>
+                            <div className="hidden sm:block">
+                                <p className="text-sm font-black tracking-tight text-slate-800 uppercase">HCC-EVAL</p>
+                                <p className="text-[10px] text-slate-400 font-medium">Evaluation System</p>
+                            </div>
+                        </div>
+
+                        <div className="hidden lg:flex items-center gap-1 bg-slate-100/50 p-1 rounded-full">
+                            {['Home', 'Features', 'Roles', 'How It Works', 'FAQ'].map((item) => (
+                                <button key={item} className="px-5 py-2 text-xs font-bold text-slate-600 hover:text-blue-600 transition-colors rounded-full hover:bg-white hover:shadow-sm">
+                                    {item}
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                            <Link href={route('login')} className="hidden sm:block px-6 py-2.5 text-xs font-bold text-slate-600 hover:text-blue-600 transition-all rounded-full hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-100">
+                                Sign In
+                            </Link>
+                            <Link href={route('login')} className="bg-blue-600 text-white px-8 py-3 rounded-full text-xs font-black shadow-lg shadow-blue-200 hover:bg-blue-700 hover:-translate-y-0.5 transition-all active:scale-95 uppercase tracking-wider">
+                                Get Started
+                            </Link>
+                        </div>
+                    </nav>
+                </div>
+
+                {/* HERO / PROCESS SECTION */}
+                <main className="pt-48 pb-20 px-6 max-w-7xl mx-auto flex flex-col items-center text-center">
+                    <div className="inline-flex items-center px-6 py-2 rounded-full bg-white border border-slate-100 shadow-sm text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-8">
+                        The Process
                     </div>
-                    <div className="hero-content" style={{position: 'relative', zIndex: 2, textAlign: 'center', maxWidth: 780}}>
-                        <div className="badge" style={{display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(168,200,240,0.3)', borderRadius: 40, padding: '7px 20px', fontSize: '0.72rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: '#a8c8f0', marginBottom: '2rem', backdropFilter: 'blur(8px)'}}>
-                            <span className="badge-dot" style={{width: 6, height: 6, borderRadius: '50%', background: '#c8a96e', display: 'inline-block', marginRight: 8}}></span>
-                            Academic Year 2024 – 2025
-                        </div>
-                        <h1 style={{fontFamily: 'Cormorant Garamond, serif', fontSize: 'clamp(2.8rem, 6vw, 5rem)', fontWeight: 300, lineHeight: 1.1, color: '#fff', marginBottom: '0.4rem', letterSpacing: '-0.01em'}}>
-                            Holy Cross <span style={{fontStyle: 'italic', color: '#a8c8f0'}}>College</span>
-                        </h1>
-                        <div className="hero-sub" style={{fontFamily: 'Cormorant Garamond, serif', fontSize: 'clamp(1rem, 2vw, 1.4rem)', fontWeight: 300, color: 'rgba(168,200,240,0.7)', letterSpacing: '0.06em', marginBottom: '2.5rem'}}>
-                            Institutional Evaluation Program
-                        </div>
-                        <div className="divider-gold" style={{width: 60, height: 1, background: 'linear-gradient(90deg, transparent, #c8a96e, transparent)', margin: '0 auto 2.5rem'}}></div>
-                        <p className="hero-desc" style={{fontSize: '1rem', fontWeight: 300, color: 'rgba(200,220,245,0.8)', lineHeight: 1.8, maxWidth: 560, margin: '0 auto 3rem'}}>
-                            Your thoughtful assessment helps us shape a more excellent, faith-centered, and student-focused learning environment. Every response is valued and confidential.
-                        </p>
-                        <div className="hero-cta" style={{display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap'}}>
-                            <Link href={route('login')} className="btn-primary" style={{background: 'linear-gradient(135deg, #4a90d9, #1a4a8a)', color: '#fff', border: 'none', padding: '14px 36px', borderRadius: 4, fontFamily: 'DM Sans, sans-serif', fontSize: '0.88rem', fontWeight: 500, letterSpacing: '0.06em', cursor: 'pointer', transition: 'all 0.3s ease', boxShadow: '0 8px 30px rgba(26, 74, 138, 0.5)', display: 'flex', alignItems: 'center', gap: 8}}>Login</Link>
-                        </div>
+                    
+                    <h1 className="text-5xl md:text-6xl font-black text-slate-800 tracking-tight mb-6">
+                        How It <span className="text-blue-600">Works</span>
+                    </h1>
+                    
+                    <p className="text-lg text-slate-500 font-medium max-w-2xl mb-20 leading-relaxed">
+                        Simple evaluation process in four steps designed for efficiency and total confidentiality.
+                    </p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 w-full">
+                        {[
+                            { step: '01', title: 'Register', desc: 'Secure login through your institutional account.', icon: 'students', color: 'text-rose-500', bg: 'bg-rose-50' },
+                            { step: '02', title: 'Configure', desc: 'Set up evaluation parameters and criteria.', icon: 'dashboard', color: 'text-indigo-500', bg: 'bg-indigo-50' },
+                            { step: '03', title: 'Evaluate', desc: 'Complete forms with our intuitive interface.', icon: 'check-circle', color: 'text-emerald-500', bg: 'bg-emerald-50' },
+                            { step: '04', title: 'Analyze', desc: 'View comprehensive reports and insights.', icon: 'ratings', color: 'text-blue-500', bg: 'bg-blue-50' },
+                        ].map((item, i) => (
+                            <div key={item.step} className="group bg-white/70 backdrop-blur-md border border-white/50 rounded-[3rem] p-10 flex flex-col items-center shadow-[0_20px_50px_rgba(0,0,0,0.05)] hover:shadow-[0_30px_60px_rgba(0,0,0,0.08)] hover:-translate-y-2 transition-all duration-300">
+                                <div className={`w-20 h-20 rounded-full ${item.bg} ${item.color} flex items-center justify-center shadow-inner mb-8 transition-transform group-hover:scale-110`}>
+                                    <AppIcon name={item.icon} className="w-10 h-10" />
+                                </div>
+                                <span className={`text-2xl font-black ${item.color} mb-2`}>{item.step}</span>
+                                <h3 className="text-xl font-bold text-slate-800 mb-3">{item.title}</h3>
+                                <p className="text-sm text-slate-400 font-medium leading-relaxed">
+                                    {item.desc}
+                                </p>
+                            </div>
+                        ))}
                     </div>
-                    <div className="scroll-hint" style={{position: 'absolute', bottom: '2.5rem', left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, color: 'rgba(168,200,240,0.4)', fontSize: '0.7rem', letterSpacing: '0.12em', textTransform: 'uppercase'}}>
-                        <span>Scroll</span>
-                        <svg className="scroll-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" style={{width: 22, height: 22, color: 'rgba(168,200,240,0.78)', strokeWidth: 1.85}}>
-                            <path d="M12 5v14"></path>
-                            <path d="m19 12-7 7-7-7"></path>
-                        </svg>
+                </main>
+
+                {/* STATS FLOATER */}
+                <div className="pb-20 px-6 max-w-4xl mx-auto">
+                    <div className="bg-slate-800 rounded-[3rem] p-12 text-white flex flex-wrap justify-center gap-12 shadow-2xl">
+                        {[
+                            { num: '4', label: 'Core Areas' },
+                            { num: '5m', label: 'Completion Time' },
+                            { num: '100%', label: 'Confidential' },
+                            { num: '∞', label: 'Impact' },
+                        ].map((stat) => (
+                            <div key={stat.label} className="text-center">
+                                <div className="text-4xl font-black mb-1">{stat.num}</div>
+                                <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{stat.label}</div>
+                            </div>
+                        ))}
                     </div>
                 </div>
-                {/* STATS BAND */}
-                <div className="stats-band" style={{background: '#eef5ff', borderTop: '1px solid #ddeeff', borderBottom: '1px solid #ddeeff', padding: '2.5rem 2rem', display: 'flex', justifyContent: 'center', gap: 0}}>
-                    {[
-                        {num: '4', label: 'Core Areas'},
-                        {num: '5', label: 'Min. to Complete'},
-                        {num: '100%', label: 'Confidential'},
-                        {num: '∞', label: 'Impact'},
-                    ].map((stat, i) => (
-                        <div className="stat-item" key={stat.label} style={{flex: 1, maxWidth: 200, textAlign: 'center', padding: '0 2rem', borderRight: i < 3 ? '1px solid #ddeeff' : 'none'}}>
-                            <div className="stat-num" style={{fontFamily: 'Cormorant Garamond, serif', fontSize: '2.6rem', fontWeight: 300, color: '#1a4a8a', lineHeight: 1}}>{stat.num}</div>
-                            <div className="stat-label" style={{fontSize: '0.72rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#6a8aaa', marginTop: 6}}>{stat.label}</div>
-                        </div>
-                    ))}
-                </div>
+
+                {/* FOOTER HINT */}
+                <footer className="py-10 text-center flex flex-col items-center gap-4">
+                     <div className="flex items-center gap-2 px-6 py-3 bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-100">
+                        <AppIcon name="shield" className="w-4 h-4 text-blue-600" />
+                        <span className="text-xs font-bold text-slate-800">Secure & Encrypted</span>
+                     </div>
+                </footer>
             </div>
         </>
     );

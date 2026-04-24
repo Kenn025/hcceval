@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Head, useForm } from '@inertiajs/react';
 
-export default function UnifiedLogin({ status, error }) {
+export default function UnifiedLogin({ status, error, submitRoute = 'login' }) {
   const { data, setData, post, processing, errors } = useForm({
     identifier: '',
     password: '',
@@ -10,7 +10,7 @@ export default function UnifiedLogin({ status, error }) {
 
   const submit = (e) => {
     e.preventDefault();
-    post(route('login'));
+    post(route(submitRoute));
   };
 
   return (

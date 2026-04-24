@@ -15,9 +15,10 @@ use App\Http\Controllers\Admin\SubjectController;
 use App\Http\Controllers\Admin\TeacherController;
 use App\Http\Controllers\Admin\YearLevelController;
 use App\Http\Controllers\Client\ClientLoginController;
+use App\Http\Controllers\Client\EmployeePortalController;
 use App\Http\Controllers\Client\StudentPortalController;
 use App\Http\Controllers\Client\TeacherPortalController;
-use App\Http\Controllers\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\BugReportController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -127,6 +128,9 @@ Route::middleware('auth')->group(function () {
         Route::delete('/admin/admin-users/{admin}', [AdminUserController::class, 'destroy']);
     });
 
+    // Bug Reports
+    Route::post('/bug-report', [BugReportController::class, 'store'])->name('bug-report.store');
+
     // Profile
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
@@ -136,19 +140,24 @@ Route::middleware('auth')->group(function () {
 // ─── Client (Student / Teacher) Portal ───────────────────────────────────────
 
 Route::prefix('portal')->name('portal.')->group(function () {
-    // Unified login entry point
-    Route::redirect('/login', '/login')->name('login');
-    Route::post('/login', [AuthenticatedSessionController::class, 'store'])->name('login.submit');
+    // Login — redirect to dashboard if already authenticated
+    Route::get('/login', [ClientLoginController::class, 'showLogin'])->name('login');
     Route::post('/logout', [ClientLoginController::class, 'logout'])->name('logout');
+    Route::post('/bug-report', [BugReportController::class, 'store'])->name('bug-report.store');
 
     // Student portal
     Route::middleware('student.auth')->group(function () {
         Route::get('/student', [StudentPortalController::class, 'dashboard'])->name('student.dashboard');
     });
 
-    // Teacher portal
+    // Teacher / faculty portal
     Route::middleware('teacher.auth')->group(function () {
         Route::get('/teacher', [TeacherPortalController::class, 'dashboard'])->name('teacher.dashboard');
+    });
+
+    // Employee portal
+    Route::middleware('employee.auth')->group(function () {
+        Route::get('/employee', [EmployeePortalController::class, 'dashboard'])->name('employee.dashboard');
     });
 });
 

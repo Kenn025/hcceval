@@ -20,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role'          => \App\Http\Middleware\EnsureAdminRole::class,
             'student.auth'  => \App\Http\Middleware\EnsureStudentAuth::class,
             'teacher.auth'  => \App\Http\Middleware\EnsureTeacherAuth::class,
+            'employee.auth' => \App\Http\Middleware\EnsureEmployeeAuth::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

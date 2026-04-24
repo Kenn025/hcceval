@@ -1,111 +1,169 @@
-import React from 'react';
-import ClientLayout from '@/Layouts/ClientLayout';
+import AppIcon from '@/Components/AppIcon';
+import PortalLayout from '@/Layouts/PortalLayout';
+import { useState } from 'react';
 
-function Badge({ children, color = 'blue' }) {
-  const map = {
-    green:  'bg-emerald-50 text-emerald-700 ring-emerald-200',
-    blue:   'bg-blue-50 text-blue-700 ring-blue-200',
-    slate:  'bg-slate-100 text-slate-600 ring-slate-200',
-    amber:  'bg-amber-50 text-amber-700 ring-amber-200',
-  };
-  return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ${map[color] ?? map.blue}`}>
-      {children}
-    </span>
-  );
-}
+const SECTION_TITLES = {
+    classes:  'My Classes',
+    ratings:  'My Ratings',
+    evaluate: 'Evaluate',
+    archive:  'Archive',
+};
 
-function EmptyState({ message }) {
-  return (
-    <div className="py-16 text-center text-slate-400">
-      <svg viewBox="0 0 24 24" className="mx-auto mb-3 h-10 w-10 opacity-30" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M3 8l9-4 9 4-9 4-9-4Z" />
-        <path d="M7 10.5v4.5c0 1.5 2.5 3 5 3s5-1.5 5-3v-4.5" />
-      </svg>
-      <p className="text-sm">{message}</p>
-    </div>
-  );
-}
+/* ── Components ───────────────────────────────────────────── */
 
-export default function TeacherDashboard({ teacher, cycle, classes }) {
-  return (
-    <ClientLayout title="Faculty Dashboard" user={teacher} userType="faculty">
-      {/* Welcome banner */}
-      <div className="mb-6 rounded-2xl bg-gradient-to-br from-[#0d2454] to-[#1a4a8a] p-5 text-white shadow-md">
-        <p className="text-xs uppercase tracking-wider text-blue-200 mb-1">Welcome back</p>
-        <h2 className="text-xl font-bold">{teacher.name}</h2>
-        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-blue-100">
-          <span>{teacher.employee_no}</span>
-          {teacher.department && <span>· {teacher.department}</span>}
-          {teacher.role && <span className="capitalize">· {teacher.role}</span>}
-          {teacher.branch && <span>· {teacher.branch}</span>}
+function EmptyState({ icon = 'teachers', message }) {
+    return (
+        <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100">
+                <AppIcon name={icon} className="h-7 w-7 text-slate-300" />
+            </div>
+            <p className="text-sm font-medium text-slate-500">{message}</p>
         </div>
-        {cycle && (
-          <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs">
-            <span className={`h-2 w-2 rounded-full ${cycle.is_open ? 'bg-blue-300' : 'bg-slate-300'}`} />
-            {cycle.school_year} &nbsp;·&nbsp; {cycle.semester}
-            {cycle.is_open ? ' — Open' : ' — Closed'}
-          </div>
-        )}
-      </div>
+    );
+}
 
-      {/* Classes heading */}
-      <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-base font-bold text-slate-800">My Classes</h3>
-        <span className="text-xs text-slate-400">{classes.length} class{classes.length !== 1 ? 'es' : ''}</span>
-      </div>
-
-      {/* Classes list */}
-      {classes.length === 0 ? (
-        <EmptyState message="No classes assigned for the current evaluation cycle." />
-      ) : (
-        <div className="space-y-3">
-          {classes.map((c) => (
-            <div key={c.section_id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="font-semibold text-slate-800 truncate">{c.course_name}</p>
-                  <p className="text-xs text-slate-500 mt-0.5">{c.course_code} &nbsp;·&nbsp; {c.section_name}</p>
+function TeacherInfoCard({ teacher, cycle }) {
+    return (
+        <div className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:shadow-md">
+            <div className="flex items-start gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow">
+                    <AppIcon name="teachers" className="h-6 w-6" />
                 </div>
-                <Badge color="blue">{c.semester_label}</Badge>
-              </div>
+                <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0">
+                            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Faculty</p>
+                            <h2 className="mt-0.5 text-xl font-bold text-slate-900">{teacher.name}</h2>
+                        </div>
+                        {cycle && (
+                            <div className={`inline-flex shrink-0 items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium ring-1 ${
+                                cycle.is_open
+                                    ? 'bg-blue-50 text-blue-700 ring-blue-200'
+                                    : 'bg-slate-100 text-slate-500 ring-slate-200'
+                            }`}>
+                                <span className={`h-2 w-2 rounded-full ${cycle.is_open ? 'animate-pulse bg-blue-500' : 'bg-slate-400'}`} />
+                                {cycle.school_year} · {cycle.semester}
+                            </div>
+                        )}
+                    </div>
+                    <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
+                        <span className="font-mono">{teacher.employee_no}</span>
+                        {teacher.department && <span>· {teacher.department}</span>}
+                        {teacher.role       && <span className="capitalize">· {teacher.role}</span>}
+                        {teacher.branch     && <span>· {teacher.branch}</span>}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
 
-              <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-500">
+function ClassCard({ c }) {
+    return (
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-blue-200 hover:shadow-md">
+            <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                    <p className="font-semibold text-slate-800 truncate">{c.course_name}</p>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                        {c.course_code}{c.section_name ? ` · ${c.section_name}` : ''}
+                    </p>
+                </div>
+                <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-600 ring-1 ring-slate-200">
+                    {c.semester_label}
+                </span>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 pt-3 text-xs text-slate-500 border-t border-slate-50">
                 {c.department_name && (
-                  <span className="flex items-center gap-1">
-                    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                    </svg>
-                    {c.department_name}
-                  </span>
+                    <span className="flex items-center gap-1.5">
+                        <AppIcon name="departments" className="h-3.5 w-3.5 shrink-0 text-blue-600/50" />
+                        {c.department_name}
+                    </span>
                 )}
                 {c.schedule && (
-                  <span className="flex items-center gap-1">
-                    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
-                    </svg>
-                    {c.schedule}
-                  </span>
+                    <span className="flex items-center gap-1.5">
+                        <AppIcon name="calendar" className="h-3.5 w-3.5 shrink-0 text-blue-600/50" />
+                        {c.schedule}
+                    </span>
                 )}
                 {c.room && (
-                  <span className="flex items-center gap-1">
-                    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" />
-                    </svg>
-                    {c.room}
-                  </span>
+                    <span className="flex items-center gap-1.5">
+                        <AppIcon name="building" className="h-3.5 w-3.5 shrink-0 text-blue-600/50" />
+                        {c.room}
+                    </span>
                 )}
-                <span className="ml-auto flex items-center gap-1 text-slate-400">
-                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                  </svg>
-                  {c.enrolled_count} enrolled
-                </span>
-              </div>
+                {c.enrolled_count !== undefined && (
+                    <span className="ml-auto flex items-center gap-1.5 font-semibold text-blue-700 bg-blue-50/50 px-2 py-0.5 rounded-lg ring-1 ring-blue-100/50">
+                        <AppIcon name="students" className="h-3.5 w-3.5 shrink-0" />
+                        {c.enrolled_count} enrolled
+                    </span>
+                )}
             </div>
-          ))}
         </div>
-      )}
-    </ClientLayout>
-  );
+    );
+}
+
+function ClassesTab({ classes, cycle }) {
+    if (!classes.length) {
+        return <EmptyState icon="teachers" message="No assigned classes for the current evaluation cycle." />;
+    }
+
+    return (
+        <div className="space-y-4">
+            <div className="flex items-center justify-between pb-3">
+                <div>
+                    <h2 className="text-base font-bold text-slate-800">My Classes</h2>
+                    <p className="text-xs text-slate-400">{classes.length} assigned record{classes.length !== 1 ? 's' : ''}</p>
+                </div>
+                {cycle?.is_open
+                    ? <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-200">
+                        Evaluation Open
+                      </span>
+                    : cycle && <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500 ring-1 ring-slate-200">
+                        Evaluation Closed
+                      </span>
+                }
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-1">
+                {classes.map((c) => <ClassCard key={c.section_id} c={c} />)}
+            </div>
+        </div>
+    );
+}
+
+/* ── Page ─────────────────────────────────────────────────────── */
+
+export default function TeacherDashboard({ teacher, cycle, classes = [] }) {
+    const [activeNav, setActiveNav] = useState('classes');
+    const title = SECTION_TITLES[activeNav] ?? 'Faculty Portal';
+
+    return (
+        <PortalLayout
+            title={title}
+            user={teacher}
+            userType="teacher"
+            activeNav={activeNav}
+            onNavChange={setActiveNav}
+        >
+            {activeNav === 'classes' && (
+                <>
+                    <TeacherInfoCard teacher={teacher} cycle={cycle} />
+                    <ClassesTab classes={classes} cycle={cycle} />
+                </>
+            )}
+
+            {activeNav === 'ratings' && (
+                <EmptyState icon="ratings" message="Ratings data will appear here once evaluations are submitted." />
+            )}
+
+            {activeNav === 'evaluate' && (
+                <EmptyState icon="peer" message="Evaluation targets will appear here when an evaluation cycle is open." />
+            )}
+
+            {activeNav === 'archive' && (
+                <EmptyState icon="archive" message="Past evaluation cycles will appear here." />
+            )}
+        </PortalLayout>
+    );
 }
