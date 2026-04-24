@@ -6,11 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\Department;
 use App\Models\Program;
-use App\Models\Strand;
 use App\Models\Subject;
+use App\Models\Teacher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class SubjectController extends Controller
@@ -20,6 +21,8 @@ class SubjectController extends Controller
         $search = $request->input('search', '');
         $scopedId = $this->scopedBranchId();
         $requestedBranchId = $request->integer('branch_id');
+        $programId = $request->integer('program_id');
+        $isGenEd = $request->input('is_gened');
 
         $typeMap = [
             'college' => 'college',
@@ -29,10 +32,24 @@ class SubjectController extends Controller
         ];
 
         $subjectType = $typeMap[$educationType] ?? 'college';
+        $departmentFilter = match ($subjectType) {
+            'college' => fn ($query) => $query->where('name', 'like', '%College%')->orWhere('code', 'like', '%COL%'),
+            'shs' => fn ($query) => $query->where('name', 'like', '%Senior High%')->orWhere('code', 'like', '%SHS%'),
+            'jhs' => fn ($query) => $query->where('name', 'like', '%Junior High%')->orWhere('code', 'like', '%JHS%'),
+            default => fn ($query) => $query->where('name', 'like', '%Elementary%')->orWhere('code', 'like', '%ELEM%'),
+        };
+
         $branches = Branch::query()
             ->select('id', 'name', 'code')
             ->where('is_deleted', 0)
             ->where('code', '!=', 'OVERALL')
+            ->whereHas('departments', function ($query) use ($departmentFilter) {
+                $query->where('is_deleted', 0)
+                    ->where('is_activated', 1)
+                    ->where(function ($departmentQuery) use ($departmentFilter) {
+                        $departmentFilter($departmentQuery);
+                    });
+            })
             ->when($scopedId, fn ($q) => $q->where('id', $scopedId))
             ->orderBy('name')
             ->get();
@@ -41,10 +58,12 @@ class SubjectController extends Controller
             ?? ($branches->contains('id', $requestedBranchId) ? $requestedBranchId : $branches->first()?->id);
 
         $subjects = Subject::query()
-            ->with(['department:id,name', 'program:id,name', 'strand:id,name'])
+            ->with(['department:id,name,branch_id', 'department.branch:id,name', 'program:id,name', 'strand:id,name'])
             ->where('is_deleted', 0)
             ->where('type', $subjectType)
             ->when($selectedBranchId, fn ($q) => $q->whereHas('department', fn ($department) => $department->where('branch_id', $selectedBranchId)))
+            ->when($subjectType === 'college' && $programId, fn ($q) => $q->where('program_id', $programId))
+            ->when($isGenEd !== null && $isGenEd !== '', fn ($q) => $q->where('is_gened', (int) $isGenEd))
             ->when($search, function ($q) use ($search) {
                 $q->where(function ($query) use ($search) {
                     $query->where('name', 'like', "%{$search}%")
@@ -55,6 +74,39 @@ class SubjectController extends Controller
             ->paginate(15)
             ->withQueryString();
 
+        $teachers = Teacher::query()
+            ->select('id', 'branch_id', 'department_id', 'firstname', 'middlename', 'lastname')
+            ->where('is_deleted', 0)
+            ->where('is_activated', 1)
+            ->when($scopedId, fn ($q) => $q->where('branch_id', $scopedId))
+            ->orderBy('lastname')
+            ->orderBy('firstname')
+            ->get()
+            ->map(function (Teacher $teacher) {
+                return [
+                    'id' => $teacher->id,
+                    'branch_id' => $teacher->branch_id,
+                    'department_id' => $teacher->department_id,
+                    'full_name' => $teacher->full_name,
+                ];
+            });
+
+        $teacherNames = $teachers->pluck('full_name', 'id');
+        $subjects->getCollection()->transform(function (Subject $subject) use ($teacherNames) {
+            $teacherIds = collect($subject->teacher_id ?? [])
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->values();
+
+            $subject->assigned_teacher_names = $teacherIds
+                ->map(fn ($id) => $teacherNames[$id] ?? null)
+                ->filter()
+                ->values()
+                ->all();
+
+            return $subject;
+        });
+
         $titleMap = [
             'college' => 'College',
             'senior-high' => 'Senior High',
@@ -64,16 +116,40 @@ class SubjectController extends Controller
 
         return Inertia::render('Admin/Subjects', [
             'subjects' => $subjects,
-            'filters' => ['search' => $search, 'branch_id' => $selectedBranchId],
+            'filters' => [
+                'search' => $search,
+                'branch_id' => $selectedBranchId,
+                'program_id' => $subjectType === 'college' ? $programId : null,
+                'is_gened' => $isGenEd,
+            ],
             'educationType' => $educationType,
             'educationLevelName' => $titleMap[$educationType] ?? 'College',
             'subjectType' => $subjectType,
             'branches' => $branches,
             'selectedBranchId' => $selectedBranchId,
             'scopedBranchId' => $scopedId,
-            'departments' => Department::query()->select('id', 'name', 'branch_id')->where('is_deleted', 0)->when($selectedBranchId, fn ($q) => $q->where('branch_id', $selectedBranchId))->orderBy('name')->get(),
-            'programs' => Program::query()->select('id', 'name', 'department_id')->where('is_deleted', 0)->whereHas('department', fn ($q) => $q->when($selectedBranchId, fn ($branchQuery) => $branchQuery->where('branch_id', $selectedBranchId)))->orderBy('name')->get(),
-            'strands' => Strand::query()->select('id', 'name', 'department_id')->where('is_deleted', 0)->whereHas('department', fn ($q) => $q->when($selectedBranchId, fn ($branchQuery) => $branchQuery->where('branch_id', $selectedBranchId)))->orderBy('name')->get(),
+            'departments' => Department::query()
+                ->select('id', 'name', 'branch_id')
+                ->where('is_deleted', 0)
+                ->where('is_activated', 1)
+                ->when($scopedId, fn ($q) => $q->where('branch_id', $scopedId))
+                ->where(function ($query) use ($departmentFilter) {
+                    $departmentFilter($query);
+                })
+                ->orderBy('name')
+                ->get(),
+            'programs' => Program::query()
+                ->select('id', 'name', 'department_id')
+                ->where('is_deleted', 0)
+                ->when($subjectType === 'college', fn ($q) => $q->whereHas('department', fn ($department) => $department
+                    ->where('is_deleted', 0)
+                    ->where('is_activated', 1)
+                    ->when($scopedId, fn ($branchQuery) => $branchQuery->where('branch_id', $scopedId))
+                ))
+                ->orderBy('name')
+                ->get(),
+            'strands' => [],
+            'teachers' => $teachers->values(),
         ]);
     }
 
@@ -120,52 +196,112 @@ class SubjectController extends Controller
             'type' => 'required|string|in:college,shs,jhs,elementary',
             'is_gened' => 'boolean',
             'is_activated' => 'boolean',
+            'teacher_ids' => 'nullable|array',
+            'teacher_ids.*' => 'nullable|integer|exists:teacher,id',
         ]);
 
         if ($scopedId !== null) {
             $validated['branch_id'] = $scopedId;
         }
 
+        $validated['strand_id'] = null;
+
         if ($validated['type'] === 'college') {
             if (empty($validated['program_id'])) {
-                abort(422, 'The selected program is required.');
+                throw ValidationException::withMessages([
+                    'program_id' => 'The selected program is required.',
+                ]);
             }
 
             $program = Program::query()
                 ->where('id', $validated['program_id'])
                 ->where('is_deleted', 0)
+                ->with('department:id,branch_id')
                 ->firstOrFail();
 
+            if ((int) ($program->department?->branch_id ?? 0) !== (int) $validated['branch_id']) {
+                throw ValidationException::withMessages([
+                    'program_id' => 'The selected program must belong to the chosen branch.',
+                ]);
+            }
+
             $validated['department_id'] = $program->department_id;
-            $validated['strand_id'] = null;
         } else {
             $validated['program_id'] = null;
+            $validated['department_id'] = $this->resolveDepartmentIdForEducationType((int) $validated['branch_id'], $validated['type']);
+        }
 
-            if (! empty($validated['strand_id'])) {
-                $strand = Strand::query()
-                    ->where('id', $validated['strand_id'])
-                    ->where('is_deleted', 0)
-                    ->firstOrFail();
-
-                $validated['department_id'] = $strand->department_id;
-            } else {
-                $validated['department_id'] = $this->resolveDepartmentIdForBranchAndType((int) $validated['branch_id'], $validated['type']);
-            }
+        if (empty($validated['department_id'])) {
+            throw ValidationException::withMessages([
+                'branch_id' => 'The selected department is required.',
+            ]);
         }
 
         $department = Department::query()
             ->where('id', $validated['department_id'])
             ->where('is_deleted', 0)
+            ->where('is_activated', 1)
             ->firstOrFail();
 
         if ((int) $department->branch_id !== (int) $validated['branch_id']) {
-            abort(422, 'The selected department does not belong to the selected branch.');
+            throw ValidationException::withMessages([
+                'branch_id' => 'The selected department does not belong to the selected branch.',
+            ]);
+        }
+
+        $validated['teacher_id'] = collect($validated['teacher_ids'] ?? [])
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        foreach ($validated['teacher_id'] as $teacherId) {
+            $teacher = Teacher::query()
+                ->where('id', $teacherId)
+                ->where('is_deleted', 0)
+                ->where('is_activated', 1)
+                ->firstOrFail();
+
+            if ((int) $teacher->branch_id !== (int) $validated['branch_id'] || (int) $teacher->department_id !== (int) $validated['department_id']) {
+                throw ValidationException::withMessages([
+                    'teacher_ids' => 'Selected teachers must belong to the chosen branch and department.',
+                ]);
+            }
         }
 
         unset($validated['branch_id']);
+        unset($validated['teacher_ids']);
         $validated['is_deleted'] = 0;
 
         return $validated;
+    }
+
+    private function resolveDepartmentIdForEducationType(int $branchId, string $educationType): int
+    {
+        $department = Department::query()
+            ->where('branch_id', $branchId)
+            ->where('is_deleted', 0)
+            ->where('is_activated', 1)
+            ->where(function ($query) use ($educationType) {
+                match ($educationType) {
+                    'college' => $query->where('name', 'like', '%College%')->orWhere('code', 'like', '%COL%'),
+                    'shs' => $query->where('name', 'like', '%Senior High%')->orWhere('code', 'like', '%SHS%'),
+                    'jhs' => $query->where('name', 'like', '%Junior High%')->orWhere('code', 'like', '%JHS%'),
+                    'elementary' => $query->where('name', 'like', '%Elementary%')->orWhere('code', 'like', '%ELEM%'),
+                    default => $query->whereRaw('1 = 0'),
+                };
+            })
+            ->orderBy('id')
+            ->first();
+
+        if (! $department) {
+            throw ValidationException::withMessages([
+                'branch_id' => 'No matching department was found for the selected branch.',
+            ]);
+        }
+
+        return (int) $department->id;
     }
 
     private function generateSubjectCode(array $validated, ?int $ignoreId = null): string
@@ -204,28 +340,5 @@ class SubjectController extends Controller
         }
 
         return $code;
-    }
-
-    private function resolveDepartmentIdForBranchAndType(int $branchId, string $type): int
-    {
-        $department = Department::query()
-            ->where('branch_id', $branchId)
-            ->where('is_deleted', 0)
-            ->where(function ($query) use ($type) {
-                match ($type) {
-                    'shs' => $query->where('name', 'like', '%Senior High%')->orWhere('code', 'like', '%SHS%'),
-                    'jhs' => $query->where('name', 'like', '%Junior High%')->orWhere('code', 'like', '%JHS%'),
-                    'elementary' => $query->where('name', 'like', '%Elementary%')->orWhere('code', 'like', '%ELEM%'),
-                    default => $query->whereRaw('1 = 0'),
-                };
-            })
-            ->orderBy('id')
-            ->first();
-
-        if (! $department) {
-            abort(422, 'No matching department was found for the selected branch.');
-        }
-
-        return (int) $department->id;
     }
 }

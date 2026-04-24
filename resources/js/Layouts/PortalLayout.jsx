@@ -1,4 +1,5 @@
 import AppIcon from '@/Components/AppIcon';
+import FlashNotification from '@/Components/FlashNotification';
 import { Head, router, useForm } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -226,6 +227,7 @@ export default function PortalLayout({
     return (
         <>
             <Head title={title} />
+            <FlashNotification />
             <div className={`min-h-screen text-slate-900 ${theme.mainBg ?? 'bg-slate-50'}`}>
 
                 {/* Mobile backdrop */}

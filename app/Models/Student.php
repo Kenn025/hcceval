@@ -12,13 +12,14 @@ class Student extends Model
     protected $fillable = [
         'code', 'branch_id', 'department_id', 'program_id',
         'strand_id', 'education_level_id',
+        'is_irreg', 'irreg_subject_id',
         'firstname', 'middlename', 'lastname',
         'email', 'password', 'is_activated', 'is_deleted',
     ];
 
     protected $hidden = ['password'];
 
-    protected $casts = ['is_activated' => 'boolean', 'is_deleted' => 'boolean'];
+    protected $casts = ['is_irreg' => 'boolean', 'is_activated' => 'boolean', 'is_deleted' => 'boolean'];
 
     public function branch(): BelongsTo
     {
@@ -45,6 +46,11 @@ class Student extends Model
         return $this->belongsTo(EducationLevel::class, 'education_level_id');
     }
 
+    public function irregSubject(): BelongsTo
+    {
+        return $this->belongsTo(Subject::class, 'irreg_subject_id');
+    }
+
     public function getFullNameAttribute(): string
     {
         return trim("{$this->firstname} {$this->middlename} {$this->lastname}");
@@ -65,6 +71,8 @@ class Student extends Model
         $attributes['last_name'] = $attributes['lastname'] ?? null;
         $attributes['suffix_name'] = null;
         $attributes['year_level_id'] = $attributes['education_level_id'] ?? null;
+        $attributes['is_irreg'] = (bool) ($attributes['is_irreg'] ?? false);
+        $attributes['irreg_subject_id'] = $attributes['irreg_subject_id'] ?? null;
         $attributes['is_active'] = (bool) ($attributes['is_activated'] ?? false);
         $attributes['status'] = ($attributes['is_activated'] ?? false) ? 'Active' : 'Inactive';
 

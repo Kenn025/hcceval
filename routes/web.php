@@ -6,7 +6,6 @@ use App\Http\Controllers\Admin\BranchController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DepartmentController;
 use App\Http\Controllers\Admin\EmployeeController;
-use App\Http\Controllers\Admin\EvaluationCycleController;
 use App\Http\Controllers\Admin\ProgramController;
 use App\Http\Controllers\Admin\QuestionController;
 use App\Http\Controllers\Admin\QuestionnaireController;
@@ -110,6 +109,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/admin/head-assignments', [AssignmentController::class, 'headAssignments'])->name('admin.head-assignments');
     Route::get('/admin/employee-assignments', [AssignmentController::class, 'employeeAssignments'])->name('admin.employee-assignments');
     Route::post('/admin/assignments', [AssignmentController::class, 'store']);
+    Route::post('/admin/assignments/select-questionnaire', [AssignmentController::class, 'assignQuestionnaire'])->name('admin.assignments.select-questionnaire');
+    Route::post('/admin/assignments/custom-subjects', [AssignmentController::class, 'updateCustomSubjects'])->name('admin.assignments.custom-subjects');
+    Route::put('/admin/assignments/{id}', [AssignmentController::class, 'update']);
     Route::delete('/admin/assignments/{id}', [AssignmentController::class, 'destroy']);
 
     // Ratings & Reports
@@ -122,6 +124,7 @@ Route::middleware('auth')->group(function () {
     // System Controls — superadmin & overalladmin access
     Route::middleware('role:superadmin,overalladmin')->group(function () {
         Route::get('/admin/departments', [DepartmentController::class, 'index'])->name('admin.departments');
+        Route::post('/admin/departments/{department}/toggle-activation', [DepartmentController::class, 'toggleActivation'])->name('admin.departments.toggle-activation');
         Route::post('/admin/departments', [DepartmentController::class, 'store']);
         Route::put('/admin/departments/{department}', [DepartmentController::class, 'update']);
         Route::delete('/admin/departments/{department}', [DepartmentController::class, 'destroy']);
@@ -130,11 +133,6 @@ Route::middleware('auth')->group(function () {
         Route::post('/admin/branches', [BranchController::class, 'store']);
         Route::put('/admin/branches/{branch}', [BranchController::class, 'update']);
         Route::delete('/admin/branches/{branch}', [BranchController::class, 'destroy']);
-
-        Route::get('/admin/evaluation-cycle', [EvaluationCycleController::class, 'index'])->name('admin.evaluation-cycle');
-        Route::post('/admin/evaluation-cycle', [EvaluationCycleController::class, 'store']);
-        Route::put('/admin/evaluation-cycle/{id}', [EvaluationCycleController::class, 'update']);
-        Route::delete('/admin/evaluation-cycle/{id}', [EvaluationCycleController::class, 'destroy']);
 
         Route::get('/admin/admin-users', [AdminUserController::class, 'index'])->name('admin.admin-users');
         Route::post('/admin/admin-users', [AdminUserController::class, 'store']);

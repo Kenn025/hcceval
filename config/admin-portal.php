@@ -31,7 +31,7 @@ return [
                     'items' => [
                         ['label' => 'Strands', 'route' => 'admin.senior-high.strands', 'icon' => 'network'],
                         ['label' => 'Subjects', 'route' => 'admin.senior-high.subjects', 'icon' => 'subjects'],
-                        ['label' => 'Year Levels', 'route' => 'admin.senior-high.year-levels', 'icon' => 'layers'],
+                        ['label' => 'Grade Levels', 'route' => 'admin.senior-high.year-levels', 'icon' => 'layers'],
                     ],
                 ],
                 [
@@ -84,7 +84,6 @@ return [
             'items' => [
                 ['label' => 'Departments', 'route' => 'admin.departments', 'icon' => 'departments'],
                 ['label' => 'Branches', 'route' => 'admin.branches', 'icon' => 'branches'],
-                ['label' => 'Evaluation Cycle', 'route' => 'admin.evaluation-cycle', 'icon' => 'calendar'],
                 ['label' => 'Admin Users', 'route' => 'admin.admin-users', 'icon' => 'shield'],
             ],
         ],
@@ -126,8 +125,8 @@ return [
             'source' => ['admin/course_management.php'],
         ],
         'admin.senior-high.year-levels' => [
-            'title' => 'Senior High Year Levels',
-            'description' => 'Year-level and section configuration for senior high evaluation coverage.',
+            'title' => 'Senior High Grade Levels',
+            'description' => 'Grade-level and section configuration for senior high evaluation coverage.',
             'eyebrow' => 'Academic Setup',
             'icon' => 'layers',
             'source' => ['admin/grade_level.php'],
@@ -275,13 +274,6 @@ return [
             'eyebrow' => 'System Controls',
             'icon' => 'branches',
             'source' => ['admin/branch_management.php'],
-        ],
-        'admin.evaluation-cycle' => [
-            'title' => 'Evaluation Cycle',
-            'description' => 'School year, semester, and open-close controls for evaluation availability.',
-            'eyebrow' => 'System Controls',
-            'icon' => 'calendar',
-            'source' => ['admin/dashboard.php', 'admin/api/evaluation_cycle.php'],
         ],
         'admin.admin-users' => [
             'title' => 'Admin Users',

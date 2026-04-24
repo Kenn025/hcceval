@@ -1,90 +1,94 @@
-import ConfirmDialog from '@/Components/Admin/ConfirmDialog';
-import FormField, { SelectInput, TextInput } from '@/Components/Admin/FormField';
 import ResourceTable from '@/Components/Admin/ResourceTable';
-import SlideOver from '@/Components/Admin/SlideOver';
 import StatusBadge from '@/Components/Admin/StatusBadge';
 import AdminLayout from '@/Layouts/AdminLayout';
-import { router, useForm } from '@inertiajs/react';
-import { useState } from 'react';
+import { router } from '@inertiajs/react';
 
-export default function Departments({ departments, filters, branches, educationLevels }) {
-    const [slideOpen, setSlideOpen] = useState(false);
-    const [editing, setEditing] = useState(null);
-    const [deleteTarget, setDeleteTarget] = useState(null);
-
-    const { data, setData, errors, processing, reset, clearErrors } = useForm({
-        code: '', name: '', branch_id: '', education_level_id: '', is_active: true,
-    });
-
-    const openCreate = () => { reset(); clearErrors(); setEditing(null); setSlideOpen(true); };
-
-    const openEdit = (row) => {
-        setData({ code: row.code, name: row.name, branch_id: row.branch_id, education_level_id: row.education_level_id, is_active: Boolean(row.is_active) });
-        clearErrors(); setEditing(row); setSlideOpen(true);
+export default function Departments({ departments, filters, branches, selectedBranchId }) {
+    const toggleDepartmentActivation = (departmentId) => {
+        router.post(route('admin.departments.toggle-activation', { department: departmentId }), {}, {
+            preserveScroll: true,
+            preserveState: true,
+        });
     };
+    const activeBranchId = String(selectedBranchId ?? filters.branch_id ?? '');
 
-    const submit = (e) => {
-        e.preventDefault();
-        const url = editing ? route('admin.departments') + '/' + editing.id : route('admin.departments');
-        const method = editing ? router.put : router.post;
-        method(url, data, { onSuccess: () => { setSlideOpen(false); reset(); } });
+    const switchBranch = (branchId) => {
+        router.get(route('admin.departments'), {
+            ...filters,
+            branch_id: branchId,
+        }, {
+            preserveState: true,
+            replace: true,
+        });
     };
 
     const columns = [
         { key: 'code', label: 'Code' },
-        { key: 'name', label: 'Department Name' },
-        { key: 'branch', label: 'Branch', render: (r) => r.branch?.name ?? '—' },
-        { key: 'education_level', label: 'Level', render: (r) => r.education_level?.name ?? '—' },
-        { key: 'is_active', label: 'Status', render: (r) => <StatusBadge active={r.is_active} /> },
+        { key: 'name', label: 'Name' },
+        { key: 'branch', label: 'Branch', render: (r) => r.branch?.name ?? '-' },
+        { key: 'is_activated', label: 'Is Active', render: (r) => <StatusBadge active={r.is_activated} /> },
     ];
 
     return (
         <AdminLayout title="Departments" activeRoute="admin.departments" breadcrumbs={['System Controls']}>
-            <div className="mb-4 flex items-center justify-between">
+            <div className="mb-4">
                 <div>
                     <h2 className="text-base font-semibold text-slate-900">Departments</h2>
-                    <p className="text-sm text-slate-500">Manage academic departments per branch and education level.</p>
+                    <p className="text-sm text-slate-500">View branch departments and activate inactive records.</p>
                 </div>
-                <button onClick={openCreate} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
-                    + New Department
-                </button>
             </div>
 
-            <ResourceTable columns={columns} data={departments} filters={filters} routeName="admin.departments" searchPlaceholder="Search departments…" onEdit={openEdit} onDelete={setDeleteTarget} />
+            <div className="mb-4 flex flex-wrap gap-2">
+                {branches.map((branch) => {
+                    const isActive = String(branch.id) === activeBranchId;
 
-            <SlideOver open={slideOpen} onClose={() => setSlideOpen(false)} title={editing ? 'Edit Department' : 'New Department'}>
-                <form onSubmit={submit} className="space-y-4">
-                    <FormField label="Code" error={errors.code} required>
-                        <TextInput value={data.code} onChange={(e) => setData('code', e.target.value)} placeholder="DEP-MAIN-COL" />
-                    </FormField>
-                    <FormField label="Department Name" error={errors.name} required>
-                        <TextInput value={data.name} onChange={(e) => setData('name', e.target.value)} />
-                    </FormField>
-                    <FormField label="Branch" error={errors.branch_id} required>
-                        <SelectInput value={data.branch_id} onChange={(e) => setData('branch_id', e.target.value)}>
-                            <option value="">Select branch…</option>
-                            {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-                        </SelectInput>
-                    </FormField>
-                    <FormField label="Education Level" error={errors.education_level_id} required>
-                        <SelectInput value={data.education_level_id} onChange={(e) => setData('education_level_id', e.target.value)}>
-                            <option value="">Select level…</option>
-                            {educationLevels.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-                        </SelectInput>
-                    </FormField>
-                    <label className="flex items-center gap-2 text-sm text-slate-700">
-                        <input type="checkbox" checked={data.is_active} onChange={(e) => setData('is_active', e.target.checked)} className="rounded border-slate-300" /> Active
-                    </label>
-                    <div className="flex gap-3 pt-2">
-                        <button type="button" onClick={() => setSlideOpen(false)} className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
-                        <button type="submit" disabled={processing} className="flex-1 rounded-lg bg-slate-900 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60">
-                            {processing ? 'Saving…' : editing ? 'Update' : 'Create'}
+                    return (
+                        <button
+                            key={branch.id}
+                            type="button"
+                            onClick={() => switchBranch(branch.id)}
+                            className={[
+                                'rounded-full border px-4 py-2 text-sm font-medium transition',
+                                isActive
+                                    ? 'border-slate-900 bg-slate-900 text-white'
+                                    : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50',
+                            ].join(' ')}
+                        >
+                            {branch.name}
                         </button>
-                    </div>
-                </form>
-            </SlideOver>
+                    );
+                })}
+            </div>
 
-            <ConfirmDialog open={Boolean(deleteTarget)} onConfirm={() => { router.delete(route('admin.departments') + '/' + deleteTarget.id, { onSuccess: () => setDeleteTarget(null) }); }} onCancel={() => setDeleteTarget(null)} title="Delete Department" message={`Delete "${deleteTarget?.name}"?`} />
+            <ResourceTable
+                columns={columns}
+                data={departments}
+                filters={filters}
+                routeName="admin.departments"
+                searchPlaceholder="Search departments..."
+                rowActions={(row) => (
+                    <button
+                        type="button"
+                        onClick={() => toggleDepartmentActivation(row.id)}
+                        role="switch"
+                        aria-checked={row.is_activated}
+                        aria-label={row.is_activated ? 'Deactivate department' : 'Activate department'}
+                        className={[
+                            'relative inline-flex h-7 w-12 items-center rounded-full border transition',
+                            row.is_activated
+                                ? 'border-emerald-200 bg-emerald-500'
+                                : 'border-slate-300 bg-slate-200 hover:bg-slate-300',
+                        ].join(' ')}
+                    >
+                        <span
+                            className={[
+                                'inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform',
+                                row.is_activated ? 'translate-x-6' : 'translate-x-1',
+                            ].join(' ')}
+                        />
+                    </button>
+                )}
+            />
         </AdminLayout>
     );
 }

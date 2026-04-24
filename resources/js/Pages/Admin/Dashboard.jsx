@@ -34,7 +34,6 @@ const QUICK_LINKS = [
     { label: 'Employees', route: 'admin.employees', icon: 'briefcase', desc: 'Staff directory' },
     { label: 'Questionnaires', route: 'admin.questionnaires', icon: 'questions', desc: 'Questionnaire builder' },
     { label: 'Peer Ratings', route: 'admin.peer-ratings', icon: 'group', desc: 'Peer evaluations' },
-    { label: 'Evaluation Cycle', route: 'admin.evaluation-cycle', icon: 'calendar', desc: 'School year settings' },
 ];
 
 export default function Dashboard({ stats }) {

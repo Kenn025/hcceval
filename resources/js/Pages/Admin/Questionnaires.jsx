@@ -2,6 +2,7 @@ import ConfirmDialog from '@/Components/Admin/ConfirmDialog';
 import FormField, { SelectInput, TextInput, TextareaInput } from '@/Components/Admin/FormField';
 import ResourceTable from '@/Components/Admin/ResourceTable';
 import SlideOver from '@/Components/Admin/SlideOver';
+import SubmitButton from '@/Components/Admin/SubmitButton';
 import StatusBadge from '@/Components/Admin/StatusBadge';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { router, useForm } from '@inertiajs/react';
@@ -51,7 +52,9 @@ function emptyClassGroup() {
 
 export default function Questionnaires({ questionnaires, questionnaireTypes, questionChoices, questionClasses, questions, filters }) {
     const [slideOpen, setSlideOpen] = useState(false);
+    const [detailOpen, setDetailOpen] = useState(false);
     const [editing, setEditing] = useState(null);
+    const [viewing, setViewing] = useState(null);
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [itemSearch, setItemSearch] = useState('');
     const [commentSearch, setCommentSearch] = useState('');
@@ -95,6 +98,16 @@ export default function Questionnaires({ questionnaires, questionnaireTypes, que
         clearErrors();
         setEditing(row);
         setSlideOpen(true);
+    };
+
+    const openView = (row) => {
+        setViewing(row);
+        setDetailOpen(true);
+    };
+
+    const editFromDetails = () => {
+        if (!viewing) return;
+        openEdit(viewing);
     };
 
     const toggleArrayValue = (key, value) => {
@@ -156,7 +169,11 @@ export default function Questionnaires({ questionnaires, questionnaireTypes, que
     const submit = (e) => {
         e.preventDefault();
         const url = editing ? '/admin/questionnaires/' + editing.questionnaire_id : '/admin/questionnaires';
-        (editing ? router.put : router.post)(url, data, {
+        const request = editing
+            ? (targetUrl, payload, options) => router.put(targetUrl, payload, options)
+            : (targetUrl, payload, options) => router.post(targetUrl, payload, options);
+
+        request(url, data, {
             onSuccess: () => {
                 setSlideOpen(false);
                 reset();
@@ -205,7 +222,36 @@ export default function Questionnaires({ questionnaires, questionnaireTypes, que
                 <button onClick={openCreate} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">+ New Questionnaire</button>
             </div>
 
-            <ResourceTable columns={columns} data={questionnaires} filters={filters} routeName="admin.questionnaires" searchPlaceholder="Search questionnaires..." onEdit={openEdit} onDelete={setDeleteTarget} />
+            <ResourceTable columns={columns} data={questionnaires} filters={filters} routeName="admin.questionnaires" searchPlaceholder="Search questionnaires..." onRowClick={openView} onEdit={openEdit} onDelete={setDeleteTarget} />
+
+            <SlideOver open={detailOpen} onClose={() => setDetailOpen(false)} title="Questionnaire Information" width="max-w-2xl">
+                {viewing && (
+                    <div className="space-y-6">
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Overview</p>
+                            <h3 className="mt-1 text-lg font-semibold text-slate-900">{viewing.questionnaire_title ?? '-'}</h3>
+                            <p className="mt-1 text-sm text-slate-600">{viewing.questionnaire_code ?? '-'}</p>
+                        </div>
+
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Questionnaire Type</p><p className="mt-1 text-sm text-slate-900">{viewing.questionnaire_type_name ?? '-'}</p></div>
+                            <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Choice Set</p><p className="mt-1 text-sm text-slate-900">{viewing.question_choices_code ? `${viewing.question_choices_name} - ${viewing.question_choices_code} (${viewing.question_choices_quantity})` : '-'}</p></div>
+                            <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Items</p><p className="mt-1 text-sm text-slate-900">{viewing.item_count ?? 0}</p></div>
+                            <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Comments</p><p className="mt-1 text-sm text-slate-900">{viewing.comment_count ?? 0}</p></div>
+                            <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</p><div className="mt-1"><StatusBadge active={viewing.is_active} activeLabel="Active" inactiveLabel="Inactive" /></div></div>
+                        </div>
+
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Notes</p>
+                            <p className="mt-1 whitespace-pre-wrap text-sm text-slate-900">{viewing.notes || '-'}</p>
+                        </div>
+
+                        <button type="button" onClick={editFromDetails} className="w-full rounded-lg bg-slate-900 py-2 text-sm font-medium text-white hover:bg-slate-800">
+                            Edit Questionnaire
+                        </button>
+                    </div>
+                )}
+            </SlideOver>
 
             <SlideOver open={slideOpen} onClose={() => setSlideOpen(false)} title={editing ? 'Edit Questionnaire' : 'New Questionnaire'} width="max-w-2xl">
                 <form onSubmit={submit} className="space-y-4">
@@ -345,9 +391,9 @@ export default function Questionnaires({ questionnaires, questionnaireTypes, que
 
                     <div className="flex gap-3 pt-2">
                         <button type="button" onClick={() => setSlideOpen(false)} className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700">Cancel</button>
-                        <button type="submit" disabled={processing} className="flex-1 rounded-lg bg-slate-900 py-2 text-sm font-medium text-white disabled:opacity-60">
-                            {processing ? 'Saving...' : editing ? 'Update' : 'Create'}
-                        </button>
+                        <SubmitButton processing={processing} className="flex-1">
+                            {editing ? 'Update' : 'Create'}
+                        </SubmitButton>
                     </div>
                 </form>
             </SlideOver>

@@ -5,6 +5,7 @@ import Pagination from './Pagination';
 export default function ResourceTable({
     columns,
     data,
+    onRowClick,
     onEdit,
     editLabel = 'Edit',
     onDelete,
@@ -13,6 +14,7 @@ export default function ResourceTable({
     filters = {},
     routeName,
     extraHeaderActions,
+    rowActions,
 }) {
     const [search, setSearch] = useState(filters.search ?? '');
     const timerRef = useRef(null);
@@ -73,7 +75,7 @@ export default function ResourceTable({
                                     {col.label}
                                 </th>
                             ))}
-                            {(onEdit || onDelete) && (
+                            {(onEdit || onDelete || rowActions) && (
                                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
                                     Actions
                                 </th>
@@ -84,7 +86,7 @@ export default function ResourceTable({
                         {data.data?.length === 0 && (
                             <tr>
                                 <td
-                                    colSpan={columns.length + (showRowNumbers ? 1 : 0) + ((onEdit || onDelete) ? 1 : 0)}
+                                    colSpan={columns.length + (showRowNumbers ? 1 : 0) + ((onEdit || onDelete || rowActions) ? 1 : 0)}
                                     className="px-4 py-10 text-center text-sm text-slate-500"
                                 >
                                     No records found.
@@ -92,7 +94,14 @@ export default function ResourceTable({
                             </tr>
                         )}
                         {data.data?.map((row, i) => (
-                            <tr key={row.id ?? i} className="hover:bg-slate-50/70">
+                            <tr
+                                key={row.id ?? i}
+                                className={[
+                                    'hover:bg-slate-50/70',
+                                    onRowClick ? 'cursor-pointer' : '',
+                                ].join(' ')}
+                                onClick={onRowClick ? () => onRowClick(row) : undefined}
+                            >
                                 {showRowNumbers && (
                                     <td className="px-4 py-3 text-sm font-medium text-slate-500">
                                         {pageStart + i}
@@ -103,13 +112,23 @@ export default function ResourceTable({
                                         {col.render ? col.render(row) : row[col.key] ?? '-'}
                                     </td>
                                 ))}
-                                {(onEdit || onDelete) && (
+                                {(onEdit || onDelete || rowActions) && (
                                     <td className="px-4 py-3 text-right">
                                         <div className="flex justify-end gap-2">
+                                            {rowActions && (
+                                                <div
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    {rowActions(row)}
+                                                </div>
+                                            )}
                                             {onEdit && (
                                                 <button
                                                     type="button"
-                                                    onClick={() => onEdit(row)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onEdit(row);
+                                                    }}
                                                     className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
                                                 >
                                                     {editLabel}
@@ -118,7 +137,10 @@ export default function ResourceTable({
                                             {onDelete && (
                                                 <button
                                                     type="button"
-                                                    onClick={() => onDelete(row)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onDelete(row);
+                                                    }}
                                                     className="rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50"
                                                 >
                                                     Delete

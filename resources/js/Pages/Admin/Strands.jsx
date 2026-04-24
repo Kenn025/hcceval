@@ -2,18 +2,21 @@ import ConfirmDialog from '@/Components/Admin/ConfirmDialog';
 import FormField, { SelectInput } from '@/Components/Admin/FormField';
 import ResourceTable from '@/Components/Admin/ResourceTable';
 import SlideOver from '@/Components/Admin/SlideOver';
+import SubmitButton from '@/Components/Admin/SubmitButton';
 import StatusBadge from '@/Components/Admin/StatusBadge';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { router, useForm } from '@inertiajs/react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+
+const stripCampusSuffix = (value) => String(value ?? '').replace(/\s*-\s*(Santa Rosa|Concepcion)\s*$/i, '').trim();
 
 export default function Strands({ strands, filters, branches, selectedBranchId, scopedBranchId, advisers, strandNameOptions }) {
     const [slideOpen, setSlideOpen] = useState(false);
+    const [detailOpen, setDetailOpen] = useState(false);
     const [editing, setEditing] = useState(null);
+    const [viewing, setViewing] = useState(null);
     const [deleteTarget, setDeleteTarget] = useState(null);
     const activeBranchId = String(selectedBranchId ?? scopedBranchId ?? '');
-    const activeBranch = branches.find((branch) => String(branch.id) === activeBranchId);
-
     const { data, setData, errors, processing, reset, clearErrors } = useForm({
         branch_id: activeBranchId,
         name: '',
@@ -21,12 +24,14 @@ export default function Strands({ strands, filters, branches, selectedBranchId, 
         is_activated: true,
     });
 
-    const filteredAdvisers = advisers.filter((adviser) => {
-        const branchMatches = !data.branch_id || String(adviser.branch_id) === String(data.branch_id);
-        const assignmentMatches = !adviser.strand_id || String(adviser.strand_id) === String(editing?.id ?? '');
-
-        return branchMatches && assignmentMatches;
-    });
+    const filteredAdvisers = useMemo(
+        () => advisers.filter((adviser) => {
+            const adviserBranchId = adviser.department_branch_id ?? adviser.branch_id;
+            const branchMatches = !data.branch_id || String(adviserBranchId) === String(data.branch_id);
+            return branchMatches;
+        }),
+        [advisers, data.branch_id],
+    );
 
     const openCreate = () => {
         reset();
@@ -53,10 +58,24 @@ export default function Strands({ strands, filters, branches, selectedBranchId, 
         setSlideOpen(true);
     };
 
+    const openView = (row) => {
+        setViewing(row);
+        setDetailOpen(true);
+    };
+
+    const editFromDetails = () => {
+        if (!viewing) return;
+        openEdit(viewing);
+    };
+
     const submit = (e) => {
         e.preventDefault();
         const url = editing ? route('admin.senior-high.strands') + '/' + editing.id : route('admin.senior-high.strands');
-        (editing ? router.put : router.post)(url, data, {
+        const request = editing
+            ? (targetUrl, payload, options) => router.put(targetUrl, payload, options)
+            : (targetUrl, payload, options) => router.post(targetUrl, payload, options);
+
+        request(url, data, {
             onSuccess: () => {
                 setSlideOpen(false);
                 reset();
@@ -76,7 +95,7 @@ export default function Strands({ strands, filters, branches, selectedBranchId, 
 
     const columns = [
         { key: 'code', label: 'Code' },
-        { key: 'name', label: 'Strand Name' },
+        { key: 'name', label: 'Strand Name', render: (row) => stripCampusSuffix(row.name) || '-' },
         { key: 'branch', label: 'Branch', render: (row) => row.department?.branch?.name ?? '-' },
         { key: 'department', label: 'Department', render: (row) => row.department?.name ?? '-' },
         { key: 'assigned_adviser', label: 'Assigned Adviser', render: (row) => row.assigned_adviser_name ?? '-' },
@@ -115,14 +134,42 @@ export default function Strands({ strands, filters, branches, selectedBranchId, 
                 })}
             </div>
 
-            <ResourceTable columns={columns} data={strands} filters={filters} routeName="admin.senior-high.strands" searchPlaceholder="Search strands..." onEdit={openEdit} onDelete={setDeleteTarget} />
+            <ResourceTable columns={columns} data={strands} filters={filters} routeName="admin.senior-high.strands" searchPlaceholder="Search strands..." onRowClick={openView} onEdit={openEdit} onDelete={setDeleteTarget} />
+
+            <SlideOver open={detailOpen} onClose={() => setDetailOpen(false)} title="Strand Information">
+                {viewing && (
+                    <div className="space-y-6">
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Overview</p>
+                            <h3 className="mt-1 text-lg font-semibold text-slate-900">{viewing.name ?? '-'}</h3>
+                            <p className="mt-1 text-sm text-slate-600">{viewing.code ?? '-'}</p>
+                        </div>
+
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Branch</p><p className="mt-1 text-sm text-slate-900">{viewing.department?.branch?.name ?? '-'}</p></div>
+                            <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Department</p><p className="mt-1 text-sm text-slate-900">{viewing.department?.name ?? '-'}</p></div>
+                            <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Assigned Adviser</p><p className="mt-1 text-sm text-slate-900">{viewing.assigned_adviser_name ?? '-'}</p></div>
+                            <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</p><div className="mt-1"><StatusBadge active={viewing.is_activated} /></div></div>
+                        </div>
+
+                        <button type="button" onClick={editFromDetails} className="w-full rounded-lg bg-slate-900 py-2 text-sm font-medium text-white hover:bg-slate-800">
+                            Edit Strand
+                        </button>
+                    </div>
+                )}
+            </SlideOver>
 
             <SlideOver open={slideOpen} onClose={() => setSlideOpen(false)} title={editing ? 'Edit Strand' : 'New Strand'}>
                 <form onSubmit={submit} className="space-y-4">
                     <FormField label="Branch" error={errors.branch_id} required>
-                        <div className="text-base font-medium text-slate-800">
-                            {activeBranch?.name ?? 'No branch selected'}
-                        </div>
+                        <SelectInput value={data.branch_id} onChange={(e) => setData({
+                            ...data,
+                            branch_id: e.target.value,
+                            adviser_teacher_id: '',
+                        })}>
+                            <option value="">Select branch...</option>
+                            {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+                        </SelectInput>
                     </FormField>
 
                     <FormField label="Strand Name" error={errors.name} required>
@@ -135,6 +182,7 @@ export default function Strands({ strands, filters, branches, selectedBranchId, 
                     <FormField label="Assigned Adviser" error={errors.adviser_teacher_id}>
                         <SelectInput value={data.adviser_teacher_id} onChange={(e) => setData('adviser_teacher_id', e.target.value)}>
                             <option value="">Select adviser...</option>
+                            {!filteredAdvisers.length && data.branch_id && <option value="" disabled>No Senior High advisers found for this branch.</option>}
                             {filteredAdvisers.map((adviser) => <option key={adviser.id} value={adviser.id}>{adviser.full_name}</option>)}
                         </SelectInput>
                     </FormField>
@@ -145,9 +193,9 @@ export default function Strands({ strands, filters, branches, selectedBranchId, 
 
                     <div className="flex gap-3 pt-2">
                         <button type="button" onClick={() => setSlideOpen(false)} className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700">Cancel</button>
-                        <button type="submit" disabled={processing} className="flex-1 rounded-lg bg-slate-900 py-2 text-sm font-medium text-white disabled:opacity-60">
-                            {processing ? 'Saving...' : editing ? 'Update' : 'Create'}
-                        </button>
+                        <SubmitButton processing={processing} className="flex-1">
+                            {editing ? 'Update' : 'Create'}
+                        </SubmitButton>
                     </div>
                 </form>
             </SlideOver>

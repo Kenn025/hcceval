@@ -18,11 +18,23 @@ class TeacherController extends Controller
         $search   = $request->input('search', '');
         $scopedId = $this->scopedBranchId();
         $branchId = $scopedId ?? $request->input('branch_id');
+        $departmentId = $request->input('department_id');
+        $programId = $request->input('program_id');
+        $branches = Branch::query()
+            ->select('id', 'name', 'code')
+            ->where('is_deleted', 0)
+            ->where('code', '!=', 'OVERALL')
+            ->when($scopedId, fn ($query) => $query->where('id', $scopedId))
+            ->orderBy('name')
+            ->get();
 
         $teachers = Teacher::query()
             ->with(['branch:id,name', 'department:id,name', 'program:id,name'])
             ->where('is_deleted', 0)
+            ->when($this->isBranchAdmin(), fn ($q) => $q->where('role', 'Program Chair'))
             ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
+            ->when($departmentId, fn ($q) => $q->where('department_id', $departmentId))
+            ->when($programId, fn ($q) => $q->where('program_id', $programId))
             ->when($search, fn ($q) => $q->where(function ($sub) use ($search) {
                 $sub->where('firstname', 'like', "%{$search}%")
                     ->orWhere('lastname', 'like', "%{$search}%")
@@ -36,60 +48,56 @@ class TeacherController extends Controller
 
         return Inertia::render('Admin/Teachers', [
             'teachers'      => $teachers,
-            'filters'       => ['search' => $search, 'branch_id' => $branchId],
-            'branches'      => $scopedId ? [] : Branch::query()
-                ->select('id', 'name')
+            'filters'       => [
+                'search' => $search, 
+                'branch_id' => $branchId,
+                'department_id' => $departmentId,
+                'program_id' => $programId,
+            ],
+            'branches'      => $branches,
+            'departments'   => Department::query()
+                ->select('id', 'name', 'code', 'branch_id', 'is_activated')
                 ->where('is_deleted', 0)
-                ->where('code', '!=', 'OVERALL')
+                ->where('is_activated', 1)
+                ->when($scopedId, fn ($q) => $q->where('branch_id', $scopedId))
                 ->orderBy('name')
                 ->get(),
-            'departments'   => Department::select('id', 'name')->orderBy('name')->get(),
-            'programs'      => Program::select('id', 'name')->orderBy('name')->get(),
-            'strands'       => Strand::select('id', 'name')->orderBy('name')->get(),
+            'programs'      => Program::query()
+                ->select('id', 'name', 'department_id')
+                ->where('is_deleted', 0)
+                ->when($scopedId, fn ($q) => $q->whereHas('department', fn ($department) => $department->where('branch_id', $scopedId)))
+                ->orderBy('name')
+                ->get(),
+            'strands'       => Strand::query()
+                ->select('id', 'name', 'department_id')
+                ->where('is_deleted', 0)
+                ->when($scopedId, fn ($q) => $q->whereHas('department', fn ($department) => $department->where('branch_id', $scopedId)))
+                ->orderBy('name')
+                ->get(),
+            'nextTeacherCodes' => array_merge(
+                ['default' => $this->generateTeacherCode()],
+                $branches
+                    ->mapWithKeys(fn ($branch) => [(string) $branch->id => $this->generateTeacherCode((int) $branch->id)])
+                    ->all()
+            ),
             'isBranchAdmin' => $this->isBranchAdmin(),
+            'selectedBranchId' => $branchId ? (int) $branchId : null,
+            'scopedBranchId' => $scopedId,
         ]);
     }
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'employee_no' => 'required|string|max:50|unique:teacher,code',
-            'branch_id' => 'required|exists:branch,id',
-            'department_id' => 'nullable|exists:department,id',
-            'program_id' => 'nullable|exists:program,id',
-            'strand_id' => 'nullable|exists:strand,id',
-            'first_name' => 'required|string|max:100',
-            'middle_name' => 'nullable|string|max:100',
-            'last_name' => 'required|string|max:100',
-            'suffix_name' => 'nullable|string|max:50',
-            'email' => 'nullable|email|max:150|unique:teacher,email',
-            'password' => 'nullable|string|min:6',
-            'role' => 'nullable|string|max:100',
-        ]);
-
-        Teacher::create($this->mapTeacherPayload($validated));
+        $payload = $this->teacherPayloadFromRequest($request);
+        Teacher::create($this->mapTeacherPayload($payload));
 
         return back()->with('success', 'Teacher created successfully.');
     }
 
     public function update(Request $request, Teacher $teacher)
     {
-        $validated = $request->validate([
-            'employee_no' => "required|string|max:50|unique:teacher,code,{$teacher->id}",
-            'branch_id' => 'required|exists:branch,id',
-            'department_id' => 'nullable|exists:department,id',
-            'program_id' => 'nullable|exists:program,id',
-            'strand_id' => 'nullable|exists:strand,id',
-            'first_name' => 'required|string|max:100',
-            'middle_name' => 'nullable|string|max:100',
-            'last_name' => 'required|string|max:100',
-            'suffix_name' => 'nullable|string|max:50',
-            'email' => "nullable|email|max:150|unique:teacher,email,{$teacher->id}",
-            'password' => 'nullable|string|min:6',
-            'role' => 'nullable|string|max:100',
-        ]);
-
-        $teacher->update($this->mapTeacherPayload($validated, false));
+        $payload = $this->teacherPayloadFromRequest($request);
+        $teacher->update($this->mapTeacherPayload($payload, false));
 
         return back()->with('success', 'Teacher updated successfully.');
     }
@@ -103,15 +111,17 @@ class TeacherController extends Controller
 
     protected function mapTeacherPayload(array $validated, bool $includeDefaultPassword = true): array
     {
+        $branchId = $validated['branch_id'] ?: null;
+
         $payload = [
-            'code' => $validated['employee_no'],
-            'branch_id' => $validated['branch_id'],
+            'code' => $validated['employee_no'] ?: $this->generateTeacherCode($branchId ? (int) $branchId : null),
+            'branch_id' => $branchId,
             'department_id' => $validated['department_id'] ?: null,
             'program_id' => $validated['program_id'] ?: null,
             'strand_id' => $validated['strand_id'] ?: null,
-            'firstname' => $validated['first_name'],
+            'firstname' => $validated['first_name'] ?: null,
             'middlename' => $validated['middle_name'] ?: null,
-            'lastname' => $validated['last_name'],
+            'lastname' => $validated['last_name'] ?: null,
             'email' => $validated['email'] ?: null,
             'role' => $validated['role'] ?: null,
             'is_activated' => true,
@@ -125,5 +135,71 @@ class TeacherController extends Controller
         }
 
         return $payload;
+    }
+
+    protected function generateTeacherCode(?int $branchId = null): string
+    {
+        if ($branchId === null) {
+            return $this->generateGenericTeacherCode();
+        }
+
+        $branch = Branch::query()
+            ->select('id', 'code')
+            ->findOrFail($branchId);
+
+        $branchCode = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) $branch->code));
+        $prefix = 'TCH-' . $branchCode . '-';
+
+        $lastCode = Teacher::query()
+            ->where('branch_id', $branchId)
+            ->where('code', 'like', $prefix . '%')
+            ->orderByDesc('id')
+            ->value('code');
+
+        $lastNumber = 0;
+
+        if ($lastCode && preg_match('/(\d+)$/', $lastCode, $matches)) {
+            $lastNumber = (int) $matches[1];
+        }
+
+        return $prefix . str_pad((string) ($lastNumber + 1), 5, '0', STR_PAD_LEFT);
+    }
+
+    protected function generateGenericTeacherCode(): string
+    {
+        $prefix = 'TCH-GEN-';
+
+        $lastCode = Teacher::query()
+            ->where('code', 'like', $prefix . '%')
+            ->orderByDesc('id')
+            ->value('code');
+
+        $lastNumber = 0;
+
+        if ($lastCode && preg_match('/(\d+)$/', $lastCode, $matches)) {
+            $lastNumber = (int) $matches[1];
+        }
+
+        return $prefix . str_pad((string) ($lastNumber + 1), 5, '0', STR_PAD_LEFT);
+    }
+
+    protected function teacherPayloadFromRequest(Request $request): array
+    {
+        $scopedBranchId = $this->scopedBranchId();
+
+        return [
+            'employee_no' => $request->input('employee_no'),
+            'branch_id' => $scopedBranchId ?? $request->input('branch_id'),
+            'department_id' => $request->input('department_id'),
+            'program_id' => $request->input('program_id'),
+            'strand_id' => $request->input('strand_id'),
+            'first_name' => $request->input('first_name'),
+            'middle_name' => $request->input('middle_name'),
+            'last_name' => $request->input('last_name'),
+            'suffix_name' => $request->input('suffix_name'),
+            'email' => $request->input('email'),
+            'password' => $request->input('password'),
+            'role' => $request->input('role', 'Teacher'),
+        ];
     }
 }

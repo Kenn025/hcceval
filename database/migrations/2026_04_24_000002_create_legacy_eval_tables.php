@@ -18,6 +18,7 @@ return new class extends Migration
             $table->id();
             $table->string('code', 50)->unique();
             $table->string('name', 150);
+            $table->unsignedBigInteger('questionnaire_id')->nullable();
             $table->string('highest_department', 50)->nullable();
             $table->text('custom_settings')->nullable();
             $table->text('address')->nullable();
@@ -25,6 +26,7 @@ return new class extends Migration
             $table->boolean('is_activated')->default(true);
             $table->boolean('is_deleted')->default(false);
             $table->timestamps();
+            $table->index('questionnaire_id');
         });
 
         Schema::create('admin', function (Blueprint $table) {
@@ -60,11 +62,13 @@ return new class extends Migration
             $table->string('code', 50)->unique();
             $table->string('name', 150);
             $table->unsignedBigInteger('department_id')->nullable();
+            $table->unsignedBigInteger('questionnaire_id')->nullable();
             $table->integer('duration_years');
             $table->boolean('is_activated')->default(true);
             $table->boolean('is_deleted')->default(false);
             $table->timestamps();
             $table->index('department_id');
+            $table->index('questionnaire_id');
             $table->foreign('department_id')->references('id')->on('department')->nullOnDelete()->cascadeOnUpdate();
         });
 
@@ -112,6 +116,7 @@ return new class extends Migration
             $table->unsignedBigInteger('department_id')->nullable();
             $table->unsignedBigInteger('program_id')->nullable();
             $table->unsignedBigInteger('strand_id')->nullable();
+            $table->unsignedBigInteger('questionnaire_id')->nullable();
             $table->boolean('is_activated')->default(true);
             $table->boolean('is_deleted')->default(false);
             $table->timestamps();
@@ -119,6 +124,7 @@ return new class extends Migration
             $table->index('department_id');
             $table->index('program_id');
             $table->index('strand_id');
+            $table->index('questionnaire_id');
             $table->foreign('branch_id')->references('id')->on('branch')->nullOnDelete()->cascadeOnUpdate();
             $table->foreign('department_id')->references('id')->on('department')->nullOnDelete()->cascadeOnUpdate();
             $table->foreign('program_id')->references('id')->on('program')->nullOnDelete()->cascadeOnUpdate();
@@ -139,6 +145,7 @@ return new class extends Migration
             $table->unsignedBigInteger('program_id')->nullable();
             $table->unsignedBigInteger('strand_id')->nullable();
             $table->unsignedBigInteger('branch_id')->nullable();
+            $table->unsignedBigInteger('questionnaire_id')->nullable();
             $table->boolean('is_activated')->default(true);
             $table->boolean('is_deleted')->default(false);
             $table->timestamps();
@@ -146,6 +153,7 @@ return new class extends Migration
             $table->index('department_id');
             $table->index('program_id');
             $table->index('strand_id');
+            $table->index('questionnaire_id');
             $table->foreign('department_id')->references('id')->on('department')->nullOnDelete()->cascadeOnUpdate();
             $table->foreign('program_id')->references('id')->on('program')->nullOnDelete()->cascadeOnUpdate();
             $table->foreign('strand_id')->references('id')->on('strand')->nullOnDelete()->cascadeOnUpdate();
@@ -167,6 +175,8 @@ return new class extends Migration
             $table->unsignedBigInteger('strand_id')->nullable();
             $table->unsignedBigInteger('education_level_id')->nullable();
             $table->json('subject_id')->nullable();
+            $table->boolean('is_irreg')->default(false);
+            $table->unsignedBigInteger('irreg_subject_id')->nullable();
             $table->boolean('is_activated')->default(true);
             $table->boolean('is_deleted')->default(false);
             $table->timestamps();
@@ -175,6 +185,7 @@ return new class extends Migration
             $table->index('program_id');
             $table->index('strand_id');
             $table->index('education_level_id');
+            $table->index('irreg_subject_id');
             $table->foreign('branch_id')->references('id')->on('branch')->nullOnDelete()->cascadeOnUpdate();
             $table->foreign('department_id')->references('id')->on('department')->nullOnDelete()->cascadeOnUpdate();
             $table->foreign('program_id')->references('id')->on('program')->nullOnDelete()->cascadeOnUpdate();
@@ -190,6 +201,7 @@ return new class extends Migration
             $table->unsignedBigInteger('department_id')->nullable();
             $table->unsignedBigInteger('program_id')->nullable();
             $table->unsignedBigInteger('strand_id')->nullable();
+            $table->unsignedBigInteger('questionnaire_id')->nullable();
             $table->json('teacher_id')->nullable();
             $table->boolean('is_gened')->default(false);
             $table->boolean('is_activated')->default(true);
@@ -198,9 +210,14 @@ return new class extends Migration
             $table->index('department_id');
             $table->index('program_id');
             $table->index('strand_id');
+            $table->index('questionnaire_id');
             $table->foreign('department_id')->references('id')->on('department')->nullOnDelete()->cascadeOnUpdate();
             $table->foreign('program_id')->references('id')->on('program')->nullOnDelete()->cascadeOnUpdate();
             $table->foreign('strand_id')->references('id')->on('strand')->nullOnDelete()->cascadeOnUpdate();
+        });
+
+        Schema::table('student', function (Blueprint $table) {
+            $table->foreign('irreg_subject_id')->references('id')->on('subject')->nullOnDelete()->cascadeOnUpdate();
         });
 
         // Evaluation cycle
@@ -303,6 +320,26 @@ return new class extends Migration
             $table->foreign('branch_id')->references('id')->on('branch')->nullOnDelete()->cascadeOnUpdate();
             $table->foreign('questionnaire_type_id')->references('id')->on('questionnaire_type')->nullOnDelete()->cascadeOnUpdate();
             $table->foreign('question_choices_id')->references('id')->on('question_choices')->nullOnDelete()->cascadeOnUpdate();
+        });
+
+        Schema::table('branch', function (Blueprint $table) {
+            $table->foreign('questionnaire_id')->references('id')->on('questionnaires')->nullOnDelete()->cascadeOnUpdate();
+        });
+
+        Schema::table('program', function (Blueprint $table) {
+            $table->foreign('questionnaire_id')->references('id')->on('questionnaires')->nullOnDelete()->cascadeOnUpdate();
+        });
+
+        Schema::table('teacher', function (Blueprint $table) {
+            $table->foreign('questionnaire_id')->references('id')->on('questionnaires')->nullOnDelete()->cascadeOnUpdate();
+        });
+
+        Schema::table('employee', function (Blueprint $table) {
+            $table->foreign('questionnaire_id')->references('id')->on('questionnaires')->nullOnDelete()->cascadeOnUpdate();
+        });
+
+        Schema::table('subject', function (Blueprint $table) {
+            $table->foreign('questionnaire_id')->references('id')->on('questionnaires')->nullOnDelete()->cascadeOnUpdate();
         });
 
         Schema::create('questionnaire_distribution', function (Blueprint $table) {

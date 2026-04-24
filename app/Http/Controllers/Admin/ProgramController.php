@@ -40,6 +40,14 @@ class ProgramController extends Controller
             ->select('id', 'name', 'code')
             ->where('is_deleted', 0)
             ->where('code', '!=', 'OVERALL')
+            ->whereHas('departments', function ($query) {
+                $query->where('is_deleted', 0)
+                    ->where('is_activated', 1)
+                    ->where(function ($departmentQuery) {
+                        $departmentQuery->where('name', 'like', '%College%')
+                            ->orWhere('code', 'like', '%COL%');
+                    });
+            })
             ->when($scopedId, fn ($q) => $q->where('id', $scopedId))
             ->orderBy('name')
             ->get();
@@ -69,9 +77,14 @@ class ProgramController extends Controller
         });
 
         $departments = Department::query()
-            ->select('id', 'name', 'branch_id')
+            ->select('id', 'name', 'code', 'branch_id')
             ->where('is_deleted', 0)
-            ->when($selectedBranchId, fn ($q) => $q->where('branch_id', $selectedBranchId))
+            ->where('is_activated', 1)
+            ->where(function ($query) {
+                $query->where('name', 'like', '%College%')
+                    ->orWhere('code', 'like', '%COL%');
+            })
+            ->when($scopedId, fn ($q) => $q->where('branch_id', $scopedId))
             ->orderBy('name')
             ->get();
 
@@ -79,7 +92,7 @@ class ProgramController extends Controller
             ->select('id', 'branch_id', 'department_id', 'program_id', 'firstname', 'middlename', 'lastname', 'role')
             ->where('is_deleted', 0)
             ->where('is_activated', 1)
-            ->when($selectedBranchId, fn ($q) => $q->where('branch_id', $selectedBranchId))
+            ->when($scopedId, fn ($q) => $q->where('branch_id', $scopedId))
             ->orderBy('lastname')
             ->orderBy('firstname')
             ->get()
@@ -183,6 +196,7 @@ class ProgramController extends Controller
         $department = Department::query()
             ->where('branch_id', $validated['branch_id'])
             ->where('is_deleted', 0)
+            ->where('is_activated', 1)
             ->where(function ($query) {
                 $query->where('name', 'like', '%College%')
                     ->orWhere('code', 'like', '%COL%');

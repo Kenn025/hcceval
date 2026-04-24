@@ -18,6 +18,13 @@ class EmployeeController extends Controller
         $search   = $request->input('search', '');
         $scopedId = $this->scopedBranchId();
         $branchId = $scopedId ?? $request->input('branch_id');
+        $branches = Branch::query()
+            ->select('id', 'name', 'code')
+            ->where('is_deleted', 0)
+            ->where('code', '!=', 'OVERALL')
+            ->when($scopedId, fn ($query) => $query->where('id', $scopedId))
+            ->orderBy('name')
+            ->get();
 
         $employees = Employee::query()
             ->with(['branch:id,name', 'department:id,name', 'program:id,name'])
@@ -37,59 +44,34 @@ class EmployeeController extends Controller
         return Inertia::render('Admin/Employees', [
             'employees'     => $employees,
             'filters'       => ['search' => $search, 'branch_id' => $branchId],
-            'branches'      => $scopedId ? [] : Branch::query()
-                ->select('id', 'name')
-                ->where('is_deleted', 0)
-                ->where('code', '!=', 'OVERALL')
-                ->orderBy('name')
-                ->get(),
+            'branches'      => $branches,
             'departments'   => Department::select('id', 'name')->orderBy('name')->get(),
             'programs'      => Program::select('id', 'name')->orderBy('name')->get(),
             'strands'       => Strand::select('id', 'name')->orderBy('name')->get(),
+            'nextEmployeeCodes' => array_merge(
+                ['default' => $this->generateEmployeeCode()],
+                $branches
+                    ->mapWithKeys(fn ($branch) => [(string) $branch->id => $this->generateEmployeeCode((int) $branch->id)])
+                    ->all()
+            ),
             'isBranchAdmin' => $this->isBranchAdmin(),
+            'selectedBranchId' => $branchId ? (int) $branchId : null,
+            'scopedBranchId' => $scopedId,
         ]);
     }
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'employee_no' => 'required|string|max:50|unique:employee,code',
-            'branch_id' => 'required|exists:branch,id',
-            'department_id' => 'nullable|exists:department,id',
-            'program_id' => 'nullable|exists:program,id',
-            'strand_id' => 'nullable|exists:strand,id',
-            'first_name' => 'required|string|max:100',
-            'middle_name' => 'nullable|string|max:100',
-            'last_name' => 'required|string|max:100',
-            'suffix_name' => 'nullable|string|max:50',
-            'email' => 'nullable|email|max:150|unique:employee,email',
-            'password' => 'nullable|string|min:6',
-            'role' => 'nullable|string|max:100',
-        ]);
-
-        Employee::create($this->mapEmployeePayload($validated));
+        $payload = $this->employeePayloadFromRequest($request);
+        Employee::create($this->mapEmployeePayload($payload));
 
         return back()->with('success', 'Employee created successfully.');
     }
 
     public function update(Request $request, Employee $employee)
     {
-        $validated = $request->validate([
-            'employee_no' => "required|string|max:50|unique:employee,code,{$employee->id}",
-            'branch_id' => 'required|exists:branch,id',
-            'department_id' => 'nullable|exists:department,id',
-            'program_id' => 'nullable|exists:program,id',
-            'strand_id' => 'nullable|exists:strand,id',
-            'first_name' => 'required|string|max:100',
-            'middle_name' => 'nullable|string|max:100',
-            'last_name' => 'required|string|max:100',
-            'suffix_name' => 'nullable|string|max:50',
-            'email' => "nullable|email|max:150|unique:employee,email,{$employee->id}",
-            'password' => 'nullable|string|min:6',
-            'role' => 'nullable|string|max:100',
-        ]);
-
-        $employee->update($this->mapEmployeePayload($validated, false));
+        $payload = $this->employeePayloadFromRequest($request);
+        $employee->update($this->mapEmployeePayload($payload, false));
 
         return back()->with('success', 'Employee updated successfully.');
     }
@@ -103,9 +85,11 @@ class EmployeeController extends Controller
 
     protected function mapEmployeePayload(array $validated, bool $includeDefaultPassword = true): array
     {
+        $branchId = $validated['branch_id'] ?: null;
+
         $payload = [
-            'code' => $validated['employee_no'],
-            'branch_id' => $validated['branch_id'],
+            'code' => $validated['employee_no'] ?: $this->generateEmployeeCode($branchId ? (int) $branchId : null),
+            'branch_id' => $branchId,
             'department_id' => $validated['department_id'] ?: null,
             'program_id' => $validated['program_id'] ?: null,
             'strand_id' => $validated['strand_id'] ?: null,
@@ -125,5 +109,71 @@ class EmployeeController extends Controller
         }
 
         return $payload;
+    }
+
+    protected function employeePayloadFromRequest(Request $request): array
+    {
+        $scopedBranchId = $this->scopedBranchId();
+
+        return [
+            'employee_no' => $request->input('employee_no'),
+            'branch_id' => $scopedBranchId ?? $request->input('branch_id'),
+            'department_id' => $request->input('department_id'),
+            'program_id' => $request->input('program_id'),
+            'strand_id' => $request->input('strand_id'),
+            'first_name' => $request->input('first_name'),
+            'middle_name' => $request->input('middle_name'),
+            'last_name' => $request->input('last_name'),
+            'suffix_name' => $request->input('suffix_name'),
+            'email' => $request->input('email'),
+            'password' => $request->input('password'),
+            'role' => $request->input('role', 'Employee'),
+        ];
+    }
+
+    protected function generateEmployeeCode(?int $branchId = null): string
+    {
+        if ($branchId === null) {
+            return $this->generateGenericEmployeeCode();
+        }
+
+        $branch = Branch::query()
+            ->select('id', 'code')
+            ->findOrFail($branchId);
+
+        $branchCode = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) $branch->code));
+        $prefix = 'EMP-' . $branchCode . '-';
+
+        $lastCode = Employee::query()
+            ->where('branch_id', $branchId)
+            ->where('code', 'like', $prefix . '%')
+            ->orderByDesc('id')
+            ->value('code');
+
+        $lastNumber = 0;
+
+        if ($lastCode && preg_match('/(\d+)$/', $lastCode, $matches)) {
+            $lastNumber = (int) $matches[1];
+        }
+
+        return $prefix . str_pad((string) ($lastNumber + 1), 5, '0', STR_PAD_LEFT);
+    }
+
+    protected function generateGenericEmployeeCode(): string
+    {
+        $prefix = 'EMP-GEN-';
+
+        $lastCode = Employee::query()
+            ->where('code', 'like', $prefix . '%')
+            ->orderByDesc('id')
+            ->value('code');
+
+        $lastNumber = 0;
+
+        if ($lastCode && preg_match('/(\d+)$/', $lastCode, $matches)) {
+            $lastNumber = (int) $matches[1];
+        }
+
+        return $prefix . str_pad((string) ($lastNumber + 1), 5, '0', STR_PAD_LEFT);
     }
 }

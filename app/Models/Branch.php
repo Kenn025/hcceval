@@ -16,6 +16,18 @@ class Branch extends Model
 
     protected $casts = ['is_main' => 'boolean', 'is_activated' => 'boolean', 'is_deleted' => 'boolean'];
 
+    protected $appends = ['is_active', 'status'];
+
+    public function getIsActiveAttribute(): bool
+    {
+        return (bool) ($this->attributes['is_activated'] ?? false);
+    }
+
+    public function getStatusAttribute(): string
+    {
+        return ($this->attributes['is_activated'] ?? false) ? 'Active' : 'Inactive';
+    }
+
     public function departments(): HasMany
     {
         return $this->hasMany(Department::class);

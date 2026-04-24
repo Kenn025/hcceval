@@ -31,6 +31,14 @@ class StrandController extends Controller
             ->select('id', 'name', 'code')
             ->where('is_deleted', 0)
             ->where('code', '!=', 'OVERALL')
+            ->whereHas('departments', function ($query) {
+                $query->where('is_deleted', 0)
+                    ->where('is_activated', 1)
+                    ->where(function ($departmentQuery) {
+                        $departmentQuery->where('name', 'like', '%Senior High%')
+                            ->orWhere('code', 'like', '%SHS%');
+                    });
+            })
             ->when($scopedId, fn ($q) => $q->where('id', $scopedId))
             ->orderBy('name')
             ->get();
@@ -60,15 +68,25 @@ class StrandController extends Controller
 
         $advisers = Teacher::query()
             ->select('id', 'branch_id', 'department_id', 'strand_id', 'firstname', 'middlename', 'lastname')
+            ->with('department:id,branch_id')
             ->where('is_deleted', 0)
             ->where('is_activated', 1)
-            ->when($selectedBranchId, fn ($q) => $q->where('branch_id', $selectedBranchId))
+            ->when($scopedId, fn ($q) => $q->where('branch_id', $scopedId))
+            ->whereHas('department', function ($query) {
+                $query->where('is_deleted', 0)
+                    ->where('is_activated', 1)
+                    ->where(function ($departmentQuery) {
+                        $departmentQuery->where('name', 'like', '%Senior High%')
+                            ->orWhere('code', 'like', '%SHS%');
+                    });
+            })
             ->orderBy('lastname')
             ->orderBy('firstname')
             ->get()
             ->map(fn (Teacher $teacher) => [
                 'id' => $teacher->id,
                 'branch_id' => $teacher->branch_id,
+                'department_branch_id' => $teacher->department?->branch_id,
                 'department_id' => $teacher->department_id,
                 'strand_id' => $teacher->strand_id,
                 'full_name' => $teacher->full_name,
@@ -85,7 +103,12 @@ class StrandController extends Controller
             'departments' => Department::query()
                 ->select('id', 'name', 'branch_id')
                 ->where('is_deleted', 0)
-                ->when($selectedBranchId, fn ($q) => $q->where('branch_id', $selectedBranchId))
+                ->where('is_activated', 1)
+                ->when($scopedId, fn ($q) => $q->where('branch_id', $scopedId))
+                ->where(function ($query) {
+                    $query->where('name', 'like', '%Senior High%')
+                        ->orWhere('code', 'like', '%SHS%');
+                })
                 ->orderBy('name')
                 ->get(),
         ]);
@@ -145,6 +168,7 @@ class StrandController extends Controller
         $department = Department::query()
             ->where('branch_id', $validated['branch_id'])
             ->where('is_deleted', 0)
+            ->where('is_activated', 1)
             ->where(function ($query) {
                 $query->where('name', 'like', '%Senior High%')
                     ->orWhere('code', 'like', '%SHS%');

@@ -1,4 +1,5 @@
 import AppIcon from '@/Components/AppIcon';
+import FlashNotification from '@/Components/FlashNotification';
 import { Head, Link, usePage, useForm, router } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -250,6 +251,7 @@ export default function AdminLayout({ title, children, header, activeRoute, brea
     return (
         <>
             <Head title={title} />
+            <FlashNotification />
             <div className="min-h-screen bg-[#f0f4f9] text-slate-900">
 
                 {/* Mobile backdrop */}
