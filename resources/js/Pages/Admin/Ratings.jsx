@@ -7,12 +7,24 @@ const ROUTE_MAP = {
     subject: 'admin.subject-ratings',
     peer: 'admin.peer-ratings',
     employee: 'admin.employee-ratings',
+    head: 'admin.head-ratings',
+    branch: 'admin.branch-ratings',
+};
+
+const EXPORT_ROUTE_MAP = {
+    subject: 'admin.subject-ratings.export',
+    peer: 'admin.peer-ratings.export',
+    employee: 'admin.employee-ratings.export',
+    head: 'admin.head-ratings.export',
+    branch: 'admin.branch-ratings.export',
 };
 
 const TITLE_MAP = {
     subject: 'Subject Ratings',
     peer: 'Peer Ratings',
     employee: 'Employee Ratings',
+    head: 'Department Head Ratings',
+    branch: 'Branch Ratings',
 };
 
 const SUBJECT_COLUMNS = [
@@ -39,7 +51,29 @@ const EMPLOYEE_COLUMNS = [
     { key: 'school_year', label: 'School Year' },
 ];
 
-const COLUMNS_MAP = { subject: SUBJECT_COLUMNS, peer: PEER_COLUMNS, employee: EMPLOYEE_COLUMNS };
+const HEAD_COLUMNS = [
+    { key: 'rating_id', label: '#' },
+    { key: 'teacher_name', label: 'Department Head', render: (r) => r.teacher_name ?? '—' },
+    { key: 'overall_rating', label: 'Rating', render: (r) => r.overall_rating ? Number(r.overall_rating).toFixed(2) : '—' },
+    { key: 'submission_count', label: 'Responses' },
+    { key: 'school_year', label: 'School Year' },
+];
+
+const BRANCH_COLUMNS = [
+    { key: 'rating_id', label: '#' },
+    { key: 'branch_name', label: 'Branch', render: (r) => r.branch_name ?? '—' },
+    { key: 'overall_rating', label: 'Rating', render: (r) => r.overall_rating ? Number(r.overall_rating).toFixed(2) : '—' },
+    { key: 'submission_count', label: 'Responses' },
+    { key: 'school_year', label: 'School Year' },
+];
+
+const COLUMNS_MAP = {
+    subject: SUBJECT_COLUMNS,
+    peer: PEER_COLUMNS,
+    employee: EMPLOYEE_COLUMNS,
+    head: HEAD_COLUMNS,
+    branch: BRANCH_COLUMNS,
+};
 
 export default function Ratings({ ratings, ratingType, filters, schoolYears }) {
     const [selectedYear, setSelectedYear] = useState(filters.school_year ?? '');
@@ -58,16 +92,34 @@ export default function Ratings({ ratings, ratingType, filters, schoolYears }) {
                     <h2 className="text-base font-semibold text-slate-900">{TITLE_MAP[ratingType]}</h2>
                     <p className="text-sm text-slate-500">View and monitor {ratingType} evaluation results.</p>
                 </div>
-                {schoolYears?.length > 0 && (
-                    <select
-                        value={selectedYear}
-                        onChange={(e) => handleYearFilter(e.target.value)}
-                        className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                <div className="flex flex-wrap items-center gap-2">
+                    {schoolYears?.length > 0 && (
+                        <select
+                            value={selectedYear}
+                            onChange={(e) => handleYearFilter(e.target.value)}
+                            className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                        >
+                            <option value="">All school years</option>
+                            {schoolYears.map((y) => <option key={y} value={y}>{y}</option>)}
+                        </select>
+                    )}
+                    <a
+                        href={route(EXPORT_ROUTE_MAP[ratingType] ?? EXPORT_ROUTE_MAP.subject, { search: filters.search ?? '', school_year: selectedYear })}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
                     >
-                        <option value="">All school years</option>
-                        {schoolYears.map((y) => <option key={y} value={y}>{y}</option>)}
-                    </select>
-                )}
+                        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12l7 7 7-7" /></svg>
+                        Export CSV
+                    </a>
+                    <a
+                        href={route('admin.reports.summary', { school_year: selectedYear })}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                    >
+                        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9V4h12v5M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z" /></svg>
+                        Print Summary
+                    </a>
+                </div>
             </div>
 
             <ResourceTable

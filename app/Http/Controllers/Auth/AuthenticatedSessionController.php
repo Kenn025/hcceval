@@ -32,9 +32,10 @@ class AuthenticatedSessionController extends Controller
         $request->session()->regenerate();
 
         return match ($request->input('login_destination')) {
-            'student' => redirect()->route('portal.student.dashboard'),
+            '2fa'                 => redirect()->route('two-factor.challenge'),
+            'student'             => redirect()->route('portal.student.dashboard'),
             'teacher', 'employee' => redirect()->route('portal.teacher.dashboard'),
-            default => redirect()->intended(route('dashboard', absolute: false)),
+            default               => redirect()->intended(route('dashboard', absolute: false)),
         };
     }
 

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\StoreStudentRequest;
+use App\Http\Requests\Admin\UpdateStudentRequest;
 use App\Models\Branch;
 use App\Models\Department;
 use App\Models\EducationLevel;
@@ -57,48 +59,16 @@ class StudentController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(StoreStudentRequest $request)
     {
-        $validated = $request->validate([
-            'student_no' => 'required|string|max:50|unique:student,code',
-            'branch_id' => 'required|exists:branch,id',
-            'department_id' => 'required|exists:department,id',
-            'program_id' => 'nullable|exists:program,id',
-            'strand_id' => 'nullable|exists:strand,id',
-            'year_level_id' => 'nullable|exists:education_level,id',
-            'first_name' => 'required|string|max:100',
-            'middle_name' => 'nullable|string|max:100',
-            'last_name' => 'required|string|max:100',
-            'suffix_name' => 'nullable|string|max:50',
-            'email' => 'nullable|email|max:150|unique:student,email',
-            'password' => 'nullable|string|min:6',
-            'status' => 'nullable|string|max:50',
-        ]);
-
-        Student::create($this->mapStudentPayload($validated));
+        Student::create($this->mapStudentPayload($request->validated()));
 
         return back()->with('success', 'Student created successfully.');
     }
 
-    public function update(Request $request, Student $student)
+    public function update(UpdateStudentRequest $request, Student $student)
     {
-        $validated = $request->validate([
-            'student_no' => "required|string|max:50|unique:student,code,{$student->id}",
-            'branch_id' => 'required|exists:branch,id',
-            'department_id' => 'required|exists:department,id',
-            'program_id' => 'nullable|exists:program,id',
-            'strand_id' => 'nullable|exists:strand,id',
-            'year_level_id' => 'nullable|exists:education_level,id',
-            'first_name' => 'required|string|max:100',
-            'middle_name' => 'nullable|string|max:100',
-            'last_name' => 'required|string|max:100',
-            'suffix_name' => 'nullable|string|max:50',
-            'email' => "nullable|email|max:150|unique:student,email,{$student->id}",
-            'password' => 'nullable|string|min:6',
-            'status' => 'nullable|string|max:50',
-        ]);
-
-        $student->update($this->mapStudentPayload($validated, false));
+        $student->update($this->mapStudentPayload($request->validated(), false));
 
         return back()->with('success', 'Student updated successfully.');
     }

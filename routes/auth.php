@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\ConfirmablePasswordController;
+use App\Http\Controllers\Auth\TwoFactorChallengeController;
 use App\Http\Controllers\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Auth\EmailVerificationPromptController;
 use App\Http\Controllers\Auth\NewPasswordController;
@@ -21,6 +22,11 @@ Route::middleware('guest')->group(function () {
     Route::get('login', [ClientLoginController::class, 'showLogin'])->name('login');
 
     Route::post('login', [AuthenticatedSessionController::class, 'store'])->name('login.submit');
+
+    // Two-factor challenge (admin) — session state is created during LoginRequest::authenticate
+    Route::get('two-factor/challenge', [TwoFactorChallengeController::class, 'show'])->name('two-factor.challenge');
+    Route::post('two-factor/resend', [TwoFactorChallengeController::class, 'send'])->middleware('throttle:3,5')->name('two-factor.send');
+    Route::post('two-factor/verify', [TwoFactorChallengeController::class, 'verify'])->middleware('throttle:5,5')->name('two-factor.verify');
 
     Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
         ->name('password.request');

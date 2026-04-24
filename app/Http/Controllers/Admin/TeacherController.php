@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\StoreTeacherRequest;
+use App\Http\Requests\Admin\UpdateTeacherRequest;
 use App\Models\Branch;
 use App\Models\Department;
 use App\Models\Program;
@@ -50,46 +52,16 @@ class TeacherController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(StoreTeacherRequest $request)
     {
-        $validated = $request->validate([
-            'employee_no' => 'required|string|max:50|unique:teacher,code',
-            'branch_id' => 'required|exists:branch,id',
-            'department_id' => 'nullable|exists:department,id',
-            'program_id' => 'nullable|exists:program,id',
-            'strand_id' => 'nullable|exists:strand,id',
-            'first_name' => 'required|string|max:100',
-            'middle_name' => 'nullable|string|max:100',
-            'last_name' => 'required|string|max:100',
-            'suffix_name' => 'nullable|string|max:50',
-            'email' => 'nullable|email|max:150|unique:teacher,email',
-            'password' => 'nullable|string|min:6',
-            'role' => 'nullable|string|max:100',
-        ]);
-
-        Teacher::create($this->mapTeacherPayload($validated));
+        Teacher::create($this->mapTeacherPayload($request->validated()));
 
         return back()->with('success', 'Teacher created successfully.');
     }
 
-    public function update(Request $request, Teacher $teacher)
+    public function update(UpdateTeacherRequest $request, Teacher $teacher)
     {
-        $validated = $request->validate([
-            'employee_no' => "required|string|max:50|unique:teacher,code,{$teacher->id}",
-            'branch_id' => 'required|exists:branch,id',
-            'department_id' => 'nullable|exists:department,id',
-            'program_id' => 'nullable|exists:program,id',
-            'strand_id' => 'nullable|exists:strand,id',
-            'first_name' => 'required|string|max:100',
-            'middle_name' => 'nullable|string|max:100',
-            'last_name' => 'required|string|max:100',
-            'suffix_name' => 'nullable|string|max:50',
-            'email' => "nullable|email|max:150|unique:teacher,email,{$teacher->id}",
-            'password' => 'nullable|string|min:6',
-            'role' => 'nullable|string|max:100',
-        ]);
-
-        $teacher->update($this->mapTeacherPayload($validated, false));
+        $teacher->update($this->mapTeacherPayload($request->validated(), false));
 
         return back()->with('success', 'Teacher updated successfully.');
     }
