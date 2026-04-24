@@ -88,7 +88,6 @@ export default function Assignments({ assignments, assignmentType, filters }) {
     ];
 
     const columns = [
-        { key: 'distribution_id', label: '#' },
         { key: 'distribution_code', label: 'Distribution Code', render: (row) => row.distribution_code ?? '-' },
         { key: 'questionnaire_title', label: 'Questionnaire', render: (row) => row.questionnaire_title ?? '-' },
         { key: 'questionnaire_type_name', label: 'Questionnaire Type', render: (row) => row.questionnaire_type_name ?? '-' },
