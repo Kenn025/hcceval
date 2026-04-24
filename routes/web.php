@@ -26,6 +26,7 @@ use App\Http\Controllers\Client\EmployeePortalController;
 use App\Http\Controllers\Client\StudentPortalController;
 use App\Http\Controllers\Client\TeacherPortalController;
 use App\Http\Controllers\BugReportController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -185,6 +186,12 @@ Route::middleware('auth')->group(function () {
     // Bug Reports
     Route::post('/bug-report', [BugReportController::class, 'store'])->name('bug-report.store');
 
+    // Notifications (admin)
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead'])->name('notifications.read')->whereNumber('id');
+    Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
+    Route::delete('/notifications/clear', [NotificationController::class, 'clear'])->name('notifications.clear');
+
     // Profile
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
@@ -206,6 +213,12 @@ Route::prefix('portal')->name('portal.')->group(function () {
     Route::get('/password/reset', [ClientPasswordResetController::class, 'showReset'])->name('password.reset');
     Route::post('/password/reset', [ClientPasswordResetController::class, 'reset'])->name('password.update')
         ->middleware('throttle:5,10');
+
+    // Portal notifications (student / teacher / employee)
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead'])->name('notifications.read')->whereNumber('id');
+    Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
+    Route::delete('/notifications/clear', [NotificationController::class, 'clear'])->name('notifications.clear');
 
     // Student portal
     Route::middleware('student.auth')->group(function () {
