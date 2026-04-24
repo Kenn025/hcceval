@@ -5,9 +5,11 @@ use App\Http\Controllers\Admin\AssignmentController;
 use App\Http\Controllers\Admin\BranchController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DepartmentController;
+use App\Http\Controllers\Admin\EmployeeController;
 use App\Http\Controllers\Admin\EvaluationCycleController;
 use App\Http\Controllers\Admin\ProgramController;
 use App\Http\Controllers\Admin\QuestionController;
+use App\Http\Controllers\Admin\QuestionnaireController;
 use App\Http\Controllers\Admin\RatingsController;
 use App\Http\Controllers\Admin\StrandController;
 use App\Http\Controllers\Admin\StudentController;
@@ -79,16 +81,29 @@ Route::middleware('auth')->group(function () {
     // Teachers
     Route::get('/admin/teachers', [TeacherController::class, 'index'])->name('admin.teachers');
     Route::post('/admin/teachers', [TeacherController::class, 'store']);
-    Route::put('/admin/teachers/{employee}', [TeacherController::class, 'update']);
-    Route::delete('/admin/teachers/{employee}', [TeacherController::class, 'destroy']);
+    Route::put('/admin/teachers/{teacher}', [TeacherController::class, 'update']);
+    Route::delete('/admin/teachers/{teacher}', [TeacherController::class, 'destroy']);
+
+    // Employees
+    Route::get('/admin/employees', [EmployeeController::class, 'index'])->name('admin.employees');
+    Route::post('/admin/employees', [EmployeeController::class, 'store']);
+    Route::put('/admin/employees/{employee}', [EmployeeController::class, 'update']);
+    Route::delete('/admin/employees/{employee}', [EmployeeController::class, 'destroy']);
 
     // Questions
+    Route::get('/admin/questions', [QuestionController::class, 'index'])->name('admin.questions');
     Route::get('/admin/subject-questions', [QuestionController::class, 'subjectQuestions'])->name('admin.subject-questions');
     Route::get('/admin/peer-questions', [QuestionController::class, 'peerQuestions'])->name('admin.peer-questions');
     Route::get('/admin/employee-questions', [QuestionController::class, 'employeeQuestions'])->name('admin.employee-questions');
     Route::post('/admin/questions', [QuestionController::class, 'store']);
     Route::put('/admin/questions/{id}', [QuestionController::class, 'update']);
     Route::delete('/admin/questions/{id}', [QuestionController::class, 'destroy']);
+
+    // Questionnaires
+    Route::get('/admin/questionnaires', [QuestionnaireController::class, 'index'])->name('admin.questionnaires');
+    Route::post('/admin/questionnaires', [QuestionnaireController::class, 'store']);
+    Route::put('/admin/questionnaires/{id}', [QuestionnaireController::class, 'update']);
+    Route::delete('/admin/questionnaires/{id}', [QuestionnaireController::class, 'destroy']);
 
     // Assignments
     Route::get('/admin/subject-assignments', [AssignmentController::class, 'subjectAssignments'])->name('admin.subject-assignments');

@@ -190,39 +190,39 @@ class DatabaseSeeder extends Seeder
         ]);
 
         DB::table('question_class')->insert([
-            ['id' => 1, 'code' => 'QC-01', 'name' => 'Teacher Evaluation', 'is_activated' => 1, 'is_deleted' => 0],
-            ['id' => 2, 'code' => 'QC-02', 'name' => 'Employee Evaluation', 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 1, 'branch_id' => 1, 'code' => 'QC-01', 'name' => 'Teacher Evaluation', 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 2, 'branch_id' => 1, 'code' => 'QC-02', 'name' => 'Employee Evaluation', 'is_activated' => 1, 'is_deleted' => 0],
         ]);
 
         DB::table('question_type')->insert([
-            ['id' => 1, 'code' => 'QT-01', 'name' => 'Scale', 'is_activated' => 1, 'is_deleted' => 0],
-            ['id' => 2, 'code' => 'QT-02', 'name' => 'Comment', 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 1, 'branch_id' => 1, 'code' => 'QT-01', 'name' => 'Scale', 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 2, 'branch_id' => 1, 'code' => 'QT-02', 'name' => 'Comment', 'is_activated' => 1, 'is_deleted' => 0],
         ]);
 
         DB::table('question_choices')->insert([
-            ['id' => 1, 'code' => 'QCH-05', 'quantity' => 5, 'verbal_interpretation' => json_encode(['1' => 'Poor', '2' => 'Fair', '3' => 'Good', '4' => 'Very Good', '5' => 'Excellent']), 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 1, 'branch_id' => 1, 'code' => 'QCH-05', 'quantity' => 5, 'verbal_interpretation' => json_encode(['1' => 'Poor', '2' => 'Fair', '3' => 'Good', '4' => 'Very Good', '5' => 'Excellent']), 'is_activated' => 1, 'is_deleted' => 0],
         ]);
 
         DB::table('question')->insert([
-            ['id' => 1, 'code' => 'Q-001', 'description' => 'The instructor discusses the lessons clearly.', 'question_type_id' => 1, 'is_required' => 1, 'is_activated' => 1, 'is_deleted' => 0],
-            ['id' => 2, 'code' => 'Q-002', 'description' => 'The instructor comes to class prepared.', 'question_type_id' => 1, 'is_required' => 1, 'is_activated' => 1, 'is_deleted' => 0],
-            ['id' => 3, 'code' => 'Q-003', 'description' => 'Additional comments or suggestions.', 'question_type_id' => 2, 'is_required' => 0, 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 1, 'branch_id' => 1, 'code' => 'Q-001', 'description' => 'The instructor discusses the lessons clearly.', 'question_type_id' => 1, 'is_required' => 1, 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 2, 'branch_id' => 1, 'code' => 'Q-002', 'description' => 'The instructor comes to class prepared.', 'question_type_id' => 1, 'is_required' => 1, 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 3, 'branch_id' => 1, 'code' => 'Q-003', 'description' => 'Additional comments or suggestions.', 'question_type_id' => 2, 'is_required' => 0, 'is_activated' => 1, 'is_deleted' => 0],
         ]);
 
         DB::table('questionnaire_type')->insert([
-            ['id' => 1, 'code' => 'QTYPE-TEACHER', 'name' => 'Teacher Evaluation Form', 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 1, 'branch_id' => 1, 'code' => 'QTYPE-TEACHER', 'name' => 'Teacher Evaluation Form', 'is_activated' => 1, 'is_deleted' => 0],
         ]);
 
         DB::table('questionnaires')->insert([
-            ['id' => 1, 'code' => 'QUES-001', 'questionnaire_type_id' => 1, 'question_choices_id' => 1, 'items' => json_encode([1, 2]), 'comments' => json_encode([3]), 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 1, 'branch_id' => 2, 'code' => 'QUES-001', 'questionnaire_type_id' => 1, 'question_choices_id' => 1, 'items' => json_encode([1, 2]), 'comments' => json_encode([3]), 'is_activated' => 1, 'is_deleted' => 0],
         ]);
 
         DB::table('questionnaire_distribution')->insert([
-            ['id' => 1, 'code' => 'QD-001', 'questionnaire_id' => 1, 'academic_year_id' => 1, 'items' => json_encode([1, 2, 3]), 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 1, 'branch_id' => 2, 'code' => 'QD-001', 'questionnaire_id' => 1, 'academic_year_id' => 1, 'items' => json_encode([1, 2, 3]), 'is_activated' => 1, 'is_deleted' => 0],
         ]);
 
         DB::table('answer_questionnaires')->insert([
-            ['id' => 1, 'code' => 'A1000000', 'academic_year_id' => 1, 'questionnaire_id' => 1, 'teacher_id' => 1, 'subject_id' => 1, 'answers' => json_encode(['1' => 5, '2' => 4]), 'comments' => json_encode(['Very good teacher'])],
+            ['id' => 1, 'branch_id' => 2, 'code' => 'A1000000', 'academic_year_id' => 1, 'questionnaire_id' => 1, 'teacher_id' => 1, 'subject_id' => 1, 'answers' => json_encode(['1' => 5, '2' => 4]), 'comments' => json_encode(['Very good teacher'])],
         ]);
 
         DB::table('ratings_subject')->insert([

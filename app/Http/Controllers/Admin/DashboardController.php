@@ -8,6 +8,7 @@ use App\Models\Department;
 use App\Models\Employee;
 use App\Models\Program;
 use App\Models\Student;
+use App\Models\Teacher;
 use Inertia\Inertia;
 
 class DashboardController extends Controller
@@ -18,7 +19,8 @@ class DashboardController extends Controller
 
         $stats = [
             ['label' => 'Students', 'value' => Student::when($branchId, fn ($q) => $q->where('branch_id', $branchId))->count(), 'icon' => 'students'],
-            ['label' => 'Teachers', 'value' => Employee::when($branchId, fn ($q) => $q->where('branch_id', $branchId))->count(), 'icon' => 'teachers'],
+            ['label' => 'Teachers', 'value' => Teacher::when($branchId, fn ($q) => $q->where('branch_id', $branchId))->count(), 'icon' => 'teachers'],
+            ['label' => 'Employees', 'value' => Employee::when($branchId, fn ($q) => $q->where('branch_id', $branchId))->count(), 'icon' => 'briefcase'],
             ['label' => 'Programs', 'value' => Program::count(), 'icon' => 'programs'],
         ];
 

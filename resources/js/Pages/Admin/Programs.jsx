@@ -11,46 +11,37 @@ export default function Programs({
     programs,
     filters,
     branches,
-    departments,
     chairs,
     programNameOptions,
     scopedBranchId,
     isBranchAdmin,
+    selectedBranchId,
 }) {
     const [slideOpen, setSlideOpen] = useState(false);
     const [editing, setEditing] = useState(null);
     const [deleteTarget, setDeleteTarget] = useState(null);
+    const activeBranchId = String(selectedBranchId ?? scopedBranchId ?? '');
+    const activeBranch = branches.find((branch) => String(branch.id) === activeBranchId);
 
     const { data, setData, errors, processing, reset, clearErrors } = useForm({
-        branch_id: scopedBranchId ? String(scopedBranchId) : '',
-        department_id: '',
+        branch_id: activeBranchId,
         name: '',
         chair_teacher_id: '',
         duration_years: '',
         is_activated: true,
     });
 
-    const filteredDepartments = departments.filter((department) => {
-        if (!data.branch_id) {
-            return true;
-        }
-
-        return String(department.branch_id) === String(data.branch_id);
-    });
-
     const filteredChairs = chairs.filter((chair) => {
         const branchMatches = !data.branch_id || String(chair.branch_id) === String(data.branch_id);
-        const departmentMatches = !data.department_id || String(chair.department_id) === String(data.department_id);
         const assignmentMatches = !chair.program_id || String(chair.program_id) === String(editing?.id ?? '');
 
-        return branchMatches && departmentMatches && assignmentMatches;
+        return branchMatches && assignmentMatches;
     });
 
     const openCreate = () => {
         reset();
         setData({
-            branch_id: scopedBranchId ? String(scopedBranchId) : '',
-            department_id: '',
+            branch_id: activeBranchId,
             name: '',
             chair_teacher_id: '',
             duration_years: '',
@@ -63,8 +54,7 @@ export default function Programs({
 
     const openEdit = (row) => {
         setData({
-            branch_id: String(row.department?.branch_id ?? row.branch_id ?? scopedBranchId ?? ''),
-            department_id: String(row.department_id ?? ''),
+            branch_id: String(row.department?.branch_id ?? row.branch_id ?? activeBranchId ?? ''),
             name: row.name,
             chair_teacher_id: String(row.assigned_chair?.id ?? ''),
             duration_years: row.duration_years ?? '',
@@ -75,26 +65,13 @@ export default function Programs({
         setSlideOpen(true);
     };
 
-    const handleBranchChange = (value) => {
-        const nextBranchId = String(value);
-        const nextDepartmentValid = departments.some((department) => (
-            String(department.id) === String(data.department_id)
-            && String(department.branch_id) === nextBranchId
-        ));
-
-        setData({
-            ...data,
-            branch_id: nextBranchId,
-            department_id: nextDepartmentValid ? data.department_id : '',
-            chair_teacher_id: '',
-        });
-    };
-
-    const handleDepartmentChange = (value) => {
-        setData({
-            ...data,
-            department_id: String(value),
-            chair_teacher_id: '',
+    const switchBranch = (branchId) => {
+        router.get(route('admin.college.programs'), {
+            ...filters,
+            branch_id: branchId,
+        }, {
+            preserveState: true,
+            replace: true,
         });
     };
 
@@ -129,22 +106,36 @@ export default function Programs({
                 <button onClick={openCreate} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">+ New Program</button>
             </div>
 
+            <div className="mb-4 flex flex-wrap gap-2">
+                {branches.map((branch) => {
+                    const isActive = String(branch.id) === activeBranchId;
+
+                    return (
+                        <button
+                            key={branch.id}
+                            type="button"
+                            onClick={() => switchBranch(branch.id)}
+                            className={[
+                                'rounded-full border px-4 py-2 text-sm font-medium transition',
+                                isActive
+                                    ? 'border-slate-900 bg-slate-900 text-white'
+                                    : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50',
+                            ].join(' ')}
+                        >
+                            {branch.name}
+                        </button>
+                    );
+                })}
+            </div>
+
             <ResourceTable columns={columns} data={programs} filters={filters} routeName="admin.college.programs" searchPlaceholder="Search programs..." onEdit={openEdit} onDelete={setDeleteTarget} />
 
             <SlideOver open={slideOpen} onClose={() => setSlideOpen(false)} title={editing ? 'Edit Program' : 'New Program'} width="max-w-lg">
                 <form onSubmit={submit} className="space-y-4">
                     <FormField label="Branch" error={errors.branch_id} required>
-                        <SelectInput value={data.branch_id} onChange={(e) => handleBranchChange(e.target.value)} disabled={isBranchAdmin}>
-                            <option value="">Select branch...</option>
-                            {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-                        </SelectInput>
-                    </FormField>
-
-                    <FormField label="Department" error={errors.department_id} required>
-                        <SelectInput value={data.department_id} onChange={(e) => handleDepartmentChange(e.target.value)} disabled={!data.branch_id}>
-                            <option value="">Select department...</option>
-                            {filteredDepartments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
-                        </SelectInput>
+                        <div className="text-base font-medium text-slate-800">
+                            {activeBranch?.name ?? 'No branch selected'}
+                        </div>
                     </FormField>
 
                     <FormField label="Program Name" error={errors.name} required>
@@ -155,7 +146,7 @@ export default function Programs({
                     </FormField>
 
                     <FormField label="Assigned Chair" error={errors.chair_teacher_id}>
-                        <SelectInput value={data.chair_teacher_id} onChange={(e) => setData('chair_teacher_id', e.target.value)} disabled={!data.branch_id || !data.department_id}>
+                        <SelectInput value={data.chair_teacher_id} onChange={(e) => setData('chair_teacher_id', e.target.value)}>
                             <option value="">Select chair...</option>
                             {filteredChairs.map((chair) => <option key={chair.id} value={chair.id}>{chair.full_name}</option>)}
                         </SelectInput>

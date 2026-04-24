@@ -57,11 +57,14 @@ return [
             'items' => [
                 ['label' => 'Students', 'route' => 'admin.students', 'icon' => 'students'],
                 ['label' => 'Teachers', 'route' => 'admin.teachers', 'icon' => 'teachers'],
+                ['label' => 'Employees', 'route' => 'admin.employees', 'icon' => 'briefcase'],
             ],
         ],
         [
             'title' => 'Question Bank',
             'items' => [
+                ['label' => 'Questions', 'route' => 'admin.questions', 'icon' => 'questions'],
+                ['label' => 'Questionnaires', 'route' => 'admin.questionnaires', 'icon' => 'assignments'],
                 ['label' => 'Subject Assignments', 'route' => 'admin.subject-assignments', 'icon' => 'assignments'],
                 ['label' => 'Subject Questions', 'route' => 'admin.subject-questions', 'icon' => 'questions'],
                 ['label' => 'Peer Assignments', 'route' => 'admin.peer-assignments', 'icon' => 'peer'],
@@ -176,12 +179,33 @@ return [
             'icon' => 'teachers',
             'source' => ['admin/user_management.php', 'Client/teacher_dashboard.php'],
         ],
+        'admin.employees' => [
+            'title' => 'Employees',
+            'description' => 'Employee directory for non-teaching staff, branch scope, and office-role management.',
+            'eyebrow' => 'User Management',
+            'icon' => 'briefcase',
+            'source' => ['admin/user_management.php', 'Client/employee_dashboard.php'],
+        ],
         'admin.subject-assignments' => [
             'title' => 'Subject Assignments',
             'description' => 'Subject questionnaire assignment builder for courses, sections, and current evaluation cycle rules.',
             'eyebrow' => 'Question Bank',
             'icon' => 'assignments',
             'source' => ['admin/subject_question_assignment.php', 'admin/subject_assignment.php'],
+        ],
+        'admin.questions' => [
+            'title' => 'Questions',
+            'description' => 'Reusable question registry with question codes, question types, and bank-wide maintenance actions.',
+            'eyebrow' => 'Question Bank',
+            'icon' => 'questions',
+            'source' => ['admin/question_management.php'],
+        ],
+        'admin.questionnaires' => [
+            'title' => 'Questionnaires',
+            'description' => 'Questionnaire builder with questionnaire codes, types, choice sets, and linked question items.',
+            'eyebrow' => 'Question Bank',
+            'icon' => 'assignments',
+            'source' => ['admin/questionnaire_management.php'],
         ],
         'admin.subject-questions' => [
             'title' => 'Subject Questions',

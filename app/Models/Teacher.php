@@ -48,4 +48,19 @@ class Teacher extends Model
     {
         return $this->code ?: ('TCH-' . str_pad((string) $this->id, 4, '0', STR_PAD_LEFT));
     }
+
+    public function toArray(): array
+    {
+        $attributes = parent::toArray();
+
+        $attributes['first_name'] = $attributes['firstname'] ?? null;
+        $attributes['middle_name'] = $attributes['middlename'] ?? null;
+        $attributes['last_name'] = $attributes['lastname'] ?? null;
+        $attributes['suffix_name'] = null;
+        $attributes['employee_no'] = $attributes['code'] ?? $this->employee_no;
+        $attributes['is_active'] = (bool) ($attributes['is_activated'] ?? false);
+        $attributes['status'] = ($attributes['is_activated'] ?? false) ? 'Active' : 'Inactive';
+
+        return $attributes;
+    }
 }

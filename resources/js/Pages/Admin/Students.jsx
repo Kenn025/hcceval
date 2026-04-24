@@ -30,6 +30,13 @@ export default function Students({ students, filters, branches, departments, pro
         (editing ? router.put : router.post)(url, data, { onSuccess: () => { setSlideOpen(false); reset(); } });
     };
 
+    const changeBranch = (branchId = '') => {
+        router.get(route('admin.students'), { ...filters, branch_id: branchId }, {
+            preserveState: true,
+            replace: true,
+        });
+    };
+
     const columns = [
         { key: 'student_no', label: 'Student No.' },
         { key: 'full_name', label: 'Full Name', render: (r) => `${r.last_name}, ${r.first_name} ${r.middle_name ?? ''}`.trim() },
@@ -48,6 +55,28 @@ export default function Students({ students, filters, branches, departments, pro
                 </div>
                 <button onClick={openCreate} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">+ New Student</button>
             </div>
+
+            {branches.length > 0 && (
+                <div className="mb-4 flex flex-wrap gap-2">
+                    <button
+                        type="button"
+                        onClick={() => changeBranch('')}
+                        className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${!filters.branch_id ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50'}`}
+                    >
+                        Overall Branch
+                    </button>
+                    {branches.map((branch) => (
+                        <button
+                            key={branch.id}
+                            type="button"
+                            onClick={() => changeBranch(branch.id)}
+                            className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${String(filters.branch_id ?? '') === String(branch.id) ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50'}`}
+                        >
+                            {branch.name}
+                        </button>
+                    ))}
+                </div>
+            )}
 
             <ResourceTable columns={columns} data={students} filters={filters} routeName="admin.students" searchPlaceholder="Search by name or student no…" onEdit={openEdit} onDelete={setDeleteTarget} />
 

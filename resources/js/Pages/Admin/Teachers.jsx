@@ -15,13 +15,13 @@ export default function Teachers({ teachers, filters, branches, departments, pro
     const { data, setData, errors, processing, reset, clearErrors } = useForm({
         employee_no: '', branch_id: '', department_id: '', program_id: '', strand_id: '',
         first_name: '', middle_name: '', last_name: '', suffix_name: '',
-        email: '', password: '', role: 'EMPLOYEE',
+        email: '', password: '', role: 'Teacher',
     });
 
     const openCreate = () => { reset(); clearErrors(); setEditing(null); setSlideOpen(true); };
 
     const openEdit = (row) => {
-        setData({ employee_no: row.employee_no, branch_id: row.branch_id, department_id: row.department_id ?? '', program_id: row.program_id ?? '', strand_id: row.strand_id ?? '', first_name: row.first_name, middle_name: row.middle_name ?? '', last_name: row.last_name, suffix_name: row.suffix_name ?? '', email: row.email ?? '', password: '', role: row.role ?? 'EMPLOYEE' });
+        setData({ employee_no: row.employee_no, branch_id: row.branch_id, department_id: row.department_id ?? '', program_id: row.program_id ?? '', strand_id: row.strand_id ?? '', first_name: row.first_name, middle_name: row.middle_name ?? '', last_name: row.last_name, suffix_name: row.suffix_name ?? '', email: row.email ?? '', password: '', role: row.role ?? 'Teacher' });
         clearErrors(); setEditing(row); setSlideOpen(true);
     };
 
@@ -29,6 +29,13 @@ export default function Teachers({ teachers, filters, branches, departments, pro
         e.preventDefault();
         const url = editing ? route('admin.teachers') + '/' + editing.id : route('admin.teachers');
         (editing ? router.put : router.post)(url, data, { onSuccess: () => { setSlideOpen(false); reset(); } });
+    };
+
+    const changeBranch = (branchId = '') => {
+        router.get(route('admin.teachers'), { ...filters, branch_id: branchId }, {
+            preserveState: true,
+            replace: true,
+        });
     };
 
     const columns = [
@@ -41,14 +48,36 @@ export default function Teachers({ teachers, filters, branches, departments, pro
     ];
 
     return (
-        <AdminLayout title="Teachers / Faculty" activeRoute="admin.teachers" breadcrumbs={['User Management']}>
+        <AdminLayout title="Teachers" activeRoute="admin.teachers" breadcrumbs={['User Management']}>
             <div className="mb-4 flex items-center justify-between">
                 <div>
-                    <h2 className="text-base font-semibold text-slate-900">Teachers / Faculty</h2>
-                    <p className="text-sm text-slate-500">Manage faculty employees, their branch scope, and role assignments.</p>
+                    <h2 className="text-base font-semibold text-slate-900">Teachers</h2>
+                    <p className="text-sm text-slate-500">Manage teaching faculty, their branch scope, and academic role assignments.</p>
                 </div>
                 <button onClick={openCreate} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">+ New Teacher</button>
             </div>
+
+            {branches.length > 0 && (
+                <div className="mb-4 flex flex-wrap gap-2">
+                    <button
+                        type="button"
+                        onClick={() => changeBranch('')}
+                        className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${!filters.branch_id ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50'}`}
+                    >
+                        Overall Branch
+                    </button>
+                    {branches.map((branch) => (
+                        <button
+                            key={branch.id}
+                            type="button"
+                            onClick={() => changeBranch(branch.id)}
+                            className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${String(filters.branch_id ?? '') === String(branch.id) ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50'}`}
+                        >
+                            {branch.name}
+                        </button>
+                    ))}
+                </div>
+            )}
 
             <ResourceTable columns={columns} data={teachers} filters={filters} routeName="admin.teachers" searchPlaceholder="Search by name or employee no…" onEdit={openEdit} onDelete={setDeleteTarget} />
 
@@ -87,9 +116,9 @@ export default function Teachers({ teachers, filters, branches, departments, pro
                     </FormField>
                     <FormField label="Role" error={errors.role}>
                         <SelectInput value={data.role} onChange={(e) => setData('role', e.target.value)}>
-                            <option value="EMPLOYEE">Employee / Teacher</option>
-                            <option value="PROGRAM_CHAIR">Program Chair</option>
-                            <option value="DEPARTMENT_HEAD">Department Head</option>
+                            <option value="Teacher">Teacher</option>
+                            <option value="Program Chair">Program Chair</option>
+                            <option value="Department Head">Department Head</option>
                         </SelectInput>
                     </FormField>
                     <FormField label="Email" error={errors.email}>

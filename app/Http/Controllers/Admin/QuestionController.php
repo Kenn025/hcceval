@@ -12,59 +12,92 @@ class QuestionController extends Controller
     private function getQuestions(string $search = '')
     {
         return DB::table('question')
-            ->select('id as question_id', 'code', 'description as question_text', 'question_type_id', 'is_required', 'is_activated as is_active', 'is_deleted')
-            ->where('is_deleted', 0)
-            ->when($search, fn ($q) => $q->where('description', 'like', "%{$search}%"))
-            ->orderBy('id')
+            ->leftJoin('question_type as qt', 'qt.id', '=', 'question.question_type_id')
+            ->select(
+                'question.id as question_id',
+                'question.code as question_code',
+                'question.description as question_text',
+                'question.question_type_id',
+                'qt.name as question_type_name',
+                'question.is_required',
+                'question.is_activated as is_active',
+                'question.is_deleted'
+            )
+            ->where('question.is_deleted', 0)
+            ->when($search, fn ($q) => $q->where(function ($sub) use ($search) {
+                $sub->where('question.description', 'like', "%{$search}%")
+                    ->orWhere('question.code', 'like', "%{$search}%")
+                    ->orWhere('qt.name', 'like', "%{$search}%");
+            }))
+            ->orderBy('question.code')
             ->paginate(15)
             ->withQueryString();
     }
 
-    public function subjectQuestions(Request $request)
+    private function getQuestionTypes()
+    {
+        return DB::table('question_type')
+            ->select('id', 'code', 'name')
+            ->where('is_deleted', 0)
+            ->where('is_activated', 1)
+            ->orderBy('name')
+            ->get();
+    }
+
+    private function renderQuestionPage(Request $request, string $routeName, string $title, string $description)
     {
         $search = $request->input('search', '');
+
         return Inertia::render('Admin/Questions', [
-            'questions'    => $this->getQuestions($search),
-            'questionType' => 'subject',
-            'filters'      => ['search' => $search],
+            'questions' => $this->getQuestions($search),
+            'questionTypes' => $this->getQuestionTypes(),
+            'filters' => ['search' => $search],
+            'routeName' => $routeName,
+            'title' => $title,
+            'description' => $description,
         ]);
+    }
+
+    public function index(Request $request)
+    {
+        return $this->renderQuestionPage(
+            $request,
+            'admin.questions',
+            'Questions',
+            'Store and manage reusable evaluation questions with question codes and question types.'
+        );
+    }
+
+    public function subjectQuestions(Request $request)
+    {
+        return $this->renderQuestionPage($request, 'admin.subject-questions', 'Subject Questions', 'Question bank for subject evaluations.');
     }
 
     public function peerQuestions(Request $request)
     {
-        $search = $request->input('search', '');
-        return Inertia::render('Admin/Questions', [
-            'questions'    => $this->getQuestions($search),
-            'questionType' => 'peer',
-            'filters'      => ['search' => $search],
-        ]);
+        return $this->renderQuestionPage($request, 'admin.peer-questions', 'Peer Questions', 'Question bank for peer evaluations.');
     }
 
     public function employeeQuestions(Request $request)
     {
-        $search = $request->input('search', '');
-        return Inertia::render('Admin/Questions', [
-            'questions'    => $this->getQuestions($search),
-            'questionType' => 'employee',
-            'filters'      => ['search' => $search],
-        ]);
+        return $this->renderQuestionPage($request, 'admin.employee-questions', 'Employee Questions', 'Question bank for employee evaluations.');
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
+            'question_code' => 'required|string|max:50|unique:question,code',
+            'question_type_id' => 'required|exists:question_type,id',
             'question_text' => 'required|string|max:1000',
             'is_active'     => 'boolean',
         ]);
 
-        $count = DB::table('question')->count() + 1;
-
         DB::table('question')->insert([
-            'code'             => 'Q-' . str_pad($count, 3, '0', STR_PAD_LEFT),
+            'code'             => $validated['question_code'],
             'description'      => $validated['question_text'],
-            'question_type_id' => 1,
+            'question_type_id' => $validated['question_type_id'],
             'is_required'      => 1,
-            'is_activated'     => $validated['is_active'] ? 1 : 0,
+            'is_activated'     => ! empty($validated['is_active']) ? 1 : 0,
             'is_deleted'       => 0,
             'created_at'       => now(),
             'updated_at'       => now(),
@@ -76,13 +109,17 @@ class QuestionController extends Controller
     public function update(Request $request, int $id)
     {
         $validated = $request->validate([
+            'question_code' => "required|string|max:50|unique:question,code,{$id}",
+            'question_type_id' => 'required|exists:question_type,id',
             'question_text' => 'required|string|max:1000',
             'is_active'     => 'boolean',
         ]);
 
         DB::table('question')->where('id', $id)->update([
+            'code' => $validated['question_code'],
             'description'  => $validated['question_text'],
-            'is_activated' => $validated['is_active'] ? 1 : 0,
+            'question_type_id' => $validated['question_type_id'],
+            'is_activated' => ! empty($validated['is_active']) ? 1 : 0,
             'updated_at'   => now(),
         ]);
 
