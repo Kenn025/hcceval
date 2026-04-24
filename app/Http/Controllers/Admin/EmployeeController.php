@@ -50,46 +50,16 @@ class EmployeeController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(\App\Http\Requests\Admin\StoreEmployeeRequest $request)
     {
-        $validated = $request->validate([
-            'employee_no' => 'required|string|max:50|unique:employee,code',
-            'branch_id' => 'required|exists:branch,id',
-            'department_id' => 'nullable|exists:department,id',
-            'program_id' => 'nullable|exists:program,id',
-            'strand_id' => 'nullable|exists:strand,id',
-            'first_name' => 'required|string|max:100',
-            'middle_name' => 'nullable|string|max:100',
-            'last_name' => 'required|string|max:100',
-            'suffix_name' => 'nullable|string|max:50',
-            'email' => 'nullable|email|max:150|unique:employee,email',
-            'password' => 'nullable|string|min:6',
-            'role' => 'nullable|string|max:100',
-        ]);
-
-        Employee::create($this->mapEmployeePayload($validated));
+        Employee::create($this->mapEmployeePayload($request->validated()));
 
         return back()->with('success', 'Employee created successfully.');
     }
 
-    public function update(Request $request, Employee $employee)
+    public function update(\App\Http\Requests\Admin\UpdateEmployeeRequest $request, Employee $employee)
     {
-        $validated = $request->validate([
-            'employee_no' => "required|string|max:50|unique:employee,code,{$employee->id}",
-            'branch_id' => 'required|exists:branch,id',
-            'department_id' => 'nullable|exists:department,id',
-            'program_id' => 'nullable|exists:program,id',
-            'strand_id' => 'nullable|exists:strand,id',
-            'first_name' => 'required|string|max:100',
-            'middle_name' => 'nullable|string|max:100',
-            'last_name' => 'required|string|max:100',
-            'suffix_name' => 'nullable|string|max:50',
-            'email' => "nullable|email|max:150|unique:employee,email,{$employee->id}",
-            'password' => 'nullable|string|min:6',
-            'role' => 'nullable|string|max:100',
-        ]);
-
-        $employee->update($this->mapEmployeePayload($validated, false));
+        $employee->update($this->mapEmployeePayload($request->validated(), false));
 
         return back()->with('success', 'Employee updated successfully.');
     }

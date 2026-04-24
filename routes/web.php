@@ -1,12 +1,16 @@
 <?php
 
 use App\Http\Controllers\Admin\AdminUserController;
+use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Admin\AssignmentController;
+use App\Http\Controllers\Admin\BulkImportController;
+use App\Http\Controllers\Admin\GlobalSearchController;
 use App\Http\Controllers\Admin\BranchController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DepartmentController;
 use App\Http\Controllers\Admin\EmployeeController;
 use App\Http\Controllers\Admin\EvaluationCycleController;
+use App\Http\Controllers\Admin\OutstandingAwardsController;
 use App\Http\Controllers\Admin\ProgramController;
 use App\Http\Controllers\Admin\QuestionController;
 use App\Http\Controllers\Admin\QuestionnaireController;
@@ -17,6 +21,7 @@ use App\Http\Controllers\Admin\SubjectController;
 use App\Http\Controllers\Admin\TeacherController;
 use App\Http\Controllers\Admin\YearLevelController;
 use App\Http\Controllers\Client\ClientLoginController;
+use App\Http\Controllers\Client\ClientPasswordResetController;
 use App\Http\Controllers\Client\EmployeePortalController;
 use App\Http\Controllers\Client\StudentPortalController;
 use App\Http\Controllers\Client\TeacherPortalController;
@@ -118,6 +123,31 @@ Route::middleware('auth')->group(function () {
     Route::get('/admin/employee-ratings', [RatingsController::class, 'employeeRatings'])->name('admin.employee-ratings');
     Route::get('/admin/subject-archives', [RatingsController::class, 'subjectArchives'])->name('admin.subject-archives');
     Route::get('/admin/peer-archives', [RatingsController::class, 'peerArchives'])->name('admin.peer-archives');
+    Route::get('/admin/employee-archives', [RatingsController::class, 'employeeArchives'])->name('admin.employee-archives');
+
+    // Head & Branch ratings
+    Route::get('/admin/head-ratings', [RatingsController::class, 'headRatings'])->name('admin.head-ratings');
+    Route::get('/admin/branch-ratings', [RatingsController::class, 'branchRatings'])->name('admin.branch-ratings');
+
+    // Archive / restore per rating type
+    Route::post('/admin/ratings/{type}/{id}/archive', [RatingsController::class, 'archive'])
+        ->whereIn('type', ['subject', 'peer', 'employee', 'head', 'branch'])
+        ->name('admin.ratings.archive');
+    Route::post('/admin/ratings/{type}/{id}/restore', [RatingsController::class, 'restore'])
+        ->whereIn('type', ['subject', 'peer', 'employee', 'head', 'branch'])
+        ->name('admin.ratings.restore');
+
+    // Exports & Printable Summary
+    Route::get('/admin/subject-ratings/export', [RatingsController::class, 'exportSubject'])->name('admin.subject-ratings.export');
+    Route::get('/admin/peer-ratings/export', [RatingsController::class, 'exportPeer'])->name('admin.peer-ratings.export');
+    Route::get('/admin/employee-ratings/export', [RatingsController::class, 'exportEmployee'])->name('admin.employee-ratings.export');
+    Route::get('/admin/head-ratings/export', [RatingsController::class, 'exportHead'])->name('admin.head-ratings.export');
+    Route::get('/admin/branch-ratings/export', [RatingsController::class, 'exportBranch'])->name('admin.branch-ratings.export');
+    Route::get('/admin/reports/summary', [RatingsController::class, 'summaryReport'])->name('admin.reports.summary');
+
+    // Outstanding Awards
+    Route::get('/admin/outstanding-awards', [OutstandingAwardsController::class, 'index'])->name('admin.outstanding-awards');
+    Route::post('/admin/outstanding-awards/recompute', [OutstandingAwardsController::class, 'recompute'])->name('admin.outstanding-awards.recompute');
 
     // System Controls — superadmin & overalladmin access
     Route::middleware('role:superadmin,overalladmin')->group(function () {
@@ -140,7 +170,17 @@ Route::middleware('auth')->group(function () {
         Route::post('/admin/admin-users', [AdminUserController::class, 'store']);
         Route::put('/admin/admin-users/{admin}', [AdminUserController::class, 'update']);
         Route::delete('/admin/admin-users/{admin}', [AdminUserController::class, 'destroy']);
+
+        Route::get('/admin/audit-logs', [AuditLogController::class, 'index'])->name('admin.audit-logs');
     });
+
+    // Bulk CSV imports
+    Route::post('/admin/import/students', [BulkImportController::class, 'students'])->name('admin.import.students');
+    Route::post('/admin/import/teachers', [BulkImportController::class, 'teachers'])->name('admin.import.teachers');
+    Route::post('/admin/import/employees', [BulkImportController::class, 'employees'])->name('admin.import.employees');
+
+    // Global search
+    Route::get('/admin/search', [GlobalSearchController::class, 'search'])->name('admin.search');
 
     // Bug Reports
     Route::post('/bug-report', [BugReportController::class, 'store'])->name('bug-report.store');
@@ -159,6 +199,14 @@ Route::prefix('portal')->name('portal.')->group(function () {
     Route::post('/logout', [ClientLoginController::class, 'logout'])->name('logout');
     Route::post('/bug-report', [BugReportController::class, 'store'])->name('bug-report.store');
 
+    // Password reset for client users (student / teacher / employee)
+    Route::get('/password/forgot', [ClientPasswordResetController::class, 'showRequest'])->name('password.request');
+    Route::post('/password/forgot', [ClientPasswordResetController::class, 'sendLink'])->name('password.email')
+        ->middleware('throttle:5,10');
+    Route::get('/password/reset', [ClientPasswordResetController::class, 'showReset'])->name('password.reset');
+    Route::post('/password/reset', [ClientPasswordResetController::class, 'reset'])->name('password.update')
+        ->middleware('throttle:5,10');
+
     // Student portal
     Route::middleware('student.auth')->group(function () {
         Route::get('/student', [StudentPortalController::class, 'dashboard'])->name('student.dashboard');
@@ -172,6 +220,8 @@ Route::prefix('portal')->name('portal.')->group(function () {
     // Employee portal
     Route::middleware('employee.auth')->group(function () {
         Route::get('/employee', [EmployeePortalController::class, 'dashboard'])->name('employee.dashboard');
+        Route::get('/employee/evaluate', [EmployeePortalController::class, 'evaluateForm'])->name('employee.evaluate');
+        Route::post('/employee/evaluate', [EmployeePortalController::class, 'submitEvaluation'])->name('employee.evaluate.submit');
     });
 });
 
