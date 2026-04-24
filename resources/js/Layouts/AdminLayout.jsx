@@ -231,10 +231,9 @@ export default function AdminLayout({ title, children, header, activeRoute, brea
 
             {/* Bottom: logout only */}
             <div className="flex items-center justify-center border-t border-white/10 p-3">
-                <Link
-                    href={route('logout')}
-                    method="post"
-                    as="button"
+                <button
+                    type="button"
+                    onClick={() => setShowLogoutConfirm(true)}
                     title="Sign out"
                     className={[
                         'flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-bold text-blue-200 transition-all hover:bg-rose-500/20 hover:text-rose-300',
@@ -243,7 +242,7 @@ export default function AdminLayout({ title, children, header, activeRoute, brea
                 >
                     <AppIcon name="logout" className="h-4 w-4 shrink-0" />
                     {!collapsed && <span>Sign Out</span>}
-                </Link>
+                </button>
             </div>
         </div>
     );
@@ -368,87 +367,104 @@ export default function AdminLayout({ title, children, header, activeRoute, brea
                 </div>
             </div>
 
-                {/* Sign-out confirmation modal */}
-                {showLogoutConfirm && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowLogoutConfirm(false)}>
-                        <div className="mx-4 w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-rose-100 text-rose-600">
-                                <AppIcon name="logout" className="h-6 w-6" />
-                            </div>
-                            <h3 className="text-lg font-bold text-slate-900">Sign Out</h3>
-                            <p className="mt-1 text-sm text-slate-500">Are you sure you want to sign out?</p>
-                            <div className="mt-6 flex gap-3">
-                                <button type="button" onClick={() => setShowLogoutConfirm(false)} className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50">Cancel</button>
-                                <button type="button" onClick={() => router.post(route('logout'))} className="flex-1 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-medium text-white shadow transition hover:bg-rose-700">Sign Out</button>
-                            </div>
+            {/* Logout confirmation modal */}
+            {showLogoutConfirm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowLogoutConfirm(false)}>
+                    <div
+                        className="mx-4 w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-rose-100 text-rose-600">
+                            <AppIcon name="logout" className="h-6 w-6" />
+                        </div>
+                        <h3 className="text-lg font-bold text-slate-900">Sign Out</h3>
+                        <p className="mt-1 text-sm text-slate-500">
+                            Are you sure you want to sign out? You will need to log in again to access the admin panel.
+                        </p>
+                        <div className="mt-6 flex gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setShowLogoutConfirm(false)}
+                                className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => router.post(route('logout'))}
+                                className="flex-1 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-medium text-white shadow transition hover:bg-rose-700"
+                            >
+                                Sign Out
+                            </button>
                         </div>
                     </div>
-                )}
+                </div>
+            )}
 
-                {/* Bug report modal */}
-                {showBugReport && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => { setShowBugReport(false); setBugSuccess(false); }}>
-                        <div className="mx-4 w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                            {bugSuccess ? (
-                                <div className="text-center py-6">
-                                    <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-                                        <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                                            <path d="M22 4 12 14.01l-3-3" />
-                                        </svg>
-                                    </div>
-                                    <h3 className="text-lg font-bold text-slate-900">Report Submitted!</h3>
-                                    <p className="mt-1 text-sm text-slate-500">Thank you for helping us improve. The admin team will review your report.</p>
-                                    <button type="button" onClick={() => { setShowBugReport(false); setBugSuccess(false); }} className="mt-5 rounded-xl bg-slate-900 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800">Close</button>
+            {/* Bug report modal */}
+            {showBugReport && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => { setShowBugReport(false); setBugSuccess(false); }}>
+                    <div className="mx-4 w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                        {bugSuccess ? (
+                            <div className="text-center py-6">
+                                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+                                    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                                        <path d="M22 4 12 14.01l-3-3" />
+                                    </svg>
                                 </div>
-                            ) : (
-                                <>
-                                    <div className="mb-5 flex items-center gap-3">
-                                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-100 text-rose-600">
-                                            <AppIcon name="bug" className="h-5 w-5" />
+                                <h3 className="text-lg font-bold text-slate-900">Report Submitted!</h3>
+                                <p className="mt-1 text-sm text-slate-500">Thank you for helping us improve. The admin team will review your report.</p>
+                                <button type="button" onClick={() => { setShowBugReport(false); setBugSuccess(false); }} className="mt-5 rounded-xl bg-slate-900 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800">Close</button>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="mb-5 flex items-center gap-3">
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-100 text-rose-600">
+                                        <AppIcon name="bug" className="h-5 w-5" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-bold text-slate-900">Report a Bug</h3>
+                                        <p className="text-xs text-slate-400">This will be sent to the super admin</p>
+                                    </div>
+                                </div>
+                                <form onSubmit={(e) => {
+                                    e.preventDefault();
+                                    bugForm.post(route('bug-report.store'), {
+                                        onSuccess: () => { setBugSuccess(true); bugForm.reset('subject', 'description', 'severity'); },
+                                    });
+                                }}>
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">Subject</label>
+                                            <input type="text" value={bugForm.data.subject} onChange={(e) => bugForm.setData('subject', e.target.value)} placeholder="Brief description of the issue" className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100" required />
+                                            {bugForm.errors.subject && <p className="mt-1 text-xs text-rose-500">{bugForm.errors.subject}</p>}
                                         </div>
                                         <div>
-                                            <h3 className="text-lg font-bold text-slate-900">Report a Bug</h3>
-                                            <p className="text-xs text-slate-400">This will be sent to the super admin</p>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">Severity</label>
+                                            <select value={bugForm.data.severity} onChange={(e) => bugForm.setData('severity', e.target.value)} className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-800 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100">
+                                                <option value="low">Low — Minor visual issue</option>
+                                                <option value="medium">Medium — Something isn't working right</option>
+                                                <option value="high">High — Feature is broken</option>
+                                                <option value="critical">Critical — Cannot use the system</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+                                            <textarea value={bugForm.data.description} onChange={(e) => bugForm.setData('description', e.target.value)} placeholder="Please describe the issue, what you expected, and steps to reproduce..." rows={4} className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 resize-none" required />
+                                            {bugForm.errors.description && <p className="mt-1 text-xs text-rose-500">{bugForm.errors.description}</p>}
                                         </div>
                                     </div>
-                                    <form onSubmit={(e) => {
-                                        e.preventDefault();
-                                        bugForm.post(route('bug-report.store'), {
-                                            onSuccess: () => { setBugSuccess(true); bugForm.reset('subject', 'description', 'severity'); },
-                                        });
-                                    }}>
-                                        <div className="space-y-4">
-                                            <div>
-                                                <label className="block text-sm font-medium text-slate-700 mb-1">Subject</label>
-                                                <input type="text" value={bugForm.data.subject} onChange={(e) => bugForm.setData('subject', e.target.value)} placeholder="Brief description of the issue" className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100" required />
-                                                {bugForm.errors.subject && <p className="mt-1 text-xs text-rose-500">{bugForm.errors.subject}</p>}
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-slate-700 mb-1">Severity</label>
-                                                <select value={bugForm.data.severity} onChange={(e) => bugForm.setData('severity', e.target.value)} className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-800 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100">
-                                                    <option value="low">Low — Minor visual issue</option>
-                                                    <option value="medium">Medium — Something isn't working right</option>
-                                                    <option value="high">High — Feature is broken</option>
-                                                    <option value="critical">Critical — Cannot use the system</option>
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
-                                                <textarea value={bugForm.data.description} onChange={(e) => bugForm.setData('description', e.target.value)} placeholder="Please describe the issue, what you expected, and steps to reproduce..." rows={4} className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 resize-none" required />
-                                                {bugForm.errors.description && <p className="mt-1 text-xs text-rose-500">{bugForm.errors.description}</p>}
-                                            </div>
-                                        </div>
-                                        <div className="mt-6 flex gap-3">
-                                            <button type="button" onClick={() => setShowBugReport(false)} className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50">Cancel</button>
-                                            <button type="submit" disabled={bugForm.processing} className="flex-1 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-medium text-white shadow transition hover:bg-rose-700 disabled:opacity-50">{bugForm.processing ? 'Submitting...' : 'Submit Report'}</button>
-                                        </div>
-                                    </form>
-                                </>
-                            )}
-                        </div>
+                                    <div className="mt-6 flex gap-3">
+                                        <button type="button" onClick={() => setShowBugReport(false)} className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50">Cancel</button>
+                                        <button type="submit" disabled={bugForm.processing} className="flex-1 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-medium text-white shadow transition hover:bg-rose-700 disabled:opacity-50">{bugForm.processing ? 'Submitting...' : 'Submit Report'}</button>
+                                    </div>
+                                </form>
+                            </>
+                        )}
                     </div>
-                )}
+                </div>
+            )}
         </>
     );
 }

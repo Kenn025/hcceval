@@ -120,8 +120,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/admin/subject-archives', [RatingsController::class, 'subjectArchives'])->name('admin.subject-archives');
     Route::get('/admin/peer-archives', [RatingsController::class, 'peerArchives'])->name('admin.peer-archives');
 
-    // System Controls — superadmin only
-    Route::middleware('role:superadmin')->group(function () {
+    // System Controls — superadmin & overalladmin access
+    Route::middleware('role:superadmin,overalladmin')->group(function () {
         Route::get('/admin/departments', [DepartmentController::class, 'index'])->name('admin.departments');
         Route::post('/admin/departments', [DepartmentController::class, 'store']);
         Route::put('/admin/departments/{department}', [DepartmentController::class, 'update']);

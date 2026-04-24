@@ -85,7 +85,7 @@ return [
         ],
         [
             'title' => 'System Controls',
-            'roles' => ['superadmin'],
+            'roles' => ['superadmin', 'overalladmin'],
             'items' => [
                 ['label' => 'Departments', 'route' => 'admin.departments', 'icon' => 'departments'],
                 ['label' => 'Branches', 'route' => 'admin.branches', 'icon' => 'branches'],

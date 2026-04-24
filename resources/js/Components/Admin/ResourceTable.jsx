@@ -117,7 +117,7 @@ export default function ResourceTable({
                 </table>
             </div>
 
-            <Pagination links={data.links} meta={data.meta} />
+            <Pagination data={data} />
         </div>
     );
 }
