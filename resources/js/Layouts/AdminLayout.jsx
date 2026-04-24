@@ -1,4 +1,5 @@
 import AppIcon from '@/Components/AppIcon';
+import NotificationBell from '@/Components/NotificationBell';
 import { Head, Link, usePage, useForm, router } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -314,6 +315,9 @@ export default function AdminLayout({ title, children, header, activeRoute, brea
                                 </div>
                             </div>
 
+                            <div className="flex items-center gap-2">
+                                <NotificationBell />
+
                             <div className="relative" ref={userMenuRef}>
                                 <button
                                     type="button"
@@ -356,6 +360,7 @@ export default function AdminLayout({ title, children, header, activeRoute, brea
                                         </button>
                                     </div>
                                 )}
+                            </div>
                             </div>
                         </div>
                     </header>
