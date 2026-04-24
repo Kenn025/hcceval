@@ -33,7 +33,19 @@ class ProgramController extends Controller
     {
         $search = $request->input('search', '');
         $scopedId = $this->scopedBranchId();
+        $requestedBranchId = $request->integer('branch_id');
         $programNameOptions = $this->programNameOptions();
+
+        $branches = Branch::query()
+            ->select('id', 'name', 'code')
+            ->where('is_deleted', 0)
+            ->where('code', '!=', 'OVERALL')
+            ->when($scopedId, fn ($q) => $q->where('id', $scopedId))
+            ->orderBy('name')
+            ->get();
+
+        $selectedBranchId = $scopedId
+            ?? ($branches->contains('id', $requestedBranchId) ? $requestedBranchId : $branches->first()?->id);
 
         $programs = Program::query()
             ->with([
@@ -42,7 +54,7 @@ class ProgramController extends Controller
                 'assignedChair:id,program_id,firstname,middlename,lastname',
             ])
             ->where('is_deleted', 0)
-            ->when($scopedId, fn ($q) => $q->whereHas('department', fn ($department) => $department->where('branch_id', $scopedId)))
+            ->when($selectedBranchId, fn ($q) => $q->whereHas('department', fn ($department) => $department->where('branch_id', $selectedBranchId)))
             ->when($search, fn ($q) => $q->where('name', 'like', "%{$search}%"))
             ->orderBy('name')
             ->paginate(15)
@@ -56,17 +68,10 @@ class ProgramController extends Controller
             return $program;
         });
 
-        $branches = Branch::query()
-            ->select('id', 'name')
-            ->where('is_deleted', 0)
-            ->when($scopedId, fn ($q) => $q->where('id', $scopedId))
-            ->orderBy('name')
-            ->get();
-
         $departments = Department::query()
             ->select('id', 'name', 'branch_id')
             ->where('is_deleted', 0)
-            ->when($scopedId, fn ($q) => $q->where('branch_id', $scopedId))
+            ->when($selectedBranchId, fn ($q) => $q->where('branch_id', $selectedBranchId))
             ->orderBy('name')
             ->get();
 
@@ -74,7 +79,7 @@ class ProgramController extends Controller
             ->select('id', 'branch_id', 'department_id', 'program_id', 'firstname', 'middlename', 'lastname', 'role')
             ->where('is_deleted', 0)
             ->where('is_activated', 1)
-            ->when($scopedId, fn ($q) => $q->where('branch_id', $scopedId))
+            ->when($selectedBranchId, fn ($q) => $q->where('branch_id', $selectedBranchId))
             ->orderBy('lastname')
             ->orderBy('firstname')
             ->get()
@@ -91,13 +96,14 @@ class ProgramController extends Controller
 
         return Inertia::render('Admin/Programs', [
             'programs' => $programs,
-            'filters' => ['search' => $search],
+            'filters' => ['search' => $search, 'branch_id' => $selectedBranchId],
             'branches' => $branches,
             'departments' => $departments,
             'chairs' => $chairs,
             'programNameOptions' => $programNameOptions,
             'isBranchAdmin' => $this->isBranchAdmin(),
             'scopedBranchId' => $scopedId,
+            'selectedBranchId' => $selectedBranchId,
         ]);
     }
 
@@ -158,11 +164,6 @@ class ProgramController extends Controller
                 'integer',
                 Rule::exists('branch', 'id')->where(fn ($query) => $query->where('is_deleted', 0)),
             ],
-            'department_id' => [
-                'required',
-                'integer',
-                Rule::exists('department', 'id')->where(fn ($query) => $query->where('is_deleted', 0)),
-            ],
             'name' => ['required', 'string', 'max:150', Rule::in($programNameOptions)],
             'duration_years' => ['required', 'integer', 'min:1'],
             'chair_teacher_id' => [
@@ -180,9 +181,16 @@ class ProgramController extends Controller
         }
 
         $department = Department::query()
-            ->where('id', $validated['department_id'])
+            ->where('branch_id', $validated['branch_id'])
             ->where('is_deleted', 0)
+            ->where(function ($query) {
+                $query->where('name', 'like', '%College%')
+                    ->orWhere('code', 'like', '%COL%');
+            })
+            ->orderBy('id')
             ->firstOrFail();
+
+        $validated['department_id'] = $department->id;
 
         if ((int) $department->branch_id !== (int) $validated['branch_id']) {
             abort(422, 'The selected department does not belong to the selected branch.');

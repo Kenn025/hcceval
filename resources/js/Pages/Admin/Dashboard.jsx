@@ -8,6 +8,7 @@ const ICON_MAP = {
     programs: 'programs',
     students: 'students',
     teachers: 'teachers',
+    briefcase: 'briefcase',
 };
 
 function StatCard({ stat }) {
@@ -29,7 +30,8 @@ const QUICK_LINKS = [
     { label: 'Departments', route: 'admin.departments', icon: 'departments', desc: 'Academic departments' },
     { label: 'Programs', route: 'admin.college.programs', icon: 'programs', desc: 'Degree programs' },
     { label: 'Students', route: 'admin.students', icon: 'students', desc: 'Student directory' },
-    { label: 'Teachers', route: 'admin.teachers', icon: 'teachers', desc: 'Faculty & staff' },
+    { label: 'Teachers', route: 'admin.teachers', icon: 'teachers', desc: 'Faculty directory' },
+    { label: 'Employees', route: 'admin.employees', icon: 'briefcase', desc: 'Staff directory' },
     { label: 'Subject Questions', route: 'admin.subject-questions', icon: 'questions', desc: 'Question bank' },
     { label: 'Peer Ratings', route: 'admin.peer-ratings', icon: 'group', desc: 'Peer evaluations' },
     { label: 'Evaluation Cycle', route: 'admin.evaluation-cycle', icon: 'calendar', desc: 'School year settings' },

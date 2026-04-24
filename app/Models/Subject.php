@@ -4,29 +4,35 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Subject extends Model
 {
-    use SoftDeletes;
-
-    protected $table = 'subjects';
+    protected $table = 'subject';
 
     protected $fillable = [
-        'year_level_id', 'department_id', 'term_type', 'term',
-        'education_level', 'grade_level', 'academic_track', 'academic_strand',
-        'code', 'name', 'description', 'units', 'is_active',
+        'code', 'name', 'type', 'department_id', 'program_id', 'strand_id',
+        'teacher_id', 'is_gened', 'is_activated', 'is_deleted',
     ];
 
-    protected $casts = ['is_active' => 'boolean', 'units' => 'float'];
+    protected $casts = [
+        'teacher_id' => 'array',
+        'is_gened' => 'boolean',
+        'is_activated' => 'boolean',
+        'is_deleted' => 'boolean',
+    ];
 
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);
     }
 
-    public function yearLevel(): BelongsTo
+    public function program(): BelongsTo
     {
-        return $this->belongsTo(YearLevel::class);
+        return $this->belongsTo(Program::class);
+    }
+
+    public function strand(): BelongsTo
+    {
+        return $this->belongsTo(Strand::class);
     }
 }
