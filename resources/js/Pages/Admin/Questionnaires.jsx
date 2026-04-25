@@ -6,7 +6,7 @@ import SubmitButton from '@/Components/Admin/SubmitButton';
 import StatusBadge from '@/Components/Admin/StatusBadge';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { router, useForm } from '@inertiajs/react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 function CheckboxList({ options, selected, onToggle, emptyLabel }) {
     if (!options.length) {
@@ -58,6 +58,7 @@ export default function Questionnaires({ questionnaires, questionnaireTypes, que
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [itemSearch, setItemSearch] = useState('');
     const [commentSearch, setCommentSearch] = useState('');
+    const [submitError, setSubmitError] = useState('');
 
     const { data, setData, errors, processing, reset, clearErrors } = useForm({
         questionnaire_title: '',
@@ -73,6 +74,7 @@ export default function Questionnaires({ questionnaires, questionnaireTypes, que
     const openCreate = () => {
         reset();
         clearErrors();
+        setSubmitError('');
         setEditing(null);
         setSlideOpen(true);
     };
@@ -96,6 +98,7 @@ export default function Questionnaires({ questionnaires, questionnaireTypes, que
             is_active: Boolean(row.is_active),
         });
         clearErrors();
+        setSubmitError('');
         setEditing(row);
         setSlideOpen(true);
     };
@@ -168,6 +171,7 @@ export default function Questionnaires({ questionnaires, questionnaireTypes, que
 
     const submit = (e) => {
         e.preventDefault();
+        setSubmitError('');
         const url = editing ? '/admin/questionnaires/' + editing.questionnaire_id : '/admin/questionnaires';
         const request = editing
             ? (targetUrl, payload, options) => router.put(targetUrl, payload, options)
@@ -177,6 +181,10 @@ export default function Questionnaires({ questionnaires, questionnaireTypes, que
             onSuccess: () => {
                 setSlideOpen(false);
                 reset();
+            },
+            onError: (formErrors) => {
+                const firstError = Object.values(formErrors ?? {}).find((value) => typeof value === 'string' && value.trim() !== '');
+                setSubmitError(firstError || 'Unable to save questionnaire. Please check the form fields.');
             },
         });
     };
@@ -201,6 +209,12 @@ export default function Questionnaires({ questionnaires, questionnaireTypes, que
     };
     const usedWeight = data.class_groups.reduce((sum, group) => sum + Number(group.weight || 0), 0);
     const remainingWeight = Math.max(0, 100 - usedWeight);
+    const selectedQuestionClassIds = useMemo(
+        () => data.class_groups
+            .map((group) => String(group.question_class_id ?? ''))
+            .filter(Boolean),
+        [data.class_groups],
+    );
 
     const columns = [
         { key: 'questionnaire_code', label: 'Questionnaire Code' },
@@ -255,6 +269,12 @@ export default function Questionnaires({ questionnaires, questionnaireTypes, que
 
             <SlideOver open={slideOpen} onClose={() => setSlideOpen(false)} title={editing ? 'Edit Questionnaire' : 'New Questionnaire'} width="max-w-2xl">
                 <form onSubmit={submit} className="space-y-4">
+                    {(submitError || Object.keys(errors).length > 0) && (
+                        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                            {submitError || 'Please review the highlighted fields and try again.'}
+                        </div>
+                    )}
+
                     <FormField label="Questionnaire Title" error={errors.questionnaire_title} required>
                         <TextInput value={data.questionnaire_title} onChange={(e) => setData('questionnaire_title', e.target.value)} placeholder="Teacher Evaluation Form" />
                     </FormField>
@@ -296,6 +316,10 @@ export default function Questionnaires({ questionnaires, questionnaireTypes, que
                                 ), 0);
                                 const allowedWeight = Math.max(0, 100 - otherGroupsWeight);
                                 const weightOptions = WEIGHT_OPTIONS.filter((option) => option <= allowedWeight || option === Number(group.weight || 0));
+                                const availableQuestionClasses = questionClasses.filter((questionClass) => (
+                                    String(group.question_class_id ?? '') === String(questionClass.id)
+                                    || !selectedQuestionClassIds.includes(String(questionClass.id))
+                                ));
 
                                 return (
                                     <div key={index} className="rounded-lg border border-slate-200 p-4">
@@ -316,7 +340,7 @@ export default function Questionnaires({ questionnaires, questionnaireTypes, que
                                             <FormField label="Question Class">
                                                 <SelectInput value={group.question_class_id} onChange={(e) => updateClassGroup(index, 'question_class_id', e.target.value)}>
                                                     <option value="">Select question class...</option>
-                                                    {questionClasses.map((questionClass) => (
+                                                    {availableQuestionClasses.map((questionClass) => (
                                                         <option key={questionClass.id} value={questionClass.id}>{questionClass.name}</option>
                                                     ))}
                                                 </SelectInput>
@@ -353,7 +377,7 @@ export default function Questionnaires({ questionnaires, questionnaireTypes, que
                             <button
                                 type="button"
                                 onClick={addQuestionClassGroup}
-                                disabled={remainingWeight === 0}
+                                disabled={remainingWeight === 0 || selectedQuestionClassIds.length >= questionClasses.length}
                                 className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 Add Question Class

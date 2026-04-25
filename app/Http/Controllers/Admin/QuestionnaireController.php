@@ -158,6 +158,7 @@ class QuestionnaireController extends Controller
             'questionnaire_type_id' => 'required|exists:questionnaire_type,id',
             'question_choices_id' => 'required|exists:question_choices,id',
             'class_groups' => 'array',
+            'class_groups.*.question_class_id' => 'nullable|integer|exists:question_class,id',
             'class_groups.*.question_class_name' => 'nullable|string|max:150',
             'class_groups.*.weight' => 'nullable|integer|min:5|max:100',
             'class_groups.*.questions' => 'array',
@@ -169,10 +170,13 @@ class QuestionnaireController extends Controller
         ]);
 
         $count = DB::table('questionnaires')->count() + 1;
+        $questionClassNames = DB::table('question_class')
+            ->whereIn('id', collect($validated['class_groups'] ?? [])->pluck('question_class_id')->filter()->all())
+            ->pluck('name', 'id');
         $classGroups = collect($validated['class_groups'] ?? [])
-            ->filter(fn ($group) => ! empty($group['question_class_name']) || ! empty($group['weight']) || ! empty($group['questions']))
+            ->filter(fn ($group) => ! empty($group['question_class_id']) || ! empty($group['question_class_name']) || ! empty($group['weight']) || ! empty($group['questions']))
             ->map(fn ($group) => [
-                'class_name' => $group['question_class_name'] ?? '',
+                'class_name' => $questionClassNames[(int) ($group['question_class_id'] ?? 0)] ?? ($group['question_class_name'] ?? ''),
                 'weight_percentage' => (int) ($group['weight'] ?? 0),
                 'questions' => array_values($group['questions'] ?? []),
             ])
@@ -213,6 +217,7 @@ class QuestionnaireController extends Controller
             'questionnaire_type_id' => 'required|exists:questionnaire_type,id',
             'question_choices_id' => 'required|exists:question_choices,id',
             'class_groups' => 'array',
+            'class_groups.*.question_class_id' => 'nullable|integer|exists:question_class,id',
             'class_groups.*.question_class_name' => 'nullable|string|max:150',
             'class_groups.*.weight' => 'nullable|integer|min:5|max:100',
             'class_groups.*.questions' => 'array',
@@ -223,10 +228,13 @@ class QuestionnaireController extends Controller
             'is_active' => 'boolean',
         ]);
 
+        $questionClassNames = DB::table('question_class')
+            ->whereIn('id', collect($validated['class_groups'] ?? [])->pluck('question_class_id')->filter()->all())
+            ->pluck('name', 'id');
         $classGroups = collect($validated['class_groups'] ?? [])
-            ->filter(fn ($group) => ! empty($group['question_class_name']) || ! empty($group['weight']) || ! empty($group['questions']))
+            ->filter(fn ($group) => ! empty($group['question_class_id']) || ! empty($group['question_class_name']) || ! empty($group['weight']) || ! empty($group['questions']))
             ->map(fn ($group) => [
-                'class_name' => $group['question_class_name'] ?? '',
+                'class_name' => $questionClassNames[(int) ($group['question_class_id'] ?? 0)] ?? ($group['question_class_name'] ?? ''),
                 'weight_percentage' => (int) ($group['weight'] ?? 0),
                 'questions' => array_values($group['questions'] ?? []),
             ])
