@@ -1,6 +1,7 @@
 import { jsx, jsxs } from "react/jsx-runtime";
 import { useState, useEffect, useRef } from "react";
 import { router } from "@inertiajs/react";
+import AppIcon from "@/Components/AppIcon";
 const Counter = ({ end, suffix = "" }) => {
     const [count, setCount] = useState(0);
     const ref = useRef(null);
@@ -241,41 +242,41 @@ function App({ loginUrl = "/login" }) {
     ];
     const features = [
         {
-            icon: "\u{1F4CA}",
+            icon: "dashboard",
             title: "Real-Time Analytics",
             desc: "Live performance tracking with interactive charts and comprehensive dashboards.",
         },
         {
-            icon: "\u{1F512}",
+            icon: "shield",
             title: "Secure & Private",
             desc: "Enterprise-grade encryption ensuring all evaluations remain confidential.",
         },
         {
-            icon: "\u{1F4F1}",
+            icon: "network",
             title: "Multi-Device",
             desc: "Responsive design accessible on desktop, tablet, and mobile devices.",
         },
         {
-            icon: "\u{1F3EB}",
+            icon: "branches",
             title: "Multi-Campus",
             desc: "Seamlessly connect and manage evaluations across multiple campuses.",
         },
         {
-            icon: "\u2699\uFE0F",
+            icon: "edit",
             title: "Customizable",
             desc: "Tailor evaluation criteria and workflows to your institution needs.",
         },
         {
-            icon: "\u{1F4C4}",
+            icon: "assignments",
             title: "Detailed Reports",
             desc: "Generate comprehensive PDF reports with actionable insights.",
         },
     ];
     const stats = [
-        { value: 4, label: "User Roles", icon: "\u{1F465}" },
-        { value: 12, label: "Campuses", icon: "\u{1F3EB}" },
-        { value: 5e3, label: "Evaluations", icon: "\u{1F4DD}" },
-        { value: 98, label: "Satisfaction %", icon: "\u2B50" },
+        { value: 4, label: "User Roles", icon: "group" },
+        { value: 12, label: "Campuses", icon: "branches" },
+        { value: 5e3, label: "Evaluations", icon: "assignments" },
+        { value: 98, label: "Satisfaction %", icon: "ratings" },
     ];
     const faqs = [
         {
@@ -304,19 +305,19 @@ function App({ loginUrl = "/login" }) {
             name: "Dr. Maria Santos",
             role: "Dean of Engineering",
             text: "This system has revolutionized our evaluation process. The holistic approach provides invaluable insights we never had before.",
-            avatar: "\u{1F469}\u200D\u{1F3EB}",
+            avatar: "graduation",
         },
         {
             name: "Prof. Juan Cruz",
             role: "Faculty Member",
             text: "The peer evaluation feature has fostered continuous improvement. I can track my growth with actionable feedback.",
-            avatar: "\u{1F468}\u200D\u{1F4BB}",
+            avatar: "teachers",
         },
         {
             name: "Ana Reyes",
             role: "Administrator",
             text: "Managing evaluations across campuses is now seamless. The analytics dashboard provides real-time insights.",
-            avatar: "\u{1F469}\u200D\u{1F4BC}",
+            avatar: "briefcase",
         },
     ];
     const [currentTestimonial, setCurrentTestimonial] = useState(0);
@@ -350,14 +351,11 @@ function App({ loginUrl = "/login" }) {
                                             className:
                                                 "w-12 h-12 neumorphic-circle flex items-center justify-center",
                                             children: /* @__PURE__ */ jsx(
-                                                "span",
+                                                AppIcon,
                                                 {
-                                                    className:
-                                                        "text-xl font-bold",
-                                                    style: {
-                                                        color: "var(--accent)",
-                                                    },
-                                                    children: "M",
+                                                    name: "graduation",
+                                                    className: "h-6 w-6",
+                                                    strokeWidth: 1.9,
                                                 },
                                             ),
                                         }),
@@ -645,8 +643,17 @@ function App({ loginUrl = "/login" }) {
                                                                                     {
                                                                                         className:
                                                                                             "w-16 h-16 neumorphic-circle flex items-center justify-center text-2xl",
-                                                                                        children:
-                                                                                            "\u{1F468}\u200D\u{1F3EB}",
+                                                                                        style: {
+                                                                                            color: "var(--accent)",
+                                                                                        },
+                                                                                        children: /* @__PURE__ */ jsx(
+                                                                                            AppIcon,
+                                                                                            {
+                                                                                                name: "teachers",
+                                                                                                className: "h-8 w-8",
+                                                                                                strokeWidth: 1.9,
+                                                                                            },
+                                                                                        ),
                                                                                     },
                                                                                 ),
                                                                                 /* @__PURE__ */ jsxs(
@@ -981,12 +988,32 @@ function App({ loginUrl = "/login" }) {
                                             /* @__PURE__ */ jsx("div", {
                                                 className:
                                                     "absolute -top-4 -right-4 w-12 h-12 neumorphic-circle flex items-center justify-center animate-pulse-glow",
-                                                children: "\u2B50",
+                                                style: {
+                                                    color: "var(--accent)",
+                                                },
+                                                children: /* @__PURE__ */ jsx(
+                                                    AppIcon,
+                                                    {
+                                                        name: "ratings",
+                                                        className: "h-6 w-6",
+                                                        strokeWidth: 1.9,
+                                                    },
+                                                ),
                                             }),
                                             /* @__PURE__ */ jsx("div", {
                                                 className:
                                                     "absolute -bottom-4 -left-4 w-10 h-10 neumorphic-circle flex items-center justify-center",
-                                                children: "\u{1F4CA}",
+                                                style: {
+                                                    color: "var(--accent)",
+                                                },
+                                                children: /* @__PURE__ */ jsx(
+                                                    AppIcon,
+                                                    {
+                                                        name: "dashboard",
+                                                        className: "h-5 w-5",
+                                                        strokeWidth: 1.9,
+                                                    },
+                                                ),
                                             }),
                                         ],
                                     }),
@@ -1003,8 +1030,19 @@ function App({ loginUrl = "/login" }) {
                                         className: "neumorphic p-6 text-center",
                                         children: [
                                             /* @__PURE__ */ jsx("div", {
-                                                className: "text-3xl mb-2",
-                                                children: stat.icon,
+                                                className:
+                                                    "mb-2 flex items-center justify-center",
+                                                style: {
+                                                    color: "var(--accent)",
+                                                },
+                                                children: /* @__PURE__ */ jsx(
+                                                    AppIcon,
+                                                    {
+                                                        name: stat.icon,
+                                                        className: "h-8 w-8",
+                                                        strokeWidth: 1.9,
+                                                    },
+                                                ),
                                             }),
                                             /* @__PURE__ */ jsx("div", {
                                                 className:
@@ -1074,7 +1112,17 @@ function App({ loginUrl = "/login" }) {
                                             /* @__PURE__ */ jsx("div", {
                                                 className:
                                                     "w-16 h-16 neumorphic-circle flex items-center justify-center text-2xl mb-4",
-                                                children: feature.icon,
+                                                style: {
+                                                    color: "var(--accent)",
+                                                },
+                                                children: /* @__PURE__ */ jsx(
+                                                    AppIcon,
+                                                    {
+                                                        name: feature.icon,
+                                                        className: "h-8 w-8",
+                                                        strokeWidth: 1.9,
+                                                    },
+                                                ),
                                             }),
                                             /* @__PURE__ */ jsx("h3", {
                                                 className:
@@ -1348,25 +1396,25 @@ function App({ loginUrl = "/login" }) {
                                     step: "01",
                                     title: "Register",
                                     desc: "Create account and select your role",
-                                    icon: "\u{1F4DD}",
+                                    icon: "edit",
                                 },
                                 {
                                     step: "02",
                                     title: "Configure",
                                     desc: "Set up evaluation criteria",
-                                    icon: "\u2699\uFE0F",
+                                    icon: "layers",
                                 },
                                 {
                                     step: "03",
                                     title: "Evaluate",
                                     desc: "Complete evaluations forms",
-                                    icon: "\u2705",
+                                    icon: "check-circle",
                                 },
                                 {
                                     step: "04",
                                     title: "Analyze",
                                     desc: "View reports and insights",
-                                    icon: "\u{1F4CA}",
+                                    icon: "dashboard",
                                 },
                             ].map((item, i) =>
                                 /* @__PURE__ */ jsxs(
@@ -1378,7 +1426,17 @@ function App({ loginUrl = "/login" }) {
                                             /* @__PURE__ */ jsx("div", {
                                                 className:
                                                     "w-20 h-20 neumorphic-circle mx-auto flex items-center justify-center text-3xl mb-4 group-hover:animate-pulse-glow",
-                                                children: item.icon,
+                                                style: {
+                                                    color: "var(--accent)",
+                                                },
+                                                children: /* @__PURE__ */ jsx(
+                                                    AppIcon,
+                                                    {
+                                                        name: item.icon,
+                                                        className: "h-9 w-9",
+                                                        strokeWidth: 1.9,
+                                                    },
+                                                ),
                                             }),
                                             /* @__PURE__ */ jsx("div", {
                                                 className:
@@ -1454,9 +1512,19 @@ function App({ loginUrl = "/login" }) {
                                         /* @__PURE__ */ jsx("div", {
                                             className:
                                                 "w-16 h-16 neumorphic-circle flex items-center justify-center text-2xl",
-                                            children:
-                                                testimonials[currentTestimonial]
-                                                    .avatar,
+                                            style: {
+                                                color: "var(--accent)",
+                                            },
+                                            children: /* @__PURE__ */ jsx(
+                                                AppIcon,
+                                                {
+                                                    name: testimonials[
+                                                        currentTestimonial
+                                                    ].avatar,
+                                                    className: "h-8 w-8",
+                                                    strokeWidth: 1.9,
+                                                },
+                                            ),
                                         }),
                                         /* @__PURE__ */ jsxs("div", {
                                             children: [
@@ -1639,17 +1707,17 @@ function App({ loginUrl = "/login" }) {
                                         className: "space-y-6",
                                         children: [
                                             {
-                                                icon: "\u{1F4E7}",
+                                                icon: "chat",
                                                 label: "Email",
                                                 value: "mchpems@university.edu",
                                             },
                                             {
-                                                icon: "\u{1F4CD}",
+                                                icon: "branches",
                                                 label: "Location",
                                                 value: "University Campus, Philippines",
                                             },
                                             {
-                                                icon: "\u{1F4DE}",
+                                                icon: "calendar",
                                                 label: "Phone",
                                                 value: "+63 912 345 6789",
                                             },
@@ -1665,8 +1733,17 @@ function App({ loginUrl = "/login" }) {
                                                             {
                                                                 className:
                                                                     "w-12 h-12 neumorphic-circle flex items-center justify-center text-xl",
-                                                                children:
-                                                                    item.icon,
+                                                                style: {
+                                                                    color: "var(--accent)",
+                                                                },
+                                                                children: /* @__PURE__ */ jsx(
+                                                                    AppIcon,
+                                                                    {
+                                                                        name: item.icon,
+                                                                        className: "h-6 w-6",
+                                                                        strokeWidth: 1.9,
+                                                                    },
+                                                                ),
                                                             },
                                                         ),
                                                         /* @__PURE__ */ jsxs(
@@ -1855,15 +1932,11 @@ function App({ loginUrl = "/login" }) {
                                                             "w-12 h-12 neumorphic-circle flex items-center justify-center",
                                                         children:
                                                             /* @__PURE__ */ jsx(
-                                                                "span",
+                                                                AppIcon,
                                                                 {
-                                                                    className:
-                                                                        "text-xl font-bold",
-                                                                    style: {
-                                                                        color: "var(--accent)",
-                                                                    },
-                                                                    children:
-                                                                        "M",
+                                                                    name: "graduation",
+                                                                    className: "h-6 w-6",
+                                                                    strokeWidth: 1.9,
                                                                 },
                                                             ),
                                                     }),
