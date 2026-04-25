@@ -36,6 +36,23 @@ const parseSubjectIds = (value) => {
     }
 };
 
+const parseTeacherMap = (value) => {
+    if (!value) {
+        return {};
+    }
+
+    if (typeof value === 'string') {
+        try {
+            const parsed = JSON.parse(value);
+            return parsed && typeof parsed === 'object' ? parsed : {};
+        } catch {
+            return {};
+        }
+    }
+
+    return typeof value === 'object' ? value : {};
+};
+
 const getProgramStrandLabel = (row) => {
     if (row.program?.name) {
         return stripCampusSuffix(row.program.name);
@@ -63,6 +80,7 @@ export default function Students({
     strands,
     yearLevels,
     subjects,
+    teachers,
     nextStudentCodes,
     isBranchAdmin,
     selectedBranchId,
@@ -77,7 +95,6 @@ export default function Students({
     const [submitError, setSubmitError] = useState('');
     const [subjectListOpen, setSubjectListOpen] = useState(false);
     const [subjectListMode, setSubjectListMode] = useState('year-level');
-    const [registeredSubjectIds, setRegisteredSubjectIds] = useState([]);
     const activeBranchId = String(selectedBranchId ?? scopedBranchId ?? '');
     const selectedFilterBranchId = String(filters.branch_id ?? activeBranchId ?? '');
     const selectedFilterDepartmentId = String(filters.department_id ?? '');
@@ -90,9 +107,10 @@ export default function Students({
         program_id: '',
         strand_id: '',
         year_level_id: '',
-        subject_ids: [],
+        removed_subject_ids: [],
         is_irreg: false,
-        irreg_subject_id: '',
+        irreg_subject_ids: [],
+        irreg_subject_teacher_ids: {},
         first_name: '',
         middle_name: '',
         last_name: '',
@@ -166,10 +184,49 @@ export default function Students({
         () => subjects.filter((subject) => selectedYearLevelSubjectIds.includes(String(subject.id))),
         [selectedYearLevelSubjectIds, subjects],
     );
-    const availableYearLevelSubjects = useMemo(
-        () => selectedYearLevelSubjects.filter((subject) => !registeredSubjectIds.includes(String(subject.id))),
-        [registeredSubjectIds, selectedYearLevelSubjects],
+    const teacherMap = useMemo(
+        () => new Map((teachers ?? []).map((teacher) => [String(teacher.id), teacher.full_name])),
+        [teachers],
     );
+    const selectedYearLevelTeacherMap = useMemo(
+        () => parseTeacherMap(selectedYearLevel?.subject_teacher_map),
+        [selectedYearLevel],
+    );
+    const getAssignedTeacherLabel = (subject, mode = subjectListMode) => {
+        const subjectKey = String(subject.id);
+        const irregularTeacherId = String(data.irreg_subject_teacher_ids?.[subjectKey] ?? '');
+        const yearLevelTeacherId = String(selectedYearLevelTeacherMap?.[subjectKey] ?? '');
+
+        if ((mode === 'irregular' || mode === 'irregular-selected') && irregularTeacherId && teacherMap.has(irregularTeacherId)) {
+            return {
+                label: 'Assigned Teacher',
+                value: teacherMap.get(irregularTeacherId),
+            };
+        }
+
+        if (yearLevelTeacherId && teacherMap.has(yearLevelTeacherId)) {
+            return {
+                label: 'Assigned Teacher',
+                value: teacherMap.get(yearLevelTeacherId),
+            };
+        }
+
+        const teacherNames = Array.isArray(subject.assigned_teacher_names)
+            ? subject.assigned_teacher_names.filter(Boolean)
+            : [];
+
+        if (teacherNames.length > 0) {
+            return {
+                label: teacherNames.length === 1 ? 'Assigned Teacher' : 'Assigned Teachers',
+                value: teacherNames.join(', '),
+            };
+        }
+
+        return {
+            label: mode === 'year-level' ? 'Assigned Teacher' : 'Assigned Teachers',
+            value: 'No teacher assigned',
+        };
+    };
     const selectedProgramSubjects = useMemo(
         () => subjects.filter((subject) => !data.program_id || String(subject.program_id ?? '') === String(data.program_id)),
         [data.program_id, subjects],
@@ -185,19 +242,36 @@ export default function Students({
     const showYearLevelOnly = isJuniorHighDepartment || isElementaryDepartment;
     const generatedStudentCode = editing ? data.student_no : buildStudentCode(selectedBranch, nextStudentCodes);
     const canShowIrregularControls = supportsProgram && Boolean(data.department_id);
-    const activeSubjectScopeLabel = subjectListMode === 'irregular-pick'
-        ? 'Irregular Subject'
-        : data.is_irreg
-            ? 'Program Subjects'
-            : 'Year Level Subjects';
-    const availableSubjects = data.is_irreg ? selectedProgramSubjects : availableYearLevelSubjects;
-    const availableSubjectIds = useMemo(
-        () => availableSubjects.map((subject) => String(subject.id)),
-        [availableSubjects],
+    const activeSubjectScopeLabel = subjectListMode === 'irregular'
+        ? 'Irregular Subjects'
+        : 'Year Level Subjects';
+    const removedSubjectIds = useMemo(
+        () => (Array.isArray(data.removed_subject_ids) ? data.removed_subject_ids.map((id) => String(id)) : []),
+        [data.removed_subject_ids],
     );
-    const selectedSubjectIds = useMemo(
-        () => (Array.isArray(data.subject_ids) ? data.subject_ids.map((id) => String(id)) : []),
-        [data.subject_ids],
+    const selectedIrregularSubjectIds = useMemo(
+        () => (Array.isArray(data.irreg_subject_ids) ? data.irreg_subject_ids.map((id) => String(id)) : []),
+        [data.irreg_subject_ids],
+    );
+    const regularSubjectIds = useMemo(
+        () => selectedYearLevelSubjects.map((subject) => String(subject.id)),
+        [selectedYearLevelSubjects],
+    );
+    const activeRegularSubjectIds = useMemo(
+        () => regularSubjectIds.filter((id) => !removedSubjectIds.includes(id)),
+        [regularSubjectIds, removedSubjectIds],
+    );
+    const removedRegularSubjects = useMemo(
+        () => selectedYearLevelSubjects.filter((subject) => removedSubjectIds.includes(String(subject.id))),
+        [removedSubjectIds, selectedYearLevelSubjects],
+    );
+    const irregularAvailableSubjects = useMemo(
+        () => selectedProgramSubjects.filter((subject) => !regularSubjectIds.includes(String(subject.id))),
+        [regularSubjectIds, selectedProgramSubjects],
+    );
+    const selectedIrregularSubjects = useMemo(
+        () => irregularAvailableSubjects.filter((subject) => selectedIrregularSubjectIds.includes(String(subject.id))),
+        [irregularAvailableSubjects, selectedIrregularSubjectIds],
     );
 
     useEffect(() => {
@@ -212,8 +286,9 @@ export default function Students({
             setData('program_id', '');
             setData('strand_id', '');
             setData('year_level_id', '');
-            setData('subject_ids', []);
-            setData('irreg_subject_id', '');
+            setData('removed_subject_ids', []);
+            setData('irreg_subject_ids', []);
+            setData('irreg_subject_teacher_ids', {});
         }
     }, [data.department_id, filteredDepartments, setData]);
 
@@ -221,8 +296,9 @@ export default function Students({
         if (data.program_id && !filteredPrograms.some((program) => String(program.id) === String(data.program_id))) {
             setData('program_id', '');
             setData('year_level_id', '');
-            setData('subject_ids', []);
-            setData('irreg_subject_id', '');
+            setData('removed_subject_ids', []);
+            setData('irreg_subject_ids', []);
+            setData('irreg_subject_teacher_ids', {});
         }
     }, [data.program_id, filteredPrograms, setData]);
 
@@ -235,7 +311,9 @@ export default function Students({
     useEffect(() => {
         if (!supportsProgram && data.program_id) {
             setData('program_id', '');
-            setData('subject_ids', []);
+            setData('removed_subject_ids', []);
+            setData('irreg_subject_ids', []);
+            setData('irreg_subject_teacher_ids', {});
         }
     }, [data.program_id, setData, supportsProgram]);
 
@@ -248,8 +326,9 @@ export default function Students({
     useEffect(() => {
         if (data.year_level_id && !filteredYearLevels.some((yearLevel) => String(yearLevel.id) === String(data.year_level_id))) {
             setData('year_level_id', '');
-            setData('subject_ids', []);
-            setData('irreg_subject_id', '');
+            setData('removed_subject_ids', []);
+            setData('irreg_subject_ids', []);
+            setData('irreg_subject_teacher_ids', {});
         }
     }, [data.year_level_id, filteredYearLevels, setData]);
 
@@ -260,22 +339,34 @@ export default function Students({
     }, [canShowIrregularControls, data.is_irreg, setData]);
 
     useEffect(() => {
-        if (!data.is_irreg && data.irreg_subject_id) {
-            setData('irreg_subject_id', '');
+        if (!data.is_irreg && (selectedIrregularSubjectIds.length > 0 || Object.keys(data.irreg_subject_teacher_ids ?? {}).length > 0)) {
+            setData('irreg_subject_ids', []);
+            setData('irreg_subject_teacher_ids', {});
         }
-    }, [data.irreg_subject_id, data.is_irreg, setData]);
+    }, [data.irreg_subject_teacher_ids, data.is_irreg, selectedIrregularSubjectIds.length, setData]);
 
     useEffect(() => {
-        if (data.irreg_subject_id && !availableSubjectIds.includes(String(data.irreg_subject_id))) {
-            setData('irreg_subject_id', '');
+        if (removedSubjectIds.some((id) => !regularSubjectIds.includes(id))) {
+            setData('removed_subject_ids', removedSubjectIds.filter((id) => regularSubjectIds.includes(id)));
         }
-    }, [availableSubjectIds, data.irreg_subject_id, setData]);
+    }, [regularSubjectIds, removedSubjectIds, setData]);
 
     useEffect(() => {
-        if (selectedSubjectIds.some((id) => !availableSubjectIds.includes(id))) {
-            setData('subject_ids', selectedSubjectIds.filter((id) => availableSubjectIds.includes(id)));
+        const validIrregularIds = selectedIrregularSubjectIds.filter((id) => irregularAvailableSubjects.some((subject) => String(subject.id) === id));
+
+        if (validIrregularIds.length !== selectedIrregularSubjectIds.length) {
+            const nextTeacherIds = { ...(data.irreg_subject_teacher_ids ?? {}) };
+
+            Object.keys(nextTeacherIds).forEach((subjectId) => {
+                if (!validIrregularIds.includes(String(subjectId))) {
+                    delete nextTeacherIds[subjectId];
+                }
+            });
+
+            setData('irreg_subject_ids', validIrregularIds);
+            setData('irreg_subject_teacher_ids', nextTeacherIds);
         }
-    }, [availableSubjectIds, selectedSubjectIds, setData]);
+    }, [data.irreg_subject_teacher_ids, irregularAvailableSubjects, selectedIrregularSubjectIds, setData]);
 
     const handleBranchChange = (branchId) => {
         setData('branch_id', branchId);
@@ -283,8 +374,9 @@ export default function Students({
         setData('program_id', '');
         setData('strand_id', '');
         setData('year_level_id', '');
-        setData('subject_ids', []);
-        setData('irreg_subject_id', '');
+        setData('removed_subject_ids', []);
+        setData('irreg_subject_ids', []);
+        setData('irreg_subject_teacher_ids', {});
     };
 
     const handleDepartmentChange = (departmentId) => {
@@ -292,32 +384,41 @@ export default function Students({
         setData('program_id', '');
         setData('strand_id', '');
         setData('year_level_id', '');
-        setData('subject_ids', []);
-        setData('irreg_subject_id', '');
+        setData('removed_subject_ids', []);
+        setData('irreg_subject_ids', []);
+        setData('irreg_subject_teacher_ids', {});
     };
 
     const handleProgramChange = (programId) => {
         setData('program_id', programId);
         setData('year_level_id', '');
-        setData('subject_ids', data.is_irreg
-            ? subjects
-                .filter((subject) => String(subject.program_id ?? '') === String(programId))
-                .map((subject) => String(subject.id))
-            : []);
-        setData('irreg_subject_id', '');
+        setData('removed_subject_ids', []);
+        setData('irreg_subject_ids', []);
+        setData('irreg_subject_teacher_ids', {});
     };
 
-    const toggleSubject = (subjectId) => {
+    const toggleRegularSubject = (subjectId) => {
         const subjectKey = String(subjectId);
-        const isSelected = selectedSubjectIds.includes(subjectKey);
+        const isRemoved = removedSubjectIds.includes(subjectKey);
 
-        setData('subject_ids', isSelected
-            ? selectedSubjectIds.filter((id) => id !== subjectKey)
-            : [...selectedSubjectIds, subjectKey]);
+        setData('removed_subject_ids', isRemoved
+            ? removedSubjectIds.filter((id) => id !== subjectKey)
+            : [...removedSubjectIds, subjectKey]);
+    };
 
-        if (String(data.irreg_subject_id) === subjectKey && isSelected) {
-            setData('irreg_subject_id', '');
+    const toggleIrregularSubject = (subjectId) => {
+        const subjectKey = String(subjectId);
+        const isSelected = selectedIrregularSubjectIds.includes(subjectKey);
+        const nextTeacherIds = { ...(data.irreg_subject_teacher_ids ?? {}) };
+
+        if (isSelected) {
+            delete nextTeacherIds[subjectKey];
         }
+
+        setData('irreg_subject_ids', isSelected
+            ? selectedIrregularSubjectIds.filter((id) => id !== subjectKey)
+            : [...selectedIrregularSubjectIds, subjectKey]);
+        setData('irreg_subject_teacher_ids', nextTeacherIds);
     };
 
     const openSubjectViewer = (mode) => {
@@ -325,16 +426,10 @@ export default function Students({
         setSubjectListOpen(true);
     };
 
-    const pickIrregularSubject = (subjectId) => {
-        setData('irreg_subject_id', String(subjectId));
-        setSubjectListOpen(false);
-    };
-
     const openCreate = () => {
         reset();
         setDetailOpen(false);
         setViewing(null);
-        setRegisteredSubjectIds([]);
         setData({
             student_no: '',
             branch_id: activeBranchId,
@@ -342,9 +437,10 @@ export default function Students({
             program_id: '',
             strand_id: '',
             year_level_id: '',
-            subject_ids: [],
+            removed_subject_ids: [],
             is_irreg: false,
-            irreg_subject_id: '',
+            irreg_subject_ids: [],
+            irreg_subject_teacher_ids: {},
             first_name: '',
             middle_name: '',
             last_name: '',
@@ -368,7 +464,6 @@ export default function Students({
     const openEdit = (row) => {
         setDetailOpen(false);
         setViewing(null);
-        setRegisteredSubjectIds(Array.isArray(row.subject_id) ? row.subject_id.map((id) => String(id)) : []);
         setData({
             student_no: row.student_no,
             branch_id: String(row.branch_id ?? ''),
@@ -376,9 +471,12 @@ export default function Students({
             program_id: String(row.program_id ?? ''),
             strand_id: String(row.strand_id ?? ''),
             year_level_id: String(row.year_level_id ?? ''),
-            subject_ids: Array.isArray(row.subject_id) ? row.subject_id.map((id) => String(id)) : [],
+            removed_subject_ids: Object.keys(parseTeacherMap(row.removed_subject_map)),
             is_irreg: Boolean(row.is_irreg),
-            irreg_subject_id: String(row.irreg_subject_id ?? ''),
+            irreg_subject_ids: Object.keys(parseTeacherMap(row.irreg_subject_map)),
+            irreg_subject_teacher_ids: Object.fromEntries(
+                Object.entries(parseTeacherMap(row.irreg_subject_map)).map(([subjectId, teacherId]) => [String(subjectId), String(teacherId ?? '')])
+            ),
             first_name: row.first_name,
             middle_name: row.middle_name ?? '',
             last_name: row.last_name,
@@ -582,9 +680,38 @@ export default function Students({
                                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Irregular</p>
                                 <p className="mt-1 text-sm text-slate-900">{viewing.is_irreg ? 'Yes' : 'No'}</p>
                             </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div>
-                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Irregular Subject</p>
-                                <p className="mt-1 text-sm text-slate-900">{viewing.irregSubject?.name ?? '-'}</p>
+                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Removed Regular Subjects</p>
+                                {Array.isArray(viewing.removed_subjects) && viewing.removed_subjects.length > 0 ? (
+                                    <div className="mt-2 space-y-2">
+                                        {viewing.removed_subjects.map((subject) => (
+                                            <div key={subject.id} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                                <p className="text-sm font-medium text-slate-900">{subject.name}</p>
+                                                <p className="text-xs text-slate-500">{subject.code || 'No subject code'} | {subject.teacher_name || 'No teacher assigned'}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="mt-1 text-sm text-slate-900">-</p>
+                                )}
+                            </div>
+                            <div>
+                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Irregular Subjects</p>
+                                {Array.isArray(viewing.irregular_subjects) && viewing.irregular_subjects.length > 0 ? (
+                                    <div className="mt-2 space-y-2">
+                                        {viewing.irregular_subjects.map((subject) => (
+                                            <div key={subject.id} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                                <p className="text-sm font-medium text-slate-900">{subject.name}</p>
+                                                <p className="text-xs text-slate-500">{subject.code || 'No subject code'} | {subject.teacher_name || 'No teacher assigned'}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="mt-1 text-sm text-slate-900">-</p>
+                                )}
                             </div>
                         </div>
 
@@ -678,17 +805,10 @@ export default function Students({
                             value={data.year_level_id}
                             onChange={(e) => {
                                 const nextYearLevelId = e.target.value;
-                                const nextYearLevel = yearLevels.find((yearLevel) => String(yearLevel.id) === String(nextYearLevelId));
-                                const nextYearLevelSubjectIds = parseSubjectIds(nextYearLevel?.subject_id)
-                                    .map((id) => String(id))
-                                    .filter((id) => !registeredSubjectIds.includes(id));
-
                                 setData('year_level_id', nextYearLevelId);
-                                setData('subject_ids', [
-                                    ...selectedSubjectIds,
-                                    ...nextYearLevelSubjectIds.filter((id) => !selectedSubjectIds.includes(id)),
-                                ]);
-                                setData('irreg_subject_id', '');
+                                setData('removed_subject_ids', []);
+                                setData('irreg_subject_ids', []);
+                                setData('irreg_subject_teacher_ids', {});
                             }}
                             disabled={!data.department_id || (supportsProgram && !data.program_id) || (!supportsProgram && !supportsStrand && !showYearLevelOnly && !data.department_id)}
                         >
@@ -697,14 +817,14 @@ export default function Students({
                         </SelectInput>
                     </FormField>
 
-                    {data.year_level_id && !data.is_irreg && (
+                    {data.year_level_id && (
                         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
                                     <p className="text-sm font-medium text-slate-900">Selected year level subjects</p>
                                     <p className="text-xs text-slate-500">
-                                        {availableYearLevelSubjects.length > 0
-                                            ? `${availableYearLevelSubjects.length} subject(s) available from this year level.`
+                                        {selectedYearLevelSubjects.length > 0
+                                            ? `${activeRegularSubjectIds.length} active subject(s), ${removedRegularSubjects.length} removed subject(s).`
                                             : 'No subjects are assigned to this year level yet.'}
                                     </p>
                                 </div>
@@ -731,13 +851,11 @@ export default function Students({
                                         type="button"
                                         onClick={() => {
                                             const nextValue = !data.is_irreg;
-                                            const nextSubjectIds = nextValue
-                                                ? selectedProgramSubjects.map((subject) => String(subject.id))
-                                                : selectedYearLevelSubjects.map((subject) => String(subject.id));
-
                                             setData('is_irreg', nextValue);
-                                            setData('subject_ids', nextSubjectIds);
-                                            setData('irreg_subject_id', '');
+                                            if (!nextValue) {
+                                                setData('irreg_subject_ids', []);
+                                                setData('irreg_subject_teacher_ids', {});
+                                            }
                                         }}
                                         className={`relative inline-flex h-7 w-12 items-center rounded-full transition ${data.is_irreg ? 'bg-slate-900' : 'bg-slate-300'}`}
                                         aria-pressed={data.is_irreg}
@@ -753,11 +871,11 @@ export default function Students({
                                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                         <div>
-                                            <p className="text-sm font-medium text-slate-900">Selected program subjects</p>
+                                            <p className="text-sm font-medium text-slate-900">Selected irregular subjects</p>
                                             <p className="text-xs text-slate-500">
-                                                {selectedSubjectIds.length > 0
-                                                    ? `${selectedSubjectIds.length} subject(s) selected for this irregular student.`
-                                                    : 'No program subjects are selected yet.'}
+                                                {selectedIrregularSubjectIds.length > 0
+                                                    ? `${selectedIrregularSubjectIds.length} irregular subject(s) selected for this student.`
+                                                    : 'No irregular subjects are selected yet.'}
                                             </p>
                                         </div>
                                         <button
@@ -766,39 +884,12 @@ export default function Students({
                                             disabled={!data.program_id}
                                             className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
                                         >
-                                            View Program Subjects
+                                            Manage Irregular Subjects
                                         </button>
                                     </div>
                                 </div>
                             )}
                         </div>
-                    )}
-
-                    {data.is_irreg && canShowIrregularControls && (
-                        <FormField label="Irregular Subject" error={errors.irreg_subject_id}>
-                            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                    <div>
-                                        <p className="text-sm font-medium text-slate-900">
-                                            {availableSubjects.find((subject) => String(subject.id) === String(data.irreg_subject_id))?.name ?? 'No irregular subject selected'}
-                                        </p>
-                                        <p className="text-xs text-slate-500">
-                                            {data.irreg_subject_id
-                                                ? (availableSubjects.find((subject) => String(subject.id) === String(data.irreg_subject_id))?.code || 'Selected from current program subjects')
-                                                : 'Choose one subject from the selected program subjects.'}
-                                        </p>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => openSubjectViewer('irregular-pick')}
-                                        disabled={!data.program_id || selectedSubjectIds.length === 0}
-                                        className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-                                    >
-                                        Choose Irregular Subject
-                                    </button>
-                                </div>
-                            </div>
-                        </FormField>
                     )}
 
                     <FormField label="Email" error={errors.email} required>
@@ -838,67 +929,83 @@ export default function Students({
                 <div className="space-y-4">
                     <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            {subjectListMode === 'irregular' || subjectListMode === 'irregular-pick' ? 'Program' : 'Year Level'}
+                            {subjectListMode === 'irregular' ? 'Program' : 'Year Level'}
                         </p>
                         <p className="mt-1 text-sm font-medium text-slate-900">
-                            {subjectListMode === 'irregular' || subjectListMode === 'irregular-pick'
+                            {subjectListMode === 'irregular'
                                 ? (filteredPrograms.find((program) => String(program.id) === String(data.program_id))?.name ?? 'Not assigned')
                                 : (selectedYearLevel?.name ?? 'Not assigned')}
                         </p>
                     </div>
 
-                    {(subjectListMode === 'irregular-pick'
-                        ? availableSubjects.filter((subject) => selectedSubjectIds.includes(String(subject.id)))
-                        : availableSubjects
+                    {(subjectListMode === 'irregular'
+                        ? irregularAvailableSubjects
+                        : selectedYearLevelSubjects
                     ).length > 0 ? (
                         <div className="space-y-2">
-                            {(subjectListMode === 'irregular-pick'
-                                ? availableSubjects.filter((subject) => selectedSubjectIds.includes(String(subject.id)))
-                                : availableSubjects
-                            ).map((subject) => (
-                                subjectListMode === 'irregular-pick' ? (
-                                    <button
-                                        key={subject.id}
-                                        type="button"
-                                        onClick={() => pickIrregularSubject(subject.id)}
-                                        className={`flex w-full items-start gap-3 rounded-lg border px-4 py-3 text-left transition ${
-                                            String(data.irreg_subject_id) === String(subject.id)
-                                                ? 'border-slate-900 bg-slate-100'
-                                                : 'border-slate-200 bg-white hover:bg-slate-50'
-                                        }`}
-                                    >
-                                        <span className={`mt-0.5 inline-flex h-4 w-4 rounded-full border ${
-                                            String(data.irreg_subject_id) === String(subject.id)
-                                                ? 'border-slate-900 bg-slate-900'
-                                                : 'border-slate-300 bg-white'
-                                        }`}>
-                                            <span className="m-auto h-1.5 w-1.5 rounded-full bg-white" />
-                                        </span>
-                                        <div className="min-w-0">
-                                            <p className="text-sm font-medium text-slate-900">{subject.name}</p>
-                                            <p className="text-xs text-slate-500">{subject.code || 'No subject code'}</p>
-                                        </div>
-                                    </button>
-                                ) : (
-                                    <label key={subject.id} className="flex items-start gap-3 rounded-lg border border-slate-200 px-4 py-3">
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedSubjectIds.includes(String(subject.id))}
-                                            onChange={() => toggleSubject(subject.id)}
-                                            className="mt-1 rounded border-slate-300"
-                                        />
-                                        <div className="min-w-0">
-                                            <p className="text-sm font-medium text-slate-900">{subject.name}</p>
-                                            <p className="text-xs text-slate-500">{subject.code || 'No subject code'}</p>
-                                        </div>
-                                    </label>
-                                )
-                            ))}
+                            {(subjectListMode === 'irregular'
+                                ? irregularAvailableSubjects
+                                : selectedYearLevelSubjects
+                            ).map((subject) => {
+                                const subjectKey = String(subject.id);
+                                const teacherOptions = (subject.teacher_id ?? [])
+                                    .map((teacherId) => teachers.find((teacher) => String(teacher.id) === String(teacherId)))
+                                    .filter(Boolean);
+
+                                return (
+                                    <div key={subject.id} className="rounded-lg border border-slate-200 px-4 py-3">
+                                        <label className="flex items-start gap-3">
+                                            <input
+                                                type="checkbox"
+                                                checked={subjectListMode === 'irregular'
+                                                    ? selectedIrregularSubjectIds.includes(subjectKey)
+                                                    : !removedSubjectIds.includes(subjectKey)}
+                                                onChange={() => (
+                                                    subjectListMode === 'irregular'
+                                                        ? toggleIrregularSubject(subject.id)
+                                                        : toggleRegularSubject(subject.id)
+                                                )}
+                                                className="mt-1 rounded border-slate-300"
+                                            />
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-sm font-medium text-slate-900">{subject.name}</p>
+                                                <p className="text-xs text-slate-500">{subject.code || 'No subject code'}</p>
+                                                <p className="mt-1 text-xs text-slate-500">
+                                                    {getAssignedTeacherLabel(subject, subjectListMode === 'irregular' ? 'irregular' : 'year-level').label}: {getAssignedTeacherLabel(subject, subjectListMode === 'irregular' ? 'irregular' : 'year-level').value}
+                                                </p>
+                                            </div>
+                                        </label>
+
+                                        {subjectListMode === 'irregular' && selectedIrregularSubjectIds.includes(subjectKey) ? (
+                                            <div className="mt-3 pl-7">
+                                                <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-500">Assigned Teacher</p>
+                                                <SelectInput
+                                                    value={String(data.irreg_subject_teacher_ids?.[subjectKey] ?? '')}
+                                                    onChange={(e) => setData('irreg_subject_teacher_ids', {
+                                                        ...(data.irreg_subject_teacher_ids ?? {}),
+                                                        [subjectKey]: e.target.value,
+                                                    })}
+                                                >
+                                                    <option value="">Select teacher...</option>
+                                                    {teacherOptions.map((teacher) => (
+                                                        <option key={teacher.id} value={teacher.id}>{teacher.full_name}</option>
+                                                    ))}
+                                                </SelectInput>
+                                                <p className="mt-1 text-xs text-slate-500">
+                                                    {teacherOptions.length > 0
+                                                        ? 'Choose one teacher assigned to this subject.'
+                                                        : 'No teachers are assigned to this subject yet.'}
+                                                </p>
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                );
+                            })}
                         </div>
                     ) : (
                         <div className="rounded-lg border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-500">
-                            {subjectListMode === 'irregular' || subjectListMode === 'irregular-pick'
-                                ? 'No subjects are available for the selected program yet.'
+                            {subjectListMode === 'irregular'
+                                ? 'No irregular subjects are available for the selected program.'
                                 : 'No subjects are assigned to this year level yet.'}
                         </div>
                     )}

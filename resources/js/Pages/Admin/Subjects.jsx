@@ -301,6 +301,7 @@ export default function Subjects({
     const columns = educationType === 'college'
         ? [
             { key: 'code', label: 'Code' },
+            { key: 'name', label: 'Subject Name' },
             { key: 'branch', label: 'Branch', render: (row) => row.department?.branch?.name ?? activeBranch?.name ?? '-' },
             { key: 'program', label: 'Program', render: (row) => row.program?.name ?? '-' },
             { key: 'is_gened', label: 'Gen Ed', render: (row) => row.is_gened ? 'Yes' : 'No' },
