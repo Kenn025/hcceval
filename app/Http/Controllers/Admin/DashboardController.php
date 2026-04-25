@@ -34,8 +34,47 @@ class DashboardController extends Controller
 
         return Inertia::render('Admin/Dashboard', [
             'stats' => $stats,
+            'branchSummaries' => $this->branchSummaries($branchId),
             'departmentStatuses' => $this->departmentStatuses($branchId),
         ]);
+    }
+
+    private function branchSummaries(?int $branchId): array
+    {
+        return DB::table('branch as b')
+            ->select('b.id', 'b.code', 'b.name')
+            ->where('b.is_deleted', 0)
+            ->where('b.is_activated', 1)
+            ->when($branchId, fn ($query) => $query->where('b.id', $branchId))
+            ->orderByRaw("CASE WHEN UPPER(b.code) = 'OVERALL' OR LOWER(b.name) LIKE '%overall%' THEN 0 ELSE 1 END")
+            ->orderBy('b.name')
+            ->get()
+            ->map(function ($branch) {
+                $departmentIds = DB::table('department')
+                    ->where('branch_id', $branch->id)
+                    ->where('is_deleted', 0)
+                    ->where('is_activated', 1)
+                    ->pluck('id');
+
+                return [
+                    'id' => $branch->id,
+                    'code' => $branch->code,
+                    'name' => $branch->name,
+                    'departments_count' => $departmentIds->count(),
+                    'programs_count' => DB::table('program')
+                        ->whereIn('department_id', $departmentIds)
+                        ->where('is_deleted', 0)
+                        ->where('is_activated', 1)
+                        ->count(),
+                    'strands_count' => DB::table('strand')
+                        ->whereIn('department_id', $departmentIds)
+                        ->where('is_deleted', 0)
+                        ->where('is_activated', 1)
+                        ->count(),
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     private function departmentStatuses(?int $branchId): array

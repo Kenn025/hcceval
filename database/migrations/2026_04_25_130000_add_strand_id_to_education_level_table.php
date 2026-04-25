@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -13,6 +14,11 @@ return new class extends Migration
             $table->index('strand_id');
             $table->foreign('strand_id')->references('id')->on('strand')->nullOnDelete()->cascadeOnUpdate();
         });
+
+        DB::table('education_level')->where('code', 'G11-STEM-A-SR')->update(['strand_id' => 1]);
+        DB::table('education_level')->where('code', 'G11-ABM-A-SR')->update(['strand_id' => 2]);
+        DB::table('education_level')->where('code', 'G11-STEM-A-CH')->update(['strand_id' => 5]);
+        DB::table('education_level')->where('code', 'G11-ABM-A-CH')->update(['strand_id' => 6]);
     }
 
     public function down(): void

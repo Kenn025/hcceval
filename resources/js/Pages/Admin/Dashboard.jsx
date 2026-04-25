@@ -4,26 +4,181 @@ import AdminLayout from '@/Layouts/AdminLayout';
 import { Link, router, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
-const ICON_MAP = {
-    branches: 'branches',
-    departments: 'departments',
-    programs: 'programs',
-    students: 'students',
-    teachers: 'teachers',
-    briefcase: 'briefcase',
-};
-
-function StatCard({ stat }) {
+function BranchSummaryCard({ branch, featured = false, selected = false, onSelect }) {
     return (
-        <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
-                <AppIcon name={ICON_MAP[stat.icon] ?? 'dashboard'} className="h-6 w-6" />
+        <button
+            type="button"
+            onClick={onSelect}
+            className={[
+                'w-full rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-blue-300 hover:bg-blue-50/60',
+                featured ? 'border-blue-200 bg-blue-50/40' : '',
+                selected ? 'border-blue-400 ring-2 ring-blue-100' : '',
+            ].join(' ')}
+        >
+            <div className="flex items-start gap-3">
+                <div className={[
+                    'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl',
+                    featured || selected ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700',
+                ].join(' ')}>
+                    <AppIcon name="branches" className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-900">{branch.name}</p>
+                    <p className="mt-1 text-xs font-medium uppercase tracking-wide text-slate-500">{branch.code}</p>
+                </div>
             </div>
-            <div>
-                <p className="text-sm text-slate-500">{stat.label}</p>
-                <p className="mt-0.5 text-2xl font-semibold tabular-nums text-slate-900">{stat.value.toLocaleString()}</p>
+
+            <div className="mt-4 grid grid-cols-3 gap-2">
+                {[
+                    ['Departments', branch.departments_count],
+                    ['Programs', branch.programs_count],
+                    ['Strands', branch.strands_count],
+                ].map(([label, value]) => (
+                    <div key={label} className={['rounded-lg px-3 py-2', featured || selected ? 'bg-white' : 'bg-slate-50'].join(' ')}>
+                        <p className="text-[11px] font-semibold text-slate-500">{label}</p>
+                        <p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{Number(value ?? 0).toLocaleString()}</p>
+                    </div>
+                ))}
+            </div>
+        </button>
+    );
+}
+
+function BranchSummaryDetail({ branch }) {
+    if (!branch) {
+        return null;
+    }
+
+    const overviewItems = [
+        ['Departments', branch.departments_count, 'departments'],
+        ['Programs', branch.programs_count, 'programs'],
+        ['Strands', branch.strands_count, 'layers'],
+    ];
+    const totalSetupItems = overviewItems.reduce((sum, [, value]) => sum + Number(value ?? 0), 0);
+
+    return (
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm xl:col-span-2">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="flex min-w-0 items-start gap-3">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white">
+                        <AppIcon name="branches" className="h-6 w-6" />
+                    </div>
+                    <div className="min-w-0">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Selected Branch</p>
+                        <h4 className="mt-1 truncate text-lg font-semibold text-slate-900">{branch.name}</h4>
+                        <p className="mt-1 text-sm font-medium uppercase tracking-wide text-slate-500">{branch.code}</p>
+                    </div>
+                </div>
+                <div className="rounded-xl bg-slate-50 px-4 py-3 text-right">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Total Setup</p>
+                    <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-900">{totalSetupItems.toLocaleString()}</p>
+                </div>
+            </div>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                {overviewItems.map(([label, value, icon]) => (
+                    <div key={label} className="rounded-xl bg-slate-50 p-4">
+                        <div className="flex items-center gap-2 text-slate-500">
+                            <AppIcon name={icon} className="h-4 w-4" />
+                            <p className="text-xs font-semibold uppercase tracking-wide">{label}</p>
+                        </div>
+                        <p className="mt-3 text-3xl font-semibold tabular-nums text-slate-900">{Number(value ?? 0).toLocaleString()}</p>
+                    </div>
+                ))}
             </div>
         </div>
+    );
+}
+
+function OverallBranchSummary({ branch, campusBranches = [] }) {
+    if (!branch) {
+        return null;
+    }
+
+    const totals = campusBranches.reduce((summary, campusBranch) => ({
+        departments: summary.departments + Number(campusBranch.departments_count ?? 0),
+        programs: summary.programs + Number(campusBranch.programs_count ?? 0),
+        strands: summary.strands + Number(campusBranch.strands_count ?? 0),
+    }), { departments: 0, programs: 0, strands: 0 });
+
+    return (
+        <div className="mb-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="flex min-w-0 items-start gap-3">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white">
+                        <AppIcon name="branches" className="h-6 w-6" />
+                    </div>
+                    <div className="min-w-0">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Overall Branch</p>
+                        <h3 className="mt-1 truncate text-lg font-semibold text-slate-900">{branch.name}</h3>
+                        <p className="mt-1 text-sm font-medium uppercase tracking-wide text-slate-500">{branch.code}</p>
+                    </div>
+                </div>
+                <div className="rounded-xl bg-slate-50 px-4 py-3 text-right">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Campus Branches</p>
+                    <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-900">{campusBranches.length.toLocaleString()}</p>
+                </div>
+            </div>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                {[
+                    ['Departments', totals.departments, 'departments'],
+                    ['Programs', totals.programs, 'programs'],
+                    ['Strands', totals.strands, 'layers'],
+                ].map(([label, value, icon]) => (
+                    <div key={label} className="rounded-xl bg-slate-50 p-4">
+                        <div className="flex items-center gap-2 text-slate-500">
+                            <AppIcon name={icon} className="h-4 w-4" />
+                            <p className="text-xs font-semibold uppercase tracking-wide">{label}</p>
+                        </div>
+                        <p className="mt-3 text-3xl font-semibold tabular-nums text-slate-900">{Number(value ?? 0).toLocaleString()}</p>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function BranchSummarySection({ branches = [] }) {
+    const [selectedBranchId, setSelectedBranchId] = useState(null);
+
+    const overallBranch = branches.find((branch) => (
+        String(branch.code ?? '').toUpperCase() === 'OVERALL'
+        || String(branch.name ?? '').toLowerCase().includes('overall')
+    ));
+    const campusBranches = branches.filter((branch) => branch.id !== overallBranch?.id);
+    const selectedBranch = campusBranches.find((branch) => String(branch.id) === String(selectedBranchId));
+
+    if (!overallBranch && !campusBranches.length) {
+        return null;
+    }
+
+    return (
+        <section className="mt-6">
+            <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+                <div>
+                    <h3 className="text-sm font-semibold text-slate-700">Branch Overview</h3>
+                    <p className="text-xs text-slate-500">{campusBranches.length} campus branch{campusBranches.length === 1 ? '' : 'es'} with academic setup counts.</p>
+                </div>
+            </div>
+
+            <OverallBranchSummary branch={overallBranch} campusBranches={campusBranches} />
+
+            <div className="grid gap-3 xl:grid-cols-3">
+                <div className="space-y-3">
+                    {campusBranches.map((branch) => (
+                        <BranchSummaryCard
+                            key={branch.id}
+                            branch={branch}
+                            selected={String(branch.id) === String(selectedBranch?.id)}
+                            onSelect={() => setSelectedBranchId(branch.id)}
+                        />
+                    ))}
+                </div>
+
+                {selectedBranch ? <BranchSummaryDetail branch={selectedBranch} /> : null}
+            </div>
+        </section>
     );
 }
 
@@ -214,7 +369,7 @@ const QUICK_LINKS = [
     { label: 'Peer Ratings', route: 'admin.peer-ratings', icon: 'group', desc: 'Peer evaluations' },
 ];
 
-export default function Dashboard({ stats, departmentStatuses = [] }) {
+export default function Dashboard({ branchSummaries = [], departmentStatuses = [] }) {
     const { activeAcademicYear } = usePage().props;
     const [selectedDepartmentStatus, setSelectedDepartmentStatus] = useState(null);
     const [startWarningTarget, setStartWarningTarget] = useState(null);
@@ -278,9 +433,7 @@ export default function Dashboard({ stats, departmentStatuses = [] }) {
                 </div>
             </div>
 
-            <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-                {stats.map((stat) => <StatCard key={stat.label} stat={stat} />)}
-            </section>
+            <BranchSummarySection branches={branchSummaries} />
 
             <section className="mt-6">
                 <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
