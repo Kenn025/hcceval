@@ -33,6 +33,10 @@ export default function EvaluateForm({ category, evaluatee, subjectSectionId, su
       setErrors(errs);
       return;
     }
+    setConfirmOpen(true);
+  }
+
+  function doSubmit() {
     setSubmitting(true);
     router.post(route('portal.student.evaluate.submit'), {
       category,
@@ -45,8 +49,8 @@ export default function EvaluateForm({ category, evaluatee, subjectSectionId, su
       comments:           comment || null,
     }, {
       onSuccess: () => router.visit(route('portal.student.dashboard')),
-      onError:   (errs) => { setErrors(errs); setSubmitting(false); },
-      onFinish:  () => setSubmitting(false),
+      onError:   (errs) => { setErrors(errs); setSubmitting(false); setConfirmOpen(false); },
+      onFinish:  () => { setSubmitting(false); setConfirmOpen(false); },
     });
   }
 
@@ -123,6 +127,17 @@ export default function EvaluateForm({ category, evaluatee, subjectSectionId, su
           </button>
         </div>
       </form>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Submit this evaluation?"
+        message={`Once submitted, your responses for ${evaluatee?.name?.trim() || 'this evaluation'} cannot be edited. Make sure your ratings are final.`}
+        confirmLabel="Submit"
+        tone="primary"
+        loading={submitting}
+        onConfirm={doSubmit}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </ClientLayout>
   );
 }

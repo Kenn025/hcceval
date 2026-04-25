@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { useEffect, useRef, useState } from 'react';
+import ConfirmDialog from '@/Components/ConfirmDialog';
 
 const POLL_MS = 60_000;
 
@@ -18,6 +19,7 @@ export default function NotificationBell({ routePrefix = '' }) {
     const [items, setItems]     = useState([]);
     const [unread, setUnread]   = useState(0);
     const [loading, setLoading] = useState(false);
+    const [confirm, setConfirm] = useState(null);
     const ref = useRef(null);
 
     const url = (suffix) => `${routePrefix}${suffix}`;
@@ -62,25 +64,49 @@ export default function NotificationBell({ routePrefix = '' }) {
         }
     };
 
-    const markAllRead = async () => {
-        setLoading(true);
-        try {
-            await axios.post(url('/notifications/read-all'));
-            await fetchNotifications();
-        } finally {
-            setLoading(false);
-        }
+    const askMarkAllRead = () => {
+        if (unread === 0) return;
+        setConfirm({
+            title: 'Mark all notifications as read?',
+            message: `This will mark all ${unread} unread notification${unread === 1 ? '' : 's'} as read.`,
+            confirmLabel: 'Mark all read',
+            tone: 'primary',
+            run: async () => {
+                setLoading(true);
+                try {
+                    await axios.post(url('/notifications/read-all'));
+                    await fetchNotifications();
+                } finally {
+                    setLoading(false);
+                }
+            },
+        });
     };
 
-    const clearAll = async () => {
-        if (!confirm('Clear all notifications?')) return;
-        setLoading(true);
-        try {
-            await axios.delete(url('/notifications/clear'));
-            await fetchNotifications();
-        } finally {
-            setLoading(false);
-        }
+    const askClearAll = () => {
+        if (items.length === 0) return;
+        setConfirm({
+            title: 'Clear all notifications?',
+            message: 'This permanently deletes every notification in your inbox. This cannot be undone.',
+            confirmLabel: 'Clear all',
+            tone: 'danger',
+            run: async () => {
+                setLoading(true);
+                try {
+                    await axios.delete(url('/notifications/clear'));
+                    await fetchNotifications();
+                } finally {
+                    setLoading(false);
+                }
+            },
+        });
+    };
+
+    const handleConfirm = async () => {
+        if (!confirm) return;
+        const job = confirm;
+        setConfirm(null);
+        await job.run();
     };
 
     return (
@@ -124,7 +150,7 @@ export default function NotificationBell({ routePrefix = '' }) {
                                 <div className="flex items-center gap-2">
                                     <button
                                         type="button"
-                                        onClick={markAllRead}
+                                        onClick={askMarkAllRead}
                                         disabled={loading || unread === 0}
                                         className="rounded-lg px-2 py-1 text-[10px] font-black uppercase tracking-tighter text-blue-600 transition hover:bg-blue-50 hover:text-blue-700 disabled:opacity-30"
                                     >
@@ -133,7 +159,7 @@ export default function NotificationBell({ routePrefix = '' }) {
                                     <div className="h-3 w-px bg-slate-200/50" />
                                     <button
                                         type="button"
-                                        onClick={clearAll}
+                                        onClick={askClearAll}
                                         disabled={loading || items.length === 0}
                                         className="rounded-lg px-2 py-1 text-[10px] font-black uppercase tracking-tighter text-slate-400 transition hover:bg-rose-50 hover:text-rose-500 disabled:opacity-30"
                                     >
@@ -211,6 +237,17 @@ export default function NotificationBell({ routePrefix = '' }) {
                     </div>
                 </>
             )}
+
+            <ConfirmDialog
+                open={Boolean(confirm)}
+                title={confirm?.title}
+                message={confirm?.message}
+                confirmLabel={confirm?.confirmLabel}
+                tone={confirm?.tone ?? 'primary'}
+                loading={loading}
+                onConfirm={handleConfirm}
+                onCancel={() => setConfirm(null)}
+            />
         </div>
     );
 }
