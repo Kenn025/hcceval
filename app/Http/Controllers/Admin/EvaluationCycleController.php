@@ -22,7 +22,8 @@ class EvaluationCycleController extends Controller
                 DB::raw("CONCAT(from_year, '-', to_year) as school_year"),
                 DB::raw("CASE WHEN is_deleted = 1 THEN 'closed' WHEN is_activated = 1 THEN 'active' ELSE 'inactive' END as status")
             )
-            ->orderByDesc('from_year')
+            ->orderBy('from_year')
+            ->orderBy('id')
             ->get();
 
         $activeCycle = $cycles->firstWhere('status', 'active');

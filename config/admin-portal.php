@@ -84,6 +84,7 @@ return [
             'items' => [
                 ['label' => 'Departments', 'route' => 'admin.departments', 'icon' => 'departments'],
                 ['label' => 'Branches', 'route' => 'admin.branches', 'icon' => 'branches'],
+                ['label' => 'Academic Year', 'route' => 'admin.evaluation-cycle', 'icon' => 'calendar'],
                 ['label' => 'Admin Users', 'route' => 'admin.admin-users', 'icon' => 'shield'],
             ],
         ],
@@ -274,6 +275,13 @@ return [
             'eyebrow' => 'System Controls',
             'icon' => 'branches',
             'source' => ['admin/branch_management.php'],
+        ],
+        'admin.evaluation-cycle' => [
+            'title' => 'Academic Year',
+            'description' => 'School-year and term controls for opening, closing, and activating evaluation cycles.',
+            'eyebrow' => 'System Controls',
+            'icon' => 'calendar',
+            'source' => ['admin/evaluation_cycle.php'],
         ],
         'admin.admin-users' => [
             'title' => 'Admin Users',

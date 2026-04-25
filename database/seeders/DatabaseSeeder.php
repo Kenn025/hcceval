@@ -93,10 +93,23 @@ class DatabaseSeeder extends Seeder
             ['id' => 13, 'branch_id' => null, 'code' => 'EMP-DEPT-ADMIN', 'name' => 'Admin Office', 'description' => 'Administrative office support.', 'is_activated' => 1, 'is_deleted' => 0],
         ]);
 
-        DB::table('academic_year')->insert([
-            ['id' => 1, 'from_year' => 2025, 'to_year' => 2026, 'term' => '1st Semester', 'is_activated' => 1, 'is_deleted' => 0],
-            ['id' => 2, 'from_year' => 2025, 'to_year' => 2026, 'term' => '2nd Semester', 'is_activated' => 1, 'is_deleted' => 0],
-        ]);
+        $academicYears = [];
+        $academicYearId = 1;
+
+        for ($fromYear = 2025; $fromYear <= 2034; $fromYear++) {
+            foreach (['1st Semester', '2nd Semester'] as $term) {
+                $academicYears[] = [
+                    'id' => $academicYearId++,
+                    'from_year' => $fromYear,
+                    'to_year' => $fromYear + 1,
+                    'term' => $term,
+                    'is_activated' => $fromYear === 2025 && $term === '2nd Semester' ? 1 : 0,
+                    'is_deleted' => 0,
+                ];
+            }
+        }
+
+        DB::table('academic_year')->insert($academicYears);
 
         DB::table('department')->insert([
             ['id' => 1, 'code' => 'DEP-SR-COL', 'name' => 'College Department', 'branch_id' => 2, 'is_activated' => 1, 'is_deleted' => 0],
