@@ -166,18 +166,88 @@ export default function YearLevels({
         }),
         [data.branch_id, data.program_id, data.strand_id, educationType, subjects],
     );
-    const searchedSubjects = useMemo(() => {
+    const visibleSubjectGroups = useMemo(() => {
         const search = subjectSearch.trim().toLowerCase();
+        const matchesSearch = (subject) => !search || String(subject.name ?? '').toLowerCase().includes(search) || String(subject.code ?? '').toLowerCase().includes(search);
 
-        if (!search) {
-            return filteredSubjects;
+        if (educationType === 'college') {
+            const major = filteredSubjects.filter((subject) => !subject.is_gened && matchesSearch(subject));
+            const minor = subjects.filter((subject) => (
+                !search || matchesSearch(subject)
+            )).filter((subject) => (
+                String(subject.branch_id ?? '') === String(data.branch_id)
+                && String(subject.department_id ?? '') === String(filteredPrograms.find((program) => String(program.id) === String(data.program_id))?.department_id ?? '')
+                && Boolean(subject.is_gened)
+            ));
+
+            return { major, minor };
         }
 
-        return filteredSubjects.filter((subject) => (
-            String(subject.name ?? '').toLowerCase().includes(search)
-            || String(subject.code ?? '').toLowerCase().includes(search)
-        ));
-    }, [filteredSubjects, subjectSearch]);
+        if (educationType === 'senior-high') {
+            const major = filteredSubjects.filter((subject) => !subject.is_gened && matchesSearch(subject));
+            const minor = subjects.filter((subject) => (
+                !search || matchesSearch(subject)
+            )).filter((subject) => (
+                String(subject.branch_id ?? '') === String(data.branch_id)
+                && String(subject.department_id ?? '') === String(resolvedDepartment?.id ?? '')
+                && Boolean(subject.is_gened)
+            ));
+
+            return { major, minor };
+        }
+
+        if (educationType === 'junior-high' || educationType === 'grade-school') {
+            const scoped = filteredSubjects.filter((subject) => matchesSearch(subject));
+
+            return { major: scoped, minor: [] };
+        }
+
+        return { major: [], minor: [] };
+    }, [data.branch_id, data.program_id, educationType, filteredPrograms, filteredSubjects, resolvedDepartment, subjectSearch, subjects]);
+    const totalAvailableSubjects = useMemo(() => {
+        if (educationType === 'college') {
+            if (!data.program_id) {
+                return 0;
+            }
+
+            const selectedProgramDepartmentId = String(
+                filteredPrograms.find((program) => String(program.id) === String(data.program_id))?.department_id ?? ''
+            );
+
+            return subjects.filter((subject) => (
+                String(subject.branch_id ?? '') === String(data.branch_id)
+                && String(subject.department_id ?? '') === selectedProgramDepartmentId
+                && (
+                    (!subject.is_gened && String(subject.program_id ?? '') === String(data.program_id))
+                    || Boolean(subject.is_gened)
+                )
+            )).length;
+        }
+
+        if (educationType === 'senior-high') {
+            if (!data.strand_id) {
+                return 0;
+            }
+
+            return subjects.filter((subject) => (
+                String(subject.branch_id ?? '') === String(data.branch_id)
+                && String(subject.department_id ?? '') === String(resolvedDepartment?.id ?? '')
+                && (
+                    (!subject.is_gened && String(subject.strand_id ?? '') === String(data.strand_id))
+                    || Boolean(subject.is_gened)
+                )
+            )).length;
+        }
+
+        if (educationType === 'junior-high' || educationType === 'grade-school') {
+            return subjects.filter((subject) => (
+                String(subject.branch_id ?? '') === String(data.branch_id)
+                && String(subject.department_id ?? '') === String(resolvedDepartment?.id ?? '')
+            )).length;
+        }
+
+        return 0;
+    }, [data.branch_id, data.program_id, data.strand_id, educationType, filteredPrograms, resolvedDepartment, subjects]);
     const selectedSubjectIds = useMemo(
         () => (Array.isArray(data.subject_ids) ? data.subject_ids.map((id) => String(id)) : []),
         [data.subject_ids],
@@ -206,6 +276,19 @@ export default function YearLevels({
             })
             .filter(Boolean);
     }, [subjectMap, viewing]);
+    const viewingSubjectGroups = useMemo(() => {
+        if (educationType === 'college' || educationType === 'senior-high') {
+            return {
+                major: viewingSubjects.filter((subject) => !subject.is_gened),
+                minor: viewingSubjects.filter((subject) => subject.is_gened),
+            };
+        }
+
+        return {
+            major: viewingSubjects,
+            minor: [],
+        };
+    }, [educationType, viewingSubjects]);
     const teacherMap = useMemo(
         () => new Map(advisers.map((teacher) => [String(teacher.id), teacher.full_name])),
         [advisers],
@@ -465,19 +548,29 @@ export default function YearLevels({
                             <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</p><div className="mt-1"><StatusBadge active={viewing.is_activated} /></div></div>
                         </div>
 
-                        {(educationType === 'college' || educationType === 'senior-high') && (
+                        {['college', 'senior-high', 'junior-high', 'grade-school'].includes(educationType) && (
                             <div>
                                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Assigned Subjects</p>
                                 {viewingSubjects.length > 0 ? (
-                                    <div className="mt-2 space-y-2">
-                                        {viewingSubjects.map((subject) => (
-                                            <div key={subject.id} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                                                <p className="text-sm font-medium text-slate-800">{subject.name}</p>
-                                                <p className="text-xs text-slate-500">
-                                                    {subject.code || 'No subject code'}
-                                                    {' | '}
-                                                    {teacherMap.get(subject.assignedTeacherId) || 'No teacher selected'}
-                                                </p>
+                                    <div className="mt-2 space-y-4">
+                                        {[
+                                            { key: 'major', label: educationType === 'college' || educationType === 'senior-high' ? 'Major' : 'Subjects', items: viewingSubjectGroups.major },
+                                            { key: 'minor', label: 'Minor', items: viewingSubjectGroups.minor },
+                                        ].filter((group) => group.items.length > 0).map((group) => (
+                                            <div key={group.key}>
+                                                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{group.label}</p>
+                                                <div className="space-y-2">
+                                                    {group.items.map((subject) => (
+                                                        <div key={subject.id} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                                            <p className="text-sm font-medium text-slate-800">{subject.name}</p>
+                                                            <p className="text-xs text-slate-500">
+                                                                {subject.code || 'No subject code'}
+                                                                {' | '}
+                                                                {teacherMap.get(subject.assignedTeacherId) || 'No teacher selected'}
+                                                            </p>
+                                                        </div>
+                                                    ))}
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
@@ -587,24 +680,28 @@ export default function YearLevels({
                         </SelectInput>
                     </FormField>
 
-                    {(educationType === 'college' || educationType === 'senior-high') && (
+                    {['college', 'senior-high', 'junior-high', 'grade-school'].includes(educationType) && (
                         <FormField label="Assigned Subjects" error={errors.subject_ids}>
                             <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
                                 <p className="text-xs text-slate-500">
                                     {educationType === 'college'
                                         ? data.program_id
-                                            ? filteredSubjects.length > 0
-                                                ? `${filteredSubjects.length} subject(s) available for this program.`
+                                            ? (visibleSubjectGroups.major.length + visibleSubjectGroups.minor.length) > 0
+                                                ? `${visibleSubjectGroups.major.length} major and ${visibleSubjectGroups.minor.length} minor subject(s) available.`
                                                 : 'No subjects are available for the selected program yet.'
                                             : 'Select a program first to assign subjects.'
-                                        : !data.strand_id
+                                        : educationType === 'senior-high'
+                                            ? !data.strand_id
                                             ? 'Select a strand first to assign subjects.'
-                                            : filteredSubjects.length > 0
-                                                ? `${filteredSubjects.length} subject(s) available for the selected strand.`
-                                                : 'No subjects are available for the selected strand yet.'}
+                                            : totalAvailableSubjects > 0
+                                                ? `${visibleSubjectGroups.major.length} major and ${visibleSubjectGroups.minor.length} minor subject(s) available.`
+                                                : 'No subjects are available for the selected strand yet.'
+                                            : totalAvailableSubjects > 0
+                                                ? `${visibleSubjectGroups.major.length} subject(s) available in this level scope.`
+                                                : 'No subjects are available for the selected branch yet.'}
                                 </p>
 
-                                {((educationType === 'college' && data.program_id) || (educationType === 'senior-high' && data.strand_id)) && filteredSubjects.length > 0 ? (
+                                {((educationType === 'college' && data.program_id) || (educationType === 'senior-high' && data.strand_id) || educationType === 'junior-high' || educationType === 'grade-school') && totalAvailableSubjects > 0 ? (
                                     <TextInput
                                         value={subjectSearch}
                                         onChange={(e) => setSubjectSearch(e.target.value)}
@@ -612,9 +709,34 @@ export default function YearLevels({
                                     />
                                 ) : null}
 
-                                {((educationType === 'college' && data.program_id) || (educationType === 'senior-high' && data.strand_id)) && filteredSubjects.length > 0 ? (
-                                    <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
-                                        {searchedSubjects.length > 0 ? searchedSubjects.map((subject) => {
+                                {((educationType === 'college' && data.program_id) || (educationType === 'senior-high' && data.strand_id) || educationType === 'junior-high' || educationType === 'grade-school') && totalAvailableSubjects > 0 ? (
+                                    <div className="max-h-[32rem] space-y-4 overflow-y-auto pr-1">
+                                        {[
+                                            {
+                                                key: 'major',
+                                                label: educationType === 'college' || educationType === 'senior-high' ? 'Major Subjects' : 'Subjects',
+                                                helper: educationType === 'college'
+                                                    ? 'Program subjects that are not Gen Ed.'
+                                                    : educationType === 'senior-high'
+                                                        ? 'Strand subjects that are not Gen Ed.'
+                                                        : 'Subjects available in the selected level scope.',
+                                                items: visibleSubjectGroups.major,
+                                            },
+                                            {
+                                                key: 'minor',
+                                                label: 'Minor Subjects',
+                                                helper: educationType === 'college'
+                                                    ? 'All Gen Ed subjects under the college department.'
+                                                    : 'All Gen Ed subjects under the senior high department.',
+                                                items: visibleSubjectGroups.minor,
+                                            },
+                                        ].map((group) => group.items.length > 0 ? (
+                                            <div key={group.key} className="space-y-2">
+                                                <div>
+                                                    <p className="text-sm font-semibold text-slate-800">{group.label}</p>
+                                                    <p className="text-xs text-slate-500">{group.helper}</p>
+                                                </div>
+                                                {group.items.map((subject) => {
                                             const subjectKey = String(subject.id);
                                             const isSelected = selectedSubjectIds.includes(subjectKey);
                                             const teacherOptions = advisers.filter((teacher) => (subject.teacher_ids ?? []).includes(Number(teacher.id)));
@@ -670,11 +792,15 @@ export default function YearLevels({
                                                     ) : null}
                                                 </div>
                                             );
-                                        }) : (
+                                        })}
+                                            </div>
+                                        ) : null)}
+
+                                        {visibleSubjectGroups.major.length === 0 && visibleSubjectGroups.minor.length === 0 ? (
                                             <div className="rounded-lg border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-500">
                                                 No subjects match your search.
                                             </div>
-                                        )}
+                                        ) : null}
                                     </div>
                                 ) : null}
                             </div>

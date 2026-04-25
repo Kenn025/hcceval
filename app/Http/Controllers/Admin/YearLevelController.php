@@ -163,7 +163,7 @@ class YearLevelController extends Controller
                 ->orderBy('name')
                 ->get(),
             'subjects' => Subject::query()
-                ->select('id', 'name', 'code', 'department_id', 'program_id', 'strand_id', 'teacher_id')
+                ->select('id', 'name', 'code', 'department_id', 'program_id', 'strand_id', 'teacher_id', 'is_gened')
                 ->with('department:id,branch_id')
                 ->where('is_deleted', 0)
                 ->where('is_activated', 1)
@@ -178,6 +178,7 @@ class YearLevelController extends Controller
                     'department_id' => $subject->department_id,
                     'program_id' => $subject->program_id,
                     'strand_id' => $subject->strand_id,
+                    'is_gened' => (bool) $subject->is_gened,
                     'branch_id' => $subject->department?->branch_id,
                     'teacher_ids' => collect($subject->teacher_id ?? [])
                         ->filter()
@@ -279,9 +280,13 @@ class YearLevelController extends Controller
                     ->where('type', 'college')
                     ->firstOrFail();
 
-                if ((int) $subject->department_id !== (int) $validated['department_id'] || (int) ($subject->program_id ?? 0) !== (int) $validated['program_id']) {
+                $isDepartmentMatch = (int) $subject->department_id === (int) $validated['department_id'];
+                $isAllowedMajor = ! $subject->is_gened && (int) ($subject->program_id ?? 0) === (int) $validated['program_id'];
+                $isAllowedMinor = (bool) $subject->is_gened;
+
+                if (! $isDepartmentMatch || (! $isAllowedMajor && ! $isAllowedMinor)) {
                     throw ValidationException::withMessages([
-                        'subject_ids' => 'Selected subjects must match the chosen program.',
+                        'subject_ids' => 'Selected college major subjects must match the chosen program, while minor subjects must be Gen Ed subjects from the college department.',
                     ]);
                 }
 
@@ -343,15 +348,60 @@ class YearLevelController extends Controller
                     ->where('type', $subjectType)
                     ->firstOrFail();
 
-                if ((int) $subject->department_id !== (int) $validated['department_id']) {
+                $isDepartmentMatch = (int) $subject->department_id === (int) $validated['department_id'];
+                $isAllowedMajor = ! $subject->is_gened && (int) ($subject->strand_id ?? 0) === (int) $validated['strand_id'];
+                $isAllowedMinor = (bool) $subject->is_gened;
+
+                if (! $isDepartmentMatch || (! $isAllowedMajor && ! $isAllowedMinor)) {
                     throw ValidationException::withMessages([
-                        'subject_ids' => 'Selected subjects must belong to the senior high department.',
+                        'subject_ids' => 'Selected senior high major subjects must match the chosen strand, while minor subjects must be Gen Ed subjects from the senior high department.',
                     ]);
                 }
 
-                if ((int) ($subject->strand_id ?? 0) !== (int) $validated['strand_id']) {
+                $assignedTeacherId = $subjectTeacherIds->get($subjectId);
+
+                if ($assignedTeacherId !== null) {
+                    $availableTeacherIds = collect($subject->teacher_id ?? [])
+                        ->filter()
+                        ->map(fn ($id) => (int) $id)
+                        ->values()
+                        ->all();
+
+                    if (! in_array($assignedTeacherId, $availableTeacherIds, true)) {
+                        throw ValidationException::withMessages([
+                            'subject_teacher_ids' => 'Selected subject teachers must come from the teachers assigned to each subject.',
+                        ]);
+                    }
+
+                    $validated['subject_teacher_map'][(string) $subjectId] = $assignedTeacherId;
+                }
+            }
+        } elseif (in_array(($validated['education_type'] ?? null), ['junior-high', 'grade-school'], true)) {
+            $validated['program_id'] = null;
+            $validated['strand_id'] = null;
+            $validated['department_id'] = $this->resolveDepartmentIdForEducationType((int) $validated['branch_id'], (string) ($validated['education_type'] ?? ''));
+            $validated['subject_id'] = collect($validated['subject_ids'] ?? [])
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+            $validated['subject_teacher_map'] = [];
+
+            $subjectTeacherIds = collect($validated['subject_teacher_ids'] ?? [])
+                ->mapWithKeys(fn ($teacherId, $subjectId) => [(int) $subjectId => $teacherId ? (int) $teacherId : null]);
+
+            foreach ($validated['subject_id'] as $subjectId) {
+                $subject = Subject::query()
+                    ->where('id', $subjectId)
+                    ->where('is_deleted', 0)
+                    ->where('is_activated', 1)
+                    ->where('type', $subjectType)
+                    ->firstOrFail();
+
+                if ((int) $subject->department_id !== (int) $validated['department_id']) {
                     throw ValidationException::withMessages([
-                        'subject_ids' => 'Selected subjects must match the chosen strand.',
+                        'subject_ids' => 'Selected subjects must belong to the chosen department.',
                     ]);
                 }
 

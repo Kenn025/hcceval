@@ -783,43 +783,89 @@ class AssignmentController extends Controller
 
         $typeCode = self::TYPE_CODE_MAP[$validated['assignment_type']] ?? self::TYPE_CODE_MAP['student-teacher'];
         $existingId = $this->findExistingDistributionId($typeCode, $validated['scope_type'], (int) $validated['scope_id']);
+        $firstCustomQuestionnaireId = (int) collect($validated['groups'] ?? [])
+            ->pluck('questionnaire_id')
+            ->filter()
+            ->first();
+
+        if (! $firstCustomQuestionnaireId && !empty($validated['questionnaire_id'])) {
+            $firstCustomQuestionnaireId = (int) $validated['questionnaire_id'];
+        }
 
         if (! $existingId) {
-            if ($validated['assignment_type'] !== 'peer') {
-                return back()->with('error', 'Select a questionnaire first before customizing subjects.');
+            if (! $firstCustomQuestionnaireId) {
+                return back()->with('error', $validated['assignment_type'] === 'peer'
+                    ? 'Select a questionnaire first before saving custom peer scopes.'
+                    : 'Select a questionnaire first before saving custom subjects.');
             }
 
-            $firstPeerQuestionnaireId = (int) collect($validated['groups'] ?? [])
-                ->pluck('questionnaire_id')
-                ->filter()
-                ->first();
+            $branchId = $validated['branch_id'] ?? null;
+            $departmentId = $validated['department_id'] ?? null;
+            $yearLevelIds = $validated['scope_type'] === 'level'
+                ? $this->getEquivalentYearLevelIds((int) $validated['scope_id'])
+                : [];
 
-            if (! $firstPeerQuestionnaireId && !empty($validated['questionnaire_id'])) {
-                $firstPeerQuestionnaireId = (int) $validated['questionnaire_id'];
+            if ($validated['scope_type'] === 'department') {
+                $department = DB::table('department')
+                    ->select('id', 'branch_id')
+                    ->where('id', (int) $validated['scope_id'])
+                    ->where('is_deleted', 0)
+                    ->first();
+
+                $branchId = $branchId ?? $department?->branch_id ?? null;
+                $departmentId = $department?->id ?? $departmentId;
+            } elseif (!$branchId || !$departmentId) {
+                if ($validated['scope_type'] === 'program') {
+                    $program = DB::table('program')
+                        ->join('department', 'program.department_id', '=', 'department.id')
+                        ->select('program.department_id', 'department.branch_id')
+                        ->where('program.id', (int) $validated['scope_id'])
+                        ->where('program.is_deleted', 0)
+                        ->where('department.is_deleted', 0)
+                        ->first();
+
+                    $branchId = $branchId ?? $program?->branch_id ?? null;
+                    $departmentId = $departmentId ?? $program?->department_id ?? null;
+                } elseif ($validated['scope_type'] === 'strand') {
+                    $strand = DB::table('strand')
+                        ->join('department', 'strand.department_id', '=', 'department.id')
+                        ->select('strand.department_id', 'department.branch_id')
+                        ->where('strand.id', (int) $validated['scope_id'])
+                        ->where('strand.is_deleted', 0)
+                        ->where('department.is_deleted', 0)
+                        ->first();
+
+                    $branchId = $branchId ?? $strand?->branch_id ?? null;
+                    $departmentId = $departmentId ?? $strand?->department_id ?? null;
+                } elseif ($validated['scope_type'] === 'level') {
+                    $level = DB::table('education_level')
+                        ->join('department', 'education_level.department_id', '=', 'department.id')
+                        ->select('education_level.department_id', 'department.branch_id')
+                        ->where('education_level.id', (int) $validated['scope_id'])
+                        ->where('education_level.is_deleted', 0)
+                        ->where('department.is_deleted', 0)
+                        ->first();
+
+                    $branchId = $branchId ?? $level?->branch_id ?? null;
+                    $departmentId = $departmentId ?? $level?->department_id ?? null;
+                }
             }
 
-            if (! $firstPeerQuestionnaireId) {
-                return back()->with('error', 'Select a questionnaire first before saving custom peer scopes.');
-            }
-
-            $department = DB::table('department')
-                ->select('branch_id')
-                ->where('id', (int) $validated['scope_id'])
-                ->first();
-            $branchId = $validated['branch_id'] ?? $department?->branch_id ?? null;
             $count = DB::table('questionnaire_distribution')->count() + 1;
 
             $existingId = DB::table('questionnaire_distribution')->insertGetId([
                 'branch_id' => $branchId,
                 'code' => 'QD-' . str_pad($count, 3, '0', STR_PAD_LEFT),
-                'questionnaire_id' => $firstPeerQuestionnaireId,
+                'questionnaire_id' => $firstCustomQuestionnaireId,
                 'academic_year_id' => null,
                 'items' => json_encode([
                     'branch_id' => $branchId,
-                    'department_id' => (int) $validated['scope_id'],
-                    'program_ids' => [],
-                    'strand_ids' => [],
-                    'year_level_ids' => [],
+                    'department_id' => $validated['scope_type'] === 'department'
+                        ? (int) $validated['scope_id']
+                        : $departmentId,
+                    'program_ids' => $validated['scope_type'] === 'program' ? [(int) $validated['scope_id']] : [],
+                    'strand_ids' => $validated['scope_type'] === 'strand' ? [(int) $validated['scope_id']] : [],
+                    'year_level_ids' => $yearLevelIds,
                     'custom_subject_ids' => [],
                     'custom_scope_groups' => [],
                 ]),
@@ -860,7 +906,7 @@ class AssignmentController extends Controller
             $items['year_level_ids'] = [];
             $items[$scopeConfig['items_key']] = $peerSelectedIds;
         } else {
-            $items['custom_subject_ids'] = array_values(array_map('intval', $validated['subject_ids'] ?? []));
+            $items['custom_subject_ids'] = $allSelectedIds->all();
         }
 
         $distributionPayload = [
