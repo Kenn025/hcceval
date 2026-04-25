@@ -2,7 +2,6 @@ import ConfirmDialog from '@/Components/ConfirmDialog';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { router } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
-import ConfirmDialog from '@/Components/ConfirmDialog';
 
 const TITLE_MAP = {
     'student-teacher': 'Questionnaire Distribution',
@@ -353,40 +352,18 @@ const getHeadDepartmentStatusCards = ({
 function QuestionnaireListModal({ open, scopeItem, questionnaires, assignmentType, onClose }) {
     const [viewTarget, setViewTarget] = useState(null);
     const [selectedQuestionnaireId, setSelectedQuestionnaireId] = useState('');
+    const [confirmTarget, setConfirmTarget] = useState(null);
 
     useEffect(() => {
         if (!open || !scopeItem) {
             setSelectedQuestionnaireId('');
             setViewTarget(null);
+            setConfirmTarget(null);
             return;
         }
 
         setSelectedQuestionnaireId(String(scopeItem.selectedQuestionnaire?.questionnaire_id ?? ''));
     }, [open, scopeItem]);
-    const [confirmTarget, setConfirmTarget] = useState(null);
-
-    const handleSelect = (questionnaire) => {
-        setConfirmTarget({
-            title: 'Confirm Selection',
-            message: `Are you sure you want to distribute "${questionnaire.title}" to ${scopeItem.primary}?`,
-            onConfirm: () => {
-                router.post(route('admin.assignments.select-questionnaire'), {
-                    assignment_type: assignmentType,
-                    questionnaire_id: questionnaire.questionnaire_id,
-                    scope_type: scopeItem.scopeType,
-                    scope_id: scopeItem.entityId,
-                    branch_id: scopeItem.branchId,
-                    department_id: scopeItem.departmentId,
-                }, {
-                    preserveScroll: true,
-                    onSuccess: () => {
-                        setConfirmTarget(null);
-                        onClose();
-                    },
-                });
-            }
-        });
-    };
 
     if (!open || !scopeItem) {
         return null;
@@ -400,16 +377,25 @@ function QuestionnaireListModal({ open, scopeItem, questionnaires, assignmentTyp
             return;
         }
 
-        router.post(route('admin.assignments.select-questionnaire'), {
-            assignment_type: assignmentType,
-            questionnaire_id: selectedQuestionnaireId,
-            scope_type: scopeItem.scopeType,
-            scope_id: scopeItem.entityId,
-            branch_id: scopeItem.branchId,
-            department_id: scopeItem.departmentId,
-        }, {
-            preserveScroll: true,
-            onSuccess: () => onClose(),
+        setConfirmTarget({
+            title: 'Confirm Distribution',
+            message: `Are you sure you want to distribute "${selectedQuestionnaire?.title ?? 'this questionnaire'}" to ${scopeItem.primary}?`,
+            onConfirm: () => {
+                router.post(route('admin.assignments.select-questionnaire'), {
+                    assignment_type: assignmentType,
+                    questionnaire_id: selectedQuestionnaireId,
+                    scope_type: scopeItem.scopeType,
+                    scope_id: scopeItem.entityId,
+                    branch_id: scopeItem.branchId,
+                    department_id: scopeItem.departmentId,
+                }, {
+                    preserveScroll: true,
+                    onSuccess: () => {
+                        setConfirmTarget(null);
+                        onClose();
+                    },
+                });
+            },
         });
     };
 
@@ -471,14 +457,14 @@ function QuestionnaireListModal({ open, scopeItem, questionnaires, assignmentTyp
                                                         </button>
                                                          <button
                                                             type="button"
-                                                            onClick={() => setSelectedQuestionnaireId(String(questionnaire.questionnaire_id))}
+                                                            onClick={() => setSelectedQuestionnaireId(
+                                                                isSelected ? '' : String(questionnaire.questionnaire_id),
+                                                            )}
                                                             className={isSelected
                                                                 ? 'rounded-lg bg-blue-100 px-3 py-1.5 text-sm font-medium text-blue-700 ring-1 ring-blue-200'
                                                                 : 'rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-blue-700'}
-                                                            onClick={() => handleSelect(questionnaire)}
-                                                            className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-blue-700"
                                                         >
-                                                            {isSelected ? 'Selected' : 'Select'}
+                                                            {isSelected ? 'Unselect' : 'Select'}
                                                         </button>
                                                     </div>
                                                 </td>
@@ -526,14 +512,14 @@ function QuestionnaireListModal({ open, scopeItem, questionnaires, assignmentTyp
                                                 </button>
                                                  <button
                                                     type="button"
-                                                    onClick={() => setSelectedQuestionnaireId(String(questionnaire.questionnaire_id))}
+                                                    onClick={() => setSelectedQuestionnaireId(
+                                                        isSelected ? '' : String(questionnaire.questionnaire_id),
+                                                    )}
                                                     className={isSelected
                                                         ? 'rounded-lg bg-blue-100 px-3 py-1.5 text-xs font-medium text-blue-700 shadow-sm ring-1 ring-blue-200'
                                                         : 'rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm'}
-                                                    onClick={() => handleSelect(questionnaire)}
-                                                    className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm"
                                                 >
-                                                    {isSelected ? 'Selected' : 'Select'}
+                                                    {isSelected ? 'Unselect' : 'Select'}
                                                 </button>
                                             </div>
                                         </div>
@@ -698,7 +684,16 @@ function QuestionnaireListModal({ open, scopeItem, questionnaires, assignmentTyp
     );
 }
 
-function AssignedQuestionnairesModal({ open, scopeItem, questionnaires, assignmentType, onClose }) {
+function AssignedQuestionnairesModal({
+    open,
+    scopeItem,
+    questionnaires,
+    assignmentType,
+    programs = [],
+    strands = [],
+    yearLevels = [],
+    onClose,
+}) {
     const [viewTarget, setViewTarget] = useState(null);
 
     if (!open || !scopeItem) {
@@ -706,10 +701,39 @@ function AssignedQuestionnairesModal({ open, scopeItem, questionnaires, assignme
     }
 
     const itemLabel = assignmentType === 'peer' ? getPeerScopeLabel(scopeItem.departmentKind) : 'Subjects';
+    const peerScopeLookup = assignmentType === 'peer'
+        ? (() => {
+            if (scopeItem.departmentKind === 'college') {
+                return new Map(
+                    programs
+                        .filter((program) => String(program.department_id ?? '') === String(scopeItem.entityId))
+                        .map((program) => [String(program.id), program.name]),
+                );
+            }
+
+            if (scopeItem.departmentKind === 'senior-high') {
+                return new Map(
+                    strands
+                        .filter((strand) => String(strand.department_id ?? '') === String(scopeItem.entityId))
+                        .map((strand) => [String(strand.id), strand.name]),
+                );
+            }
+
+            return new Map(
+                getUniqueGradeLevelScopes(yearLevels, scopeItem.entityId)
+                    .map((yearLevel) => [String(yearLevel.id), yearLevel.primary]),
+            );
+        })()
+        : new Map();
     const assignedQuestionnaires = Array.isArray(scopeItem.customGroups) && scopeItem.customGroups.length > 0
         ? scopeItem.customGroups
             .map((group) => ({
                 ...group,
+                selectedLabels: assignmentType === 'peer'
+                    ? (group.subject_ids ?? [])
+                        .map((id) => peerScopeLookup.get(String(id)))
+                        .filter(Boolean)
+                    : [],
                 questionnaire: questionnaires.find(
                     (questionnaire) => String(questionnaire.questionnaire_id) === String(group.questionnaire_id),
                 ) ?? null,
@@ -721,6 +745,11 @@ function AssignedQuestionnairesModal({ open, scopeItem, questionnaires, assignme
             questionnaire_code: scopeItem.selectedQuestionnaire.questionnaire_code,
             questionnaire_title: scopeItem.selectedQuestionnaire.questionnaire_title,
             subject_ids: scopeItem.selectedQuestionnaire.custom_subject_ids ?? [],
+            selectedLabels: assignmentType === 'peer'
+                ? (scopeItem.selectedQuestionnaire.custom_subject_ids ?? [])
+                    .map((id) => peerScopeLookup.get(String(id)))
+                    .filter(Boolean)
+                : [],
             questionnaire: questionnaires.find(
                 (questionnaire) => String(questionnaire.questionnaire_id) === String(scopeItem.selectedQuestionnaire.questionnaire_id),
             ) ?? null,
@@ -769,7 +798,15 @@ function AssignedQuestionnairesModal({ open, scopeItem, questionnaires, assignme
                                                 <td className="px-4 py-3 text-sm text-slate-700">{group.questionnaire?.questionnaire_code ?? group.questionnaire_code ?? '-'}</td>
                                                 <td className="px-4 py-3 text-sm font-medium text-slate-900">{group.questionnaire?.title ?? group.questionnaire_title ?? '-'}</td>
                                                 <td className="px-4 py-3 text-sm text-slate-700">{group.questionnaire?.questionnaire_type_name ?? '-'}</td>
-                                                <td className="px-4 py-3 text-sm text-slate-600">{Array.isArray(group.subject_ids) ? group.subject_ids.length : 0}</td>
+                                                <td className="px-4 py-3 text-sm text-slate-600">
+                                                    {assignmentType === 'peer' ? (
+                                                        group.selectedLabels?.length > 0
+                                                            ? group.selectedLabels.join(', ')
+                                                            : `All ${itemLabel.toLowerCase()}`
+                                                    ) : (
+                                                        Array.isArray(group.subject_ids) ? group.subject_ids.length : 0
+                                                    )}
+                                                </td>
                                                 <td className="px-4 py-3">
                                                     <div className="flex justify-end gap-2">
                                                         <button
@@ -813,7 +850,13 @@ function AssignedQuestionnairesModal({ open, scopeItem, questionnaires, assignme
                                                     </div>
                                                     <div>
                                                         <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{itemLabel}</div>
-                                                        <div className="mt-0.5 text-xs text-slate-600 font-bold">{Array.isArray(group.subject_ids) ? group.subject_ids.length : 0}</div>
+                                                        <div className="mt-0.5 text-xs text-slate-600 font-bold">
+                                                            {assignmentType === 'peer'
+                                                                ? (group.selectedLabels?.length > 0
+                                                                    ? group.selectedLabels.join(', ')
+                                                                    : `All ${itemLabel.toLowerCase()}`)
+                                                                : (Array.isArray(group.subject_ids) ? group.subject_ids.length : 0)}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1253,24 +1296,6 @@ function CustomSubjectsModal({
                         </button>
                         <button
                             type="button"
-                            onClick={() => {
-                                router.post(route('admin.assignments.custom-subjects'), {
-                                    assignment_type: assignmentType,
-                                    scope_type: scopeItem.scopeType,
-                                    scope_id: scopeItem.entityId,
-                                    branch_id: scopeItem.branchId,
-                                    department_id: scopeItem.departmentId,
-                                    questionnaire_id: selectedQuestionnaireId,
-                                    subject_ids: groups[0]?.subject_ids ?? [],
-                                    groups: groups.map((group) => ({
-                                        questionnaire_id: group.questionnaire_id || null,
-                                        subject_ids: group.subject_ids,
-                                    })).filter((group) => group.questionnaire_id && group.subject_ids.length > 0),
-                                }, {
-                                    preserveScroll: true,
-                                    onSuccess: () => onClose(),
-                                });
-                            }}
                             onClick={() => setConfirmSave(true)}
                             className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
                         >
@@ -2038,8 +2063,7 @@ export default function Assignments({
                                                     <div className="flex justify-end gap-2">
                                                         <button
                                                             type="button"
-                                                            onClick={() => openDistribute(item)}
-                                                             onClick={() => {
+                                                            onClick={() => {
                                                                 const hasCustomDistribution = assignmentType === 'student-teacher'
                                                                     && item.scopeType === 'program'
                                                                     && Array.isArray(item.customGroups)
@@ -2146,8 +2170,7 @@ export default function Assignments({
                                             <div className="flex flex-col gap-2 shrink-0">
                                                 <button
                                                     type="button"
-                                                    onClick={() => openDistribute(item)}
-                                                     onClick={() => {
+                                                    onClick={() => {
                                                         const hasCustomDistribution = assignmentType === 'student-teacher'
                                                             && item.scopeType === 'program'
                                                             && Array.isArray(item.customGroups)
@@ -2247,6 +2270,9 @@ export default function Assignments({
                 scopeItem={assignedQuestionnaireTarget}
                 questionnaires={questionnaires}
                 assignmentType={assignmentType}
+                programs={programs}
+                strands={strands}
+                yearLevels={yearLevels}
                 onClose={() => setAssignedQuestionnaireTarget(null)}
             />
 
