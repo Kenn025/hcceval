@@ -32,7 +32,7 @@ class StudentController extends Controller
             ->get();
 
         $students = Student::query()
-            ->with(['branch:id,name', 'department:id,name', 'program:id,name', 'strand:id,name', 'yearLevel:id,year_level,section'])
+            ->with(['branch:id,name', 'department:id,name', 'program:id,name', 'strand:id,name', 'yearLevel:id,year_level,section', 'irregSubject:id,code,name'])
             ->where('is_deleted', 0)
             ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
             ->when($departmentId, fn ($q) => $q->where('department_id', $departmentId))
@@ -77,12 +77,19 @@ class StudentController extends Controller
                 ->orderBy('name')
                 ->get(),
             'yearLevels'  => EducationLevel::query()
-                ->select('id', 'department_id', 'program_id')
+                ->select('id', 'department_id', 'program_id', 'subject_id', 'year_level', 'section')
                 ->selectRaw("CONCAT(year_level, ' - ', section) as name")
                 ->where('is_deleted', 0)
                 ->when($scopedId, fn ($q) => $q->whereHas('department', fn ($department) => $department->where('branch_id', $scopedId)))
                 ->orderBy('year_level')
                 ->orderBy('section')
+                ->get(),
+            'subjects' => \App\Models\Subject::query()
+                ->select('id', 'code', 'name', 'department_id', 'program_id', 'strand_id', 'type')
+                ->where('is_deleted', 0)
+                ->where('is_activated', 1)
+                ->when($scopedId, fn ($q) => $q->whereHas('department', fn ($department) => $department->where('branch_id', $scopedId)))
+                ->orderBy('name')
                 ->get(),
             'nextStudentCodes' => array_merge(
                 ['default' => $this->generateStudentCode()],
@@ -131,6 +138,9 @@ class StudentController extends Controller
             'program_id' => $validated['program_id'] ?? null,
             'strand_id' => $validated['strand_id'] ?? null,
             'education_level_id' => $validated['year_level_id'] ?? null,
+            'subject_id' => array_values(array_map('intval', $validated['subject_ids'] ?? [])),
+            'is_irreg' => (bool) ($validated['is_irreg'] ?? false),
+            'irreg_subject_id' => !empty($validated['is_irreg']) ? ($validated['irreg_subject_id'] ?? null) : null,
             'firstname' => $validated['first_name'],
             'middlename' => $validated['middle_name'] ?? null,
             'lastname' => $validated['last_name'],
@@ -205,6 +215,9 @@ class StudentController extends Controller
             'program_id' => $request->input('program_id'),
             'strand_id' => $request->input('strand_id'),
             'year_level_id' => $request->input('year_level_id'),
+            'subject_ids' => $request->input('subject_ids', []),
+            'is_irreg' => $request->boolean('is_irreg'),
+            'irreg_subject_id' => $request->input('irreg_subject_id'),
             'first_name' => $request->input('first_name'),
             'middle_name' => $request->input('middle_name'),
             'last_name' => $request->input('last_name'),

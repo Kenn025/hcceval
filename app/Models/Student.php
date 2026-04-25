@@ -11,7 +11,7 @@ class Student extends Model
 
     protected $fillable = [
         'code', 'branch_id', 'department_id', 'program_id',
-        'strand_id', 'education_level_id',
+        'strand_id', 'education_level_id', 'subject_id',
         'is_irreg', 'irreg_subject_id',
         'firstname', 'middlename', 'lastname',
         'email', 'password', 'is_activated', 'is_deleted',
@@ -19,7 +19,7 @@ class Student extends Model
 
     protected $hidden = ['password'];
 
-    protected $casts = ['is_irreg' => 'boolean', 'is_activated' => 'boolean', 'is_deleted' => 'boolean'];
+    protected $casts = ['subject_id' => 'array', 'is_irreg' => 'boolean', 'is_activated' => 'boolean', 'is_deleted' => 'boolean'];
 
     public function branch(): BelongsTo
     {
@@ -71,6 +71,7 @@ class Student extends Model
         $attributes['last_name'] = $attributes['lastname'] ?? null;
         $attributes['suffix_name'] = null;
         $attributes['year_level_id'] = $attributes['education_level_id'] ?? null;
+        $attributes['subject_id'] = $attributes['subject_id'] ?? [];
         $attributes['is_irreg'] = (bool) ($attributes['is_irreg'] ?? false);
         $attributes['irreg_subject_id'] = $attributes['irreg_subject_id'] ?? null;
         $attributes['is_active'] = (bool) ($attributes['is_activated'] ?? false);
