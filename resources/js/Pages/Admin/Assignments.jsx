@@ -1,6 +1,7 @@
 import AdminLayout from '@/Layouts/AdminLayout';
 import { router } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
+import ConfirmDialog from '@/Components/ConfirmDialog';
 
 const TITLE_MAP = {
     'student-teacher': 'Questionnaire Distribution',
@@ -350,6 +351,30 @@ const getHeadDepartmentStatusCards = ({
 
 function QuestionnaireListModal({ open, scopeItem, questionnaires, assignmentType, onClose }) {
     const [viewTarget, setViewTarget] = useState(null);
+    const [confirmTarget, setConfirmTarget] = useState(null);
+
+    const handleSelect = (questionnaire) => {
+        setConfirmTarget({
+            title: 'Confirm Selection',
+            message: `Are you sure you want to distribute "${questionnaire.title}" to ${scopeItem.primary}?`,
+            onConfirm: () => {
+                router.post(route('admin.assignments.select-questionnaire'), {
+                    assignment_type: assignmentType,
+                    questionnaire_id: questionnaire.questionnaire_id,
+                    scope_type: scopeItem.scopeType,
+                    scope_id: scopeItem.entityId,
+                    branch_id: scopeItem.branchId,
+                    department_id: scopeItem.departmentId,
+                }, {
+                    preserveScroll: true,
+                    onSuccess: () => {
+                        setConfirmTarget(null);
+                        onClose();
+                    },
+                });
+            }
+        });
+    };
 
     if (!open || !scopeItem) {
         return null;
@@ -408,21 +433,9 @@ function QuestionnaireListModal({ open, scopeItem, questionnaires, assignmentTyp
                                                         >
                                                             View
                                                         </button>
-                                                        <button
+                                                         <button
                                                             type="button"
-                                                            onClick={() => {
-                                                                router.post(route('admin.assignments.select-questionnaire'), {
-                                                                    assignment_type: assignmentType,
-                                                                    questionnaire_id: questionnaire.questionnaire_id,
-                                                                    scope_type: scopeItem.scopeType,
-                                                                    scope_id: scopeItem.entityId,
-                                                                    branch_id: scopeItem.branchId,
-                                                                    department_id: scopeItem.departmentId,
-                                                                }, {
-                                                                    preserveScroll: true,
-                                                                    onSuccess: () => onClose(),
-                                                                });
-                                                            }}
+                                                            onClick={() => handleSelect(questionnaire)}
                                                             className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-blue-700"
                                                         >
                                                             Select
@@ -467,21 +480,9 @@ function QuestionnaireListModal({ open, scopeItem, questionnaires, assignmentTyp
                                                 >
                                                     View
                                                 </button>
-                                                <button
+                                                 <button
                                                     type="button"
-                                                    onClick={() => {
-                                                        router.post(route('admin.assignments.select-questionnaire'), {
-                                                            assignment_type: assignmentType,
-                                                            questionnaire_id: questionnaire.questionnaire_id,
-                                                            scope_type: scopeItem.scopeType,
-                                                            scope_id: scopeItem.entityId,
-                                                            branch_id: scopeItem.branchId,
-                                                            department_id: scopeItem.departmentId,
-                                                        }, {
-                                                            preserveScroll: true,
-                                                            onSuccess: () => onClose(),
-                                                        });
-                                                    }}
+                                                    onClick={() => handleSelect(questionnaire)}
                                                     className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm"
                                                 >
                                                     Select
@@ -606,6 +607,15 @@ function QuestionnaireListModal({ open, scopeItem, questionnaires, assignmentTyp
                     </div>
                 </div>
             ) : null}
+            {confirmTarget && (
+                <ConfirmDialog
+                    open={Boolean(confirmTarget)}
+                    title={confirmTarget.title}
+                    message={confirmTarget.message}
+                    onConfirm={confirmTarget.onConfirm}
+                    onCancel={() => setConfirmTarget(null)}
+                />
+            )}
         </>
     );
 }
@@ -809,6 +819,7 @@ function CustomSubjectsModal({
     const [groups, setGroups] = useState([]);
     const [questionnairePickerGroupId, setQuestionnairePickerGroupId] = useState(null);
     const [questionnaireViewTarget, setQuestionnaireViewTarget] = useState(null);
+    const [confirmSave, setConfirmSave] = useState(false);
 
     useEffect(() => {
         if (!scopeItem) {
@@ -1118,24 +1129,7 @@ function CustomSubjectsModal({
                         </button>
                         <button
                             type="button"
-                            onClick={() => {
-                                router.post(route('admin.assignments.custom-subjects'), {
-                                    assignment_type: assignmentType,
-                                    scope_type: scopeItem.scopeType,
-                                    scope_id: scopeItem.entityId,
-                                    branch_id: scopeItem.branchId,
-                                    department_id: scopeItem.departmentId,
-                                    questionnaire_id: selectedQuestionnaireId,
-                                    subject_ids: groups[0]?.subject_ids ?? [],
-                                    groups: groups.map((group) => ({
-                                        questionnaire_id: group.questionnaire_id || null,
-                                        subject_ids: group.subject_ids,
-                                    })).filter((group) => group.questionnaire_id),
-                                }, {
-                                    preserveScroll: true,
-                                    onSuccess: () => onClose(),
-                                });
-                            }}
+                            onClick={() => setConfirmSave(true)}
                             className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
                         >
                             Save Custom
@@ -1143,6 +1137,34 @@ function CustomSubjectsModal({
                     </div>
                 </div>
             </div>
+
+            <ConfirmDialog
+                open={confirmSave}
+                title="Save Custom Distribution"
+                message="Are you sure you want to save these custom groups? This will update the questionnaire assignments for the selected subjects."
+                onConfirm={() => {
+                    router.post(route('admin.assignments.custom-subjects'), {
+                        assignment_type: assignmentType,
+                        scope_type: scopeItem.scopeType,
+                        scope_id: scopeItem.entityId,
+                        branch_id: scopeItem.branchId,
+                        department_id: scopeItem.departmentId,
+                        questionnaire_id: selectedQuestionnaireId,
+                        subject_ids: groups[0]?.subject_ids ?? [],
+                        groups: groups.map((group) => ({
+                            questionnaire_id: group.questionnaire_id || null,
+                            subject_ids: group.subject_ids,
+                        })).filter((group) => group.questionnaire_id),
+                    }, {
+                        preserveScroll: true,
+                        onSuccess: () => {
+                            setConfirmSave(false);
+                            onClose();
+                        },
+                    });
+                }}
+                onCancel={() => setConfirmSave(false)}
+            />
 
             {questionnairePickerGroupId ? (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
@@ -1341,6 +1363,7 @@ export default function Assignments({
     const [distributeTarget, setDistributeTarget] = useState(null);
     const [customTarget, setCustomTarget] = useState(null);
     const [assignedQuestionnaireTarget, setAssignedQuestionnaireTarget] = useState(null);
+    const [confirmDistribute, setConfirmDistribute] = useState(null);
     const tabs = [
         { key: 'student-teacher', label: 'Subject Teacher', routeName: 'admin.subject-assignments' },
         { key: 'peer', label: 'Peer to Peer', routeName: 'admin.peer-assignments' },
@@ -1858,20 +1881,22 @@ export default function Assignments({
                                                     <div className="flex justify-end gap-2">
                                                         <button
                                                             type="button"
-                                                            onClick={() => {
+                                                             onClick={() => {
                                                                 const hasCustomDistribution = assignmentType === 'student-teacher'
                                                                     && item.scopeType === 'program'
                                                                     && Array.isArray(item.customGroups)
                                                                     && item.customGroups.length > 0;
 
                                                                 if (hasCustomDistribution) {
-                                                                    const shouldContinue = window.confirm(
-                                                                        'This program is currently using custom questionnaire distribution. Continuing will reset all custom distributions for this program. Do you want to continue?',
-                                                                    );
-
-                                                                    if (!shouldContinue) {
-                                                                        return;
-                                                                    }
+                                                                    setConfirmDistribute({
+                                                                        title: 'Reset Custom Distribution?',
+                                                                        message: 'This program is currently using custom questionnaire distribution. Continuing will reset all custom distributions for this program. Do you want to continue?',
+                                                                        onConfirm: () => {
+                                                                            setConfirmDistribute(null);
+                                                                            setDistributeTarget(item);
+                                                                        }
+                                                                    });
+                                                                    return;
                                                                 }
 
                                                                 setDistributeTarget(item);
@@ -1963,20 +1988,22 @@ export default function Assignments({
                                             <div className="flex flex-col gap-2 shrink-0">
                                                 <button
                                                     type="button"
-                                                    onClick={() => {
+                                                     onClick={() => {
                                                         const hasCustomDistribution = assignmentType === 'student-teacher'
                                                             && item.scopeType === 'program'
                                                             && Array.isArray(item.customGroups)
                                                             && item.customGroups.length > 0;
 
                                                         if (hasCustomDistribution) {
-                                                            const shouldContinue = window.confirm(
-                                                                'This program is currently using custom questionnaire distribution. Continuing will reset all custom distributions for this program. Do you want to continue?',
-                                                            );
-
-                                                            if (!shouldContinue) {
-                                                                return;
-                                                            }
+                                                            setConfirmDistribute({
+                                                                title: 'Reset Custom Distribution?',
+                                                                message: 'This program is currently using custom questionnaire distribution. Continuing will reset all custom distributions for this program. Do you want to continue?',
+                                                                onConfirm: () => {
+                                                                    setConfirmDistribute(null);
+                                                                    setDistributeTarget(item);
+                                                                }
+                                                            });
+                                                            return;
                                                         }
 
                                                         setDistributeTarget(item);
@@ -2048,6 +2075,15 @@ export default function Assignments({
                 questionnaires={questionnaires}
                 assignmentType={assignmentType}
                 onClose={() => setAssignedQuestionnaireTarget(null)}
+            />
+
+            <ConfirmDialog
+                open={Boolean(confirmDistribute)}
+                title={confirmDistribute?.title}
+                message={confirmDistribute?.message}
+                tone="warning"
+                onConfirm={confirmDistribute?.onConfirm}
+                onCancel={() => setConfirmDistribute(null)}
             />
         </AdminLayout>
     );
