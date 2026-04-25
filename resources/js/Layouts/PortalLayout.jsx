@@ -82,7 +82,7 @@ function SignOutButton({ collapsed, onClick }) {
             type="button"
             onClick={onClick}
             className={[
-                "flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-bold text-white/50 transition-all hover:bg-rose-500/20 hover:text-rose-300",
+                "flex items-center gap-3 rounded-2xl border border-red-400/55 bg-red-600 px-4 py-3.5 text-sm font-bold text-white shadow-[0_10px_24px_-12px_rgba(220,38,38,0.9)] transition-all hover:border-red-300 hover:bg-red-500",
                 collapsed ? "w-12 h-12 justify-center px-0" : "w-full",
             ].join(" ")}
         >
@@ -640,16 +640,16 @@ export default function PortalLayout({
                     onClick={() => setShowLogoutConfirm(false)}
                 >
                     <div
-                        className="portal-modal mx-4 w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl"
+                        className="portal-modal mx-4 w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-2xl"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-rose-100 text-rose-600">
+                        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-rose-100 text-rose-600">
                             <AppIcon name="logout" className="h-6 w-6" />
                         </div>
                         <h3 className="text-lg font-bold text-slate-900">
                             Sign Out
                         </h3>
-                        <p className="mt-1 text-sm text-slate-500">
+                        <p className="mx-auto mt-1 max-w-xs text-sm text-slate-500">
                             Are you sure you want to sign out? You will need to
                             log in again to access the portal.
                         </p>
