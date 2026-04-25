@@ -25,10 +25,10 @@
 | 3 | Compatibility           | 70%   | Demonstrable |
 | 4 | Usability               | 75%   | Polish remaining |
 | 5 | Reliability             | 50%   | Tests required |
-| 6 | Security                | 65%   | MD5 must go |
+| 6 | Security                | 80%   | MD5 migration done — bcrypt with on-login rehash |
 | 7 | Maintainability         | 80%   | Pass-ready |
 | 8 | Portability             | 50%   | Deploy doc required |
-|   | **Weighted average**    | **68%** | **Borderline pass — fix top 5 below to reach 85%+** |
+|   | **Weighted average**    | **70%** | **Borderline pass — fix remaining items in top-5 to reach 85%+** |
 
 ---
 
@@ -166,7 +166,7 @@ Five passing tests is enough evidence for the rubric.
 
 ## 6. Security — *are users + data protected?*
 
-**Score: 65%.**
+**Score: 80%.**
 
 ### Done
 - Role-based access (`role:superadmin,overalladmin` middleware) on system controls
@@ -177,9 +177,9 @@ Five passing tests is enough evidence for the rubric.
 - Audit log table + service
 - Input validation centralized in FormRequest classes
 - Foreign-key constraints + soft deletes
+- **Passwords migrated MD5 -> bcrypt** via `App\Services\LegacyHash`. New writes use bcrypt; legacy MD5 rows verify on login and silently upgrade to bcrypt. `php artisan auth:rehash` reports remaining legacy rows; `--prune` invalidates them when ready to cut over.
 
 ### Partial
-- **Passwords are MD5-hashed** in `student/teacher/employee/admin` tables. MD5 is broken; this is the single biggest red flag a security-focused panel will catch.
 - `.env` has `APP_DEBUG=true` — leaks stack traces with secrets if deployed as-is.
 - No HTTPS enforcement middleware.
 
@@ -189,7 +189,7 @@ Five passing tests is enough evidence for the rubric.
 - No CSP / XSS hardening headers.
 
 ### Recommendation
-**TOP PRIORITY** — migrate to bcrypt with on-login fallback (if `md5(password) === stored`, rehash to bcrypt and save). MD5 alone can fail you on a security panel question.
+Set `APP_DEBUG=false` and add a `\Illuminate\Routing\Middleware\TrustProxies`-backed HTTPS redirect for production. Run `php artisan auth:rehash` periodically and `--prune` once active users are confirmed on bcrypt.
 
 ---
 
@@ -256,7 +256,7 @@ Ranked by **impact divided by effort**.
 
 | # | Fix                                                          | Categories Improved          | Effort   |
 |---|--------------------------------------------------------------|------------------------------|----------|
-| 1 | Migrate passwords from MD5 -> bcrypt (with on-login rehash)  | Security                     | 1-2 hrs  |
+| 1 | ~~Migrate passwords from MD5 -> bcrypt (with on-login rehash)~~ **DONE** | Security                     | shipped  |
 | 2 | Write 5 feature tests for evaluation flows                   | Reliability                  | 3 hrs    |
 | 3 | Add missing sidebar nav entries + wire `ConfirmDialog`       | Functional + Usability       | 2 hrs    |
 | 4 | Write README + DEPLOY.md + minimal docker-compose            | Maintainability + Portability| 2 hrs    |
@@ -319,3 +319,4 @@ If a request implies any of these, the AI must stop and ask the user to confirm:
 | Date       | Author           | Change                                                  |
 |------------|------------------|---------------------------------------------------------|
 | 2026-04-26 | Claude (review)  | Initial report against ISO 25010 — overall 68%          |
+| 2026-04-26 | Claude           | Priority #1 shipped: MD5 -> bcrypt with on-login rehash + `auth:rehash` command. Security 65% -> 80%. Overall 68% -> 70%. |
