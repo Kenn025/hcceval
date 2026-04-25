@@ -59,6 +59,7 @@ export default function Questionnaires({ questionnaires, questionnaireTypes, que
     const [itemSearch, setItemSearch] = useState('');
     const [commentSearch, setCommentSearch] = useState('');
     const [submitError, setSubmitError] = useState('');
+    const [confirmSave, setConfirmSave] = useState(false);
 
     const { data, setData, errors, processing, reset, clearErrors } = useForm({
         questionnaire_title: '',
@@ -169,8 +170,7 @@ export default function Questionnaires({ questionnaires, questionnaireTypes, que
         updateClassGroups(nextGroups.length ? nextGroups : [emptyClassGroup()]);
     };
 
-    const submit = (e) => {
-        e.preventDefault();
+    const handleSaveConfirm = () => {
         setSubmitError('');
         const url = editing ? '/admin/questionnaires/' + editing.questionnaire_id : '/admin/questionnaires';
         const request = editing
@@ -179,14 +179,21 @@ export default function Questionnaires({ questionnaires, questionnaireTypes, que
 
         request(url, data, {
             onSuccess: () => {
+                setConfirmSave(false);
                 setSlideOpen(false);
                 reset();
             },
             onError: (formErrors) => {
+                setConfirmSave(false);
                 const firstError = Object.values(formErrors ?? {}).find((value) => typeof value === 'string' && value.trim() !== '');
                 setSubmitError(firstError || 'Unable to save questionnaire. Please check the form fields.');
             },
         });
+    };
+
+    const submit = (e) => {
+        e.preventDefault();
+        setConfirmSave(true);
     };
 
     const itemQuestions = questions.filter((question) => !String(question.question_type_name ?? '').toLowerCase().includes('comment'));
@@ -428,6 +435,16 @@ export default function Questionnaires({ questionnaires, questionnaireTypes, que
                 onCancel={() => setDeleteTarget(null)}
                 title="Delete Questionnaire"
                 message={`Delete questionnaire "${deleteTarget?.questionnaire_code}"?`}
+            />
+
+            <ConfirmDialog
+                open={confirmSave}
+                title={editing ? 'Update Questionnaire?' : 'Create Questionnaire?'}
+                message={editing 
+                    ? `Are you sure you want to update the questionnaire "${data.questionnaire_title}"?` 
+                    : `Are you sure you want to create the new questionnaire "${data.questionnaire_title}"?`}
+                onConfirm={handleSaveConfirm}
+                onCancel={() => setConfirmSave(false)}
             />
         </AdminLayout>
     );

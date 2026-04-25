@@ -34,7 +34,7 @@ class TeacherController extends Controller
         $perPage = in_array($perPage, [10, 20, 50, 100, 250]) ? $perPage : 20;
 
         $teachers = Teacher::query()
-            ->with(['branch:id,name', 'department:id,name', 'program:id,name'])
+            ->with(['branch:id,name', 'department:id,name', 'program:id,name', 'strand:id,name'])
             ->where('is_deleted', 0)
             ->when($this->isBranchAdmin(), fn ($q) => $q->where('role', 'Program Chair'))
             ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))

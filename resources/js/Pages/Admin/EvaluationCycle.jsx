@@ -33,6 +33,7 @@ export default function EvaluationCycle({ cycles = [], activeCycle = null }) {
     const [slideOpen, setSlideOpen] = useState(false);
     const [editing, setEditing] = useState(null);
     const [deleteTarget, setDeleteTarget] = useState(null);
+    const [confirmSave, setConfirmSave] = useState(false);
     const activeLabel = activeCycle
         ? `${activeCycle.school_year} ${activeCycle.semester}`
         : 'No active academic year set';
@@ -70,17 +71,23 @@ export default function EvaluationCycle({ cycles = [], activeCycle = null }) {
         clearErrors();
     };
 
-    const submit = (event) => {
-        event.preventDefault();
-
+    const handleSaveConfirm = () => {
         const options = {
             preserveScroll: true,
-            onSuccess: closeSlide,
+            onSuccess: () => {
+                setConfirmSave(false);
+                closeSlide();
+            },
         };
 
         if (editing) {
             put(`/admin/evaluation-cycle/${editing.year_id}`, options);
         }
+    };
+
+    const submit = (event) => {
+        event.preventDefault();
+        setConfirmSave(true);
     };
 
     const deleteCycle = () => {
@@ -298,6 +305,16 @@ export default function EvaluationCycle({ cycles = [], activeCycle = null }) {
                 confirmLabel="Close"
                 onCancel={() => setDeleteTarget(null)}
                 onConfirm={deleteCycle}
+            />
+
+            <ConfirmDialog
+                open={confirmSave}
+                title="Save Changes?"
+                message={data.status === 'active' 
+                    ? "Are you sure you want to save these changes? Setting this cycle as 'Active' will automatically deactivate all other cycles." 
+                    : "Are you sure you want to save the changes to this academic year?"}
+                onConfirm={handleSaveConfirm}
+                onCancel={() => setConfirmSave(false)}
             />
         </AdminLayout>
     );
