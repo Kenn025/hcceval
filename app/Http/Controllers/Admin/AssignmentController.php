@@ -360,6 +360,15 @@ class AssignmentController extends Controller
 
         foreach ($distributions as $distribution) {
             $items = json_decode($distribution->items ?? '{}', true) ?: [];
+            $customScopeGroups = collect($items['custom_scope_groups'] ?? [])
+                ->map(fn ($group) => [
+                    'id' => $group['id'] ?? null,
+                    'questionnaire_id' => (int) ($group['questionnaire_id'] ?? 0),
+                    'subject_ids' => array_values(array_map('intval', $group['subject_ids'] ?? [])),
+                ])
+                ->filter(fn ($group) => !empty($group['questionnaire_id']))
+                ->values()
+                ->all();
 
             if (!empty($items['department_id'])) {
                 $map['department-' . (int) $items['department_id']] = [
@@ -368,15 +377,7 @@ class AssignmentController extends Controller
                     'questionnaire_code' => $distribution->questionnaire_code,
                     'questionnaire_title' => $distribution->questionnaire_title,
                     'custom_subject_ids' => array_values(array_map('intval', $items['custom_subject_ids'] ?? [])),
-                    'custom_scope_groups' => collect($items['custom_scope_groups'] ?? [])
-                        ->map(fn ($group) => [
-                            'id' => $group['id'] ?? null,
-                            'questionnaire_id' => (int) ($group['questionnaire_id'] ?? 0),
-                            'subject_ids' => array_values(array_map('intval', $group['subject_ids'] ?? [])),
-                        ])
-                        ->filter(fn ($group) => !empty($group['questionnaire_id']))
-                        ->values()
-                        ->all(),
+                    'custom_scope_groups' => $customScopeGroups,
                 ];
             }
 
@@ -388,6 +389,7 @@ class AssignmentController extends Controller
                     'questionnaire_title' => $distribution->questionnaire_title,
                     'custom_subject_ids' => $customSubjectMap[(int) $programId . ':' . (int) $distribution->questionnaire_id]
                         ?? array_values(array_map('intval', $items['custom_subject_ids'] ?? [])),
+                    'custom_scope_groups' => $customScopeGroups,
                 ];
             }
 
@@ -398,6 +400,7 @@ class AssignmentController extends Controller
                     'questionnaire_code' => $distribution->questionnaire_code,
                     'questionnaire_title' => $distribution->questionnaire_title,
                     'custom_subject_ids' => array_values(array_map('intval', $items['custom_subject_ids'] ?? [])),
+                    'custom_scope_groups' => $customScopeGroups,
                 ];
             }
 
@@ -408,6 +411,7 @@ class AssignmentController extends Controller
                     'questionnaire_code' => $distribution->questionnaire_code,
                     'questionnaire_title' => $distribution->questionnaire_title,
                     'custom_subject_ids' => array_values(array_map('intval', $items['custom_subject_ids'] ?? [])),
+                    'custom_scope_groups' => $customScopeGroups,
                 ];
             }
 
@@ -585,6 +589,127 @@ class AssignmentController extends Controller
         };
     }
 
+    private function subjectIdsForDistributionScope(string $scopeType, int $scopeId): array
+    {
+        if (! Schema::hasTable('subject')) {
+            return [];
+        }
+
+        $subjectIds = collect();
+
+        if ($scopeType === 'department') {
+            $subjectIds = $subjectIds->merge(
+                DB::table('subject')
+                    ->where('department_id', $scopeId)
+                    ->where('is_deleted', 0)
+                    ->pluck('id')
+            );
+        }
+
+        if ($scopeType === 'program') {
+            $subjectIds = $subjectIds->merge(
+                DB::table('subject')
+                    ->where('program_id', $scopeId)
+                    ->where('is_deleted', 0)
+                    ->pluck('id')
+            );
+
+            $subjectIds = $subjectIds->merge(
+                DB::table('education_level')
+                    ->where('program_id', $scopeId)
+                    ->where('is_deleted', 0)
+                    ->pluck('subject_id')
+                    ->flatMap(fn ($ids) => json_decode($ids ?? '[]', true) ?: [])
+            );
+        }
+
+        if ($scopeType === 'strand') {
+            $subjectIds = $subjectIds->merge(
+                DB::table('subject')
+                    ->where('strand_id', $scopeId)
+                    ->where('is_deleted', 0)
+                    ->pluck('id')
+            );
+
+            $subjectIds = $subjectIds->merge(
+                DB::table('education_level')
+                    ->where('strand_id', $scopeId)
+                    ->where('is_deleted', 0)
+                    ->pluck('subject_id')
+                    ->flatMap(fn ($ids) => json_decode($ids ?? '[]', true) ?: [])
+            );
+        }
+
+        if ($scopeType === 'level') {
+            $subjectIds = $subjectIds->merge(
+                DB::table('education_level')
+                    ->whereIn('id', $this->getEquivalentYearLevelIds($scopeId))
+                    ->where('is_deleted', 0)
+                    ->pluck('subject_id')
+                    ->flatMap(fn ($ids) => json_decode($ids ?? '[]', true) ?: [])
+            );
+        }
+
+        return $subjectIds
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function applyQuestionnaireToScopedSubjects(string $assignmentType, string $scopeType, int $scopeId, int $questionnaireId): int
+    {
+        if (
+            $assignmentType !== 'student-teacher'
+            || ! Schema::hasTable('subject')
+            || ! Schema::hasColumn('subject', 'questionnaire_id')
+        ) {
+            return 0;
+        }
+
+        $subjectIds = $this->subjectIdsForDistributionScope($scopeType, $scopeId);
+
+        if (empty($subjectIds)) {
+            return 0;
+        }
+
+        return DB::table('subject')
+            ->whereIn('id', $subjectIds)
+            ->where('is_deleted', 0)
+            ->update([
+                'questionnaire_id' => $questionnaireId,
+                'updated_at' => now(),
+            ]);
+    }
+
+    private function applyQuestionnaireToSubjectIds(array $subjectIds, int $questionnaireId): int
+    {
+        $subjectIds = collect($subjectIds)
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if (
+            empty($subjectIds)
+            || $questionnaireId <= 0
+            || ! Schema::hasTable('subject')
+            || ! Schema::hasColumn('subject', 'questionnaire_id')
+        ) {
+            return 0;
+        }
+
+        return DB::table('subject')
+            ->whereIn('id', $subjectIds)
+            ->where('is_deleted', 0)
+            ->update([
+                'questionnaire_id' => $questionnaireId,
+                'updated_at' => now(),
+            ]);
+    }
+
     public function index(Request $request)
     {
         return $this->renderAssignmentsPage($request, 'student-teacher');
@@ -721,7 +846,18 @@ class AssignmentController extends Controller
                 ]);
         }
 
-        return back()->with('success', 'Questionnaire selected.');
+        $updatedSubjects = $this->applyQuestionnaireToScopedSubjects(
+            $validated['assignment_type'],
+            $validated['scope_type'],
+            $scopeId,
+            (int) $validated['questionnaire_id'],
+        );
+
+        $message = $validated['assignment_type'] === 'student-teacher'
+            ? 'Questionnaire selected and applied to ' . $updatedSubjects . ' scoped subject' . ($updatedSubjects === 1 ? '.' : 's.')
+            : 'Questionnaire selected.';
+
+        return back()->with('success', $message);
     }
 
     public function updateCustomSubjects(Request $request)
@@ -906,7 +1042,20 @@ class AssignmentController extends Controller
             $items['year_level_ids'] = [];
             $items[$scopeConfig['items_key']] = $peerSelectedIds;
         } else {
-            $items['custom_subject_ids'] = $allSelectedIds->all();
+            $customGroups = collect($validated['groups'] ?? [])
+                ->filter(fn ($group) => !empty($group['questionnaire_id']) && !empty($group['subject_ids']))
+                ->map(fn ($group, $index) => [
+                    'id' => $validated['scope_type'] . '-' . ((int) $validated['scope_id']) . '-' . $index,
+                    'questionnaire_id' => (int) $group['questionnaire_id'],
+                    'subject_ids' => array_values(array_map('intval', $group['subject_ids'] ?? [])),
+                ])
+                ->values()
+                ->all();
+
+            $items['custom_scope_groups'] = $customGroups;
+            $items['custom_subject_ids'] = !empty($customGroups)
+                ? collect($customGroups)->flatMap(fn ($group) => $group['subject_ids'])->unique()->values()->all()
+                : $allSelectedIds->all();
         }
 
         $distributionPayload = [
@@ -922,11 +1071,24 @@ class AssignmentController extends Controller
             } elseif (!empty($validated['questionnaire_id'])) {
                 $distributionPayload['questionnaire_id'] = (int) $validated['questionnaire_id'];
             }
+        } elseif (!empty($validated['questionnaire_id'])) {
+            $distributionPayload['questionnaire_id'] = (int) $validated['questionnaire_id'];
         }
 
         DB::table('questionnaire_distribution')
             ->where('id', $existingId)
             ->update($distributionPayload);
+
+        $updatedSubjects = 0;
+
+        if ($validated['assignment_type'] === 'student-teacher') {
+            foreach (($items['custom_scope_groups'] ?? []) as $group) {
+                $updatedSubjects += $this->applyQuestionnaireToSubjectIds(
+                    $group['subject_ids'] ?? [],
+                    (int) ($group['questionnaire_id'] ?? 0),
+                );
+            }
+        }
 
         if (
             $validated['scope_type'] === 'program'
@@ -1009,7 +1171,7 @@ class AssignmentController extends Controller
 
         return back()->with('success', $validated['assignment_type'] === 'peer'
             ? 'Custom peer scopes updated.'
-            : 'Custom subjects updated.');
+            : 'Custom subjects updated. Applied questionnaire IDs to ' . $updatedSubjects . ' selected subject' . ($updatedSubjects === 1 ? '.' : 's.'));
     }
 
     public function destroy(int $id)

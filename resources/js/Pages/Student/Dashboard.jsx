@@ -1,7 +1,9 @@
 import AppIcon from '@/Components/AppIcon';
+import ConfirmDialog from '@/Components/ConfirmDialog';
+import Modal from '@/Components/Modal';
 import PortalLayout from '@/Layouts/PortalLayout';
 import { router } from '@inertiajs/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 const SECTION_TITLES = {
     subjects:    'My Subjects',
@@ -70,7 +72,7 @@ function StudentInfoCard({ student, cycle }) {
     );
 }
 
-function SubjectsTab({ subjects, cycle }) {
+function SubjectsTab({ subjects, cycle, onStartEvaluation }) {
     if (!subjects.length) {
         return <EmptyState icon="subjects" message="No enrolled subjects for the current evaluation cycle." />;
     }
@@ -84,9 +86,11 @@ function SubjectsTab({ subjects, cycle }) {
                             <p className="font-semibold text-slate-800 truncate">{s.course_name}</p>
                             <p className="mt-0.5 text-xs text-slate-500">{s.course_code}{s.section_name ? ` · ${s.section_name}` : ''}</p>
                         </div>
-                        {s.already_evaluated
-                            ? <Badge color="blue">Evaluated</Badge>
-                            : <Badge color="slate">Pending</Badge>}
+                        {s.registration_status
+                            ? <Badge color="green">{s.registration_status}</Badge>
+                            : s.already_evaluated
+                                ? <Badge color="blue">Evaluated</Badge>
+                                : <Badge color="slate">Pending</Badge>}
                     </div>
                     <div className="mt-3 grid grid-cols-[1fr_auto] items-end gap-2">
                         <div className="flex flex-wrap gap-3 text-xs text-slate-500">
@@ -109,13 +113,13 @@ function SubjectsTab({ subjects, cycle }) {
                         </div>
                         <div className="flex items-center gap-2">
                             <Badge color="blue">{s.semester_label}</Badge>
-                            {cycle?.is_open && !s.already_evaluated && (
+                            {cycle?.is_open && !s.already_evaluated && s.can_evaluate !== false && (s.section_id || s.course_id) && (
                                 <button
                                     type="button"
-                                    onClick={() => router.visit(route('portal.student.evaluate', { subject_section_id: s.section_id, category: 'teacher_subject' }))}
+                                    onClick={() => onStartEvaluation?.(s)}
                                     className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
                                 >
-                                    Evaluate
+                                    Start Evaluation
                                 </button>
                             )}
                         </div>
@@ -123,6 +127,211 @@ function SubjectsTab({ subjects, cycle }) {
                 </div>
             ))}
         </div>
+    );
+}
+
+function EvaluationModal({ form, open, onClose }) {
+    const [answers, setAnswers] = useState({});
+    const [comment, setComment] = useState('');
+    const [errors, setErrors] = useState({});
+    const [submitting, setSubmitting] = useState(false);
+    const [confirmOpen, setConfirmOpen] = useState(false);
+    const [pendingPayload, setPendingPayload] = useState(null);
+
+    const questions = form?.questions ?? [];
+    const allAnswered = questions.length > 0 && questions.every((q) => answers[q.question_id]);
+    const ratingLabels = { 1: 'Poor', 2: 'Fair', 3: 'Good', 4: 'Very Good', 5: 'Excellent' };
+
+    useEffect(() => {
+        if (!open) {
+            setAnswers({});
+            setComment('');
+            setErrors({});
+            setSubmitting(false);
+            setConfirmOpen(false);
+            setPendingPayload(null);
+        }
+    }, [open, form]);
+
+    function setRating(questionId, rating) {
+        setAnswers((prev) => ({ ...prev, [questionId]: rating }));
+        if (errors[questionId]) {
+            setErrors((prev) => {
+                const next = { ...prev };
+                delete next[questionId];
+                return next;
+            });
+        }
+    }
+
+    function submit(event) {
+        event.preventDefault();
+        const missing = questions.filter((q) => !answers[q.question_id]);
+
+        if (missing.length) {
+            const nextErrors = {};
+            missing.forEach((q) => { nextErrors[q.question_id] = 'Required'; });
+            setErrors(nextErrors);
+            return;
+        }
+
+        if (!form) {
+            setErrors({ message: 'Evaluation details are no longer available. Please reopen the form and try again.' });
+            return;
+        }
+
+        setPendingPayload({
+            category: form.category,
+            questionnaire_id: form.questionnaireId ?? null,
+            evaluatee_id: form.evaluatee?.id ?? null,
+            subject_section_id: form.subjectSectionId ?? null,
+            subject_id: form.subjectId ?? null,
+            academic_year_id: form.cycle.id,
+            school_year: form.cycle.school_year,
+            term: form.cycle.term ?? form.cycle.semester,
+            answers: Object.entries(answers).map(([questionId, rating]) => ({
+                question_id: parseInt(questionId, 10),
+                rating,
+            })),
+            comments: comment || null,
+        });
+        setConfirmOpen(true);
+    }
+
+    function doSubmit() {
+        if (!pendingPayload) {
+            setConfirmOpen(false);
+            setSubmitting(false);
+            setErrors({ message: 'Evaluation details are no longer available. Please reopen the form and try again.' });
+            return;
+        }
+
+        setSubmitting(true);
+        router.post(route('portal.student.evaluate.submit'), pendingPayload, {
+            preserveScroll: true,
+            onSuccess: () => onClose(),
+            onError: (nextErrors) => {
+                setErrors(nextErrors);
+                setSubmitting(false);
+                setConfirmOpen(false);
+                setPendingPayload(null);
+            },
+            onFinish: () => {
+                setSubmitting(false);
+                setConfirmOpen(false);
+                setPendingPayload(null);
+            },
+        });
+    }
+
+    return (
+        <>
+            <Modal show={open} maxWidth="2xl" closeable={!submitting && !confirmOpen} onClose={onClose}>
+                {form && (
+                    <div className="max-h-[86vh] overflow-hidden bg-white">
+                        <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
+                            <div className="flex items-start justify-between gap-4">
+                                <div className="min-w-0">
+                                    <p className="text-xs font-semibold uppercase text-emerald-600">Subject Teacher Evaluation</p>
+                                    <h3 className="mt-1 truncate text-lg font-bold text-slate-900">{form.evaluatee?.name?.trim() || 'Teacher'}</h3>
+                                    <p className="mt-1 text-sm text-slate-500">
+                                        {form.subjectInfo?.code} · {form.subjectInfo?.name}
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={onClose}
+                                    disabled={submitting}
+                                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-50"
+                                >
+                                    Close
+                                </button>
+                            </div>
+                            <p className="mt-2 text-xs text-slate-400">{form.cycle.school_year} · {form.cycle.semester}</p>
+                        </div>
+
+                        <form onSubmit={submit} className="max-h-[calc(86vh-108px)] overflow-y-auto px-5 py-4">
+                            <p className="mb-4 text-xs text-slate-500">Rate each item from <strong>1 (Poor)</strong> to <strong>5 (Excellent)</strong>.</p>
+
+                            <div className="space-y-3">
+                                {questions.map((q, index) => (
+                                    <div key={q.question_id} className="rounded-lg border border-slate-200 bg-white p-4">
+                                        <p className="mb-3 text-sm text-slate-700">
+                                            <span className="mr-1 font-semibold text-slate-500">{index + 1}.</span>{q.question_text}
+                                        </p>
+                                        <div className="grid grid-cols-5 gap-2">
+                                            {[1, 2, 3, 4, 5].map((value) => (
+                                                <button
+                                                    key={value}
+                                                    type="button"
+                                                    onClick={() => setRating(q.question_id, value)}
+                                                    className={[
+                                                        'min-h-[54px] rounded-lg border px-2 py-2 text-xs font-semibold transition',
+                                                        answers[q.question_id] === value
+                                                            ? 'border-emerald-500 bg-emerald-500 text-white shadow'
+                                                            : 'border-slate-200 text-slate-600 hover:border-emerald-300 hover:bg-emerald-50',
+                                                    ].join(' ')}
+                                                >
+                                                    <span className="block text-base font-bold">{value}</span>
+                                                    <span className="block text-[10px] leading-tight opacity-80">{ratingLabels[value]}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                        {errors[q.question_id] && (
+                                            <p className="mt-2 text-xs text-red-500">Please select a rating.</p>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
+                                <label className="mb-2 block text-sm font-medium text-slate-700">Comments <span className="font-normal text-slate-400">(optional)</span></label>
+                                <textarea
+                                    rows={3}
+                                    value={comment}
+                                    onChange={(event) => setComment(event.target.value)}
+                                    className="w-full rounded-lg border border-slate-200 p-3 text-sm focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                    placeholder="Share any additional feedback or observations..."
+                                />
+                            </div>
+
+                            {errors.message && (
+                                <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{errors.message}</p>
+                            )}
+
+                            <div className="sticky bottom-0 mt-5 flex gap-3 border-t border-slate-100 bg-white py-4">
+                                <button
+                                    type="button"
+                                    onClick={onClose}
+                                    disabled={submitting}
+                                    className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={submitting || !allAnswered}
+                                    className="flex-1 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                                >
+                                    {submitting ? 'Submitting...' : 'Submit Evaluation'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                )}
+            </Modal>
+
+            <ConfirmDialog
+                open={confirmOpen}
+                title="Submit this evaluation?"
+                message={`Once submitted, your responses for ${form?.evaluatee?.name?.trim() || 'this evaluation'} cannot be edited. Make sure your ratings are final.`}
+                confirmLabel="Submit"
+                tone="primary"
+                loading={submitting}
+                onConfirm={doSubmit}
+                onCancel={() => setConfirmOpen(false)}
+            />
+        </>
     );
 }
 
@@ -209,8 +418,9 @@ function ArchiveTab({ archive }) {
     );
 }
 
-export default function StudentDashboard({ student, cycle, subjects = [], evaluations = [], archive = [] }) {
+export default function StudentDashboard({ student, cycle, subjects = [], evaluations = [], archive = [], evaluationForms = {} }) {
     const [activeNav, setActiveNav] = useState('subjects');
+    const [selectedEvaluationKey, setSelectedEvaluationKey] = useState(null);
 
     const counts = {
         subjects:    subjects.length,
@@ -219,6 +429,24 @@ export default function StudentDashboard({ student, cycle, subjects = [], evalua
     };
 
     const title = SECTION_TITLES[activeNav] ?? 'Student Portal';
+    const selectedEvaluationForm = selectedEvaluationKey ? evaluationForms[selectedEvaluationKey] : null;
+
+    function startEvaluation(subject) {
+        const key = String(subject.section_id ?? subject.course_id);
+        const form = evaluationForms[key];
+
+        if (form) {
+            setSelectedEvaluationKey(key);
+            return;
+        }
+
+        router.visit(route('portal.student.evaluate', {
+            subject_section_id: subject.section_id,
+            subject_id: subject.course_id,
+            questionnaire_id: subject.questionnaire_id,
+            category: 'teacher_subject',
+        }));
+    }
 
     return (
         <PortalLayout
@@ -253,9 +481,15 @@ export default function StudentDashboard({ student, cycle, subjects = [], evalua
                 )}
             </div>
 
-            {activeNav === 'subjects'    && <SubjectsTab    subjects={subjects} cycle={cycle} />}
+            {activeNav === 'subjects'    && <SubjectsTab    subjects={subjects} cycle={cycle} onStartEvaluation={startEvaluation} />}
             {activeNav === 'evaluations' && <EvaluationsTab evaluations={evaluations} />}
             {activeNav === 'archive'     && <ArchiveTab     archive={archive} />}
+
+            <EvaluationModal
+                open={Boolean(selectedEvaluationForm)}
+                form={selectedEvaluationForm}
+                onClose={() => setSelectedEvaluationKey(null)}
+            />
         </PortalLayout>
     );
 }
