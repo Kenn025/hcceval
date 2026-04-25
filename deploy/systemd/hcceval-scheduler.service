@@ -1,0 +1,14 @@
+[Unit]
+Description=HCC Eval Laravel Scheduler
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+Restart=always
+RestartSec=5
+WorkingDirectory=/var/www/hcceval
+ExecStart=/usr/bin/php artisan schedule:work
+
+[Install]
+WantedBy=multi-user.target
