@@ -1,0 +1,52 @@
+# Cursor rules — HCC Eval
+
+This file mirrors CLAUDE.md so Cursor AI follows the same project rules. The full report lives at docs/PROGRESS_REPORT.md.
+
+## Before doing ANY task
+
+1. Read docs/PROGRESS_REPORT.md first.
+2. Compare the user's prompt to the "Top 5 priority fixes", "Conventions to preserve", and "Anti-patterns to refuse / flag" sections.
+3. If the request is unrelated or conflicts with a convention/anti-pattern, STOP and ASK using this template:
+
+   > "I checked docs/PROGRESS_REPORT.md. Your request <X> looks like it <is unrelated to / conflicts with> the recommendation <Y>. Do you still want to proceed, or should I work on <priority item> instead?"
+
+4. Never silently violate the conventions.
+
+## Project at a glance
+
+- Stack: Laravel 12, Inertia 2, React 18, Tailwind, MySQL, PHP 8.2+
+- Domain: HCC Faculty/Employee Evaluation System (capstone). Legacy tables (student, teacher, employee, admin, branch, department, program, strand, subject, academic_year) are read by the new app — do not rename or restructure them.
+- Frontend pages: resources/js/Pages/ using AdminLayout / PortalLayout / ClientLayout.
+- Branch scoping: every admin list query must apply $this->scopedBranchId() from app/Http/Controllers/Controller.php.
+
+## Hard rules (do not break)
+
+1. No new MD5 / SHA1 hashing. Use Hash::make(...) (bcrypt). Existing legacy MD5 is being migrated.
+2. Validation goes in FormRequest classes under app/Http/Requests/. No inline $request->validate() in new controller actions.
+3. Cross-cutting side-effects must use existing services:
+   - App\Services\AppNotifier — in-app bell
+   - App\Services\EvaluationNotifier — eval cycle email + bell
+   - App\Services\AuditLogger — admin/auth audit trail
+4. No hard deletes on domain tables. Set is_deleted = 1.
+5. No bypassing auth middleware (EnsureAdminRole, student.auth, teacher.auth, employee.auth, role:superadmin,overalladmin).
+6. No new composer/npm dependency for something Laravel/Tailwind already provides. Justify any new package.
+7. Inertia + React + Tailwind only. No Vue, Livewire, Alpine, or alternative styling.
+8. Migrations must include a working down() method and must be additive.
+9. Confirmation dialogs — use resources/js/Components/ConfirmDialog.jsx, not browser confirm().
+10. No git history rewrites without explicit user permission. No --force, no --amend of pushed commits, no --no-verify.
+
+## Workflow
+
+- Run php artisan pail when debugging notifications/mail/2FA (MAIL_MAILER=log writes to storage/logs/laravel.log).
+- Frontend changes need npm run dev or npm run build.
+- After schema changes: php artisan migrate, then verify with php artisan db:show.
+- Tests live in tests/Feature/ — PHPUnit + Laravel TestCase.
+
+## Completing a task
+
+- Briefly note which priority/category in docs/PROGRESS_REPORT.md the change advances.
+- If the change creates a new convention, propose updating docs/PROGRESS_REPORT.md -> "Conventions to preserve".
+
+---
+
+For the full evaluation, see docs/PROGRESS_REPORT.md.

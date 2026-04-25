@@ -154,9 +154,9 @@ class StudentController extends Controller
         ];
 
         if (! empty($validated['password'])) {
-            $payload['password'] = md5($validated['password']);
+            $payload['password'] = \App\Services\LegacyHash::make($validated['password']);
         } elseif ($includeDefaultPassword) {
-            $payload['password'] = md5('hcc1234');
+            $payload['password'] = \App\Services\LegacyHash::make('hcc1234');
         }
 
         return $payload;

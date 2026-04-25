@@ -171,6 +171,7 @@ class EmployeePortalController extends Controller
                 'id'          => $cycle->id,
                 'school_year' => "{$cycle->from_year}-{$cycle->to_year}",
                 'semester'    => $this->semesterLabel($cycle->term),
+                'term'        => $cycle->term,
             ],
         ]);
     }
@@ -230,7 +231,7 @@ class EmployeePortalController extends Controller
         ]);
 
         $targetTable = $data['category'] === 'head' ? 'ratings_head' : 'ratings_employee';
-        $targetCol   = $data['category'] === 'head' ? 'teacher_id'    : 'employee_id';
+        $targetCol   = 'employee_id';
 
         $existing = DB::table($targetTable)
             ->where('academic_year_id', $data['academic_year_id'])

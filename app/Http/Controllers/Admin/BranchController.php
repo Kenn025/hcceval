@@ -99,7 +99,7 @@ class BranchController extends Controller
                 'role' => 'admin',
                 'branch_id' => $branch->id,
                 'email' => $adminEmail,
-                'password' => md5($adminPassword),
+                'password' => \App\Services\LegacyHash::make($adminPassword),
                 'is_activated' => true,
                 'is_deleted' => 0,
             ]);

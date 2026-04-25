@@ -21,8 +21,8 @@ class AuthenticationTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $response = $this->post('/login', [
-            'email' => $user->email,
+        $response = $this->post(route('login.submit'), [
+            'identifier' => $user->email,
             'password' => 'password',
         ]);
 
@@ -34,12 +34,14 @@ class AuthenticationTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $this->post('/login', [
-            'email' => $user->email,
+        $response = $this->from(route('login'))->post(route('login.submit'), [
+            'identifier' => $user->email,
             'password' => 'wrong-password',
         ]);
 
         $this->assertGuest();
+        $response->assertRedirect(route('login'));
+        $response->assertSessionHasErrors('identifier');
     }
 
     public function test_users_can_logout(): void

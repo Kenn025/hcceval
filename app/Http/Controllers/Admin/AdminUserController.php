@@ -68,7 +68,7 @@ class AdminUserController extends Controller
             'code' => $this->generateAdminCode($validated['role'], $validated['branch_id'] ?? null),
             'name' => $validated['name'],
             'email' => $validated['email'],
-            'password' => md5($validated['password']),
+            'password' => \App\Services\LegacyHash::make($validated['password']),
             'role' => $validated['role'],
             'branch_id' => $validated['branch_id'] ?? null,
             'is_activated' => array_key_exists('is_activated', $validated) ? (bool) $validated['is_activated'] : true,
@@ -100,7 +100,7 @@ class AdminUserController extends Controller
         }
 
         if (! empty($validated['password'])) {
-            $validated['password'] = md5($validated['password']);
+            $validated['password'] = \App\Services\LegacyHash::make($validated['password']);
         } else {
             unset($validated['password']);
         }

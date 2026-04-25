@@ -104,7 +104,7 @@ class BulkImportController extends Controller
                 continue;
             }
 
-            $payload['password']     = md5('hcc1234');
+            $payload['password']     = \App\Services\LegacyHash::make('hcc1234');
             $payload['is_activated'] = 1;
             $payload['is_deleted']   = 0;
             $payload['created_at']   = now();

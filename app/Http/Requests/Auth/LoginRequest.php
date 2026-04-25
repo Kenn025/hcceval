@@ -8,6 +8,7 @@ use App\Models\Teacher;
 use App\Models\User;
 use App\Notifications\TwoFactorCode;
 use App\Services\AuditLogger;
+use App\Services\LegacyHash;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
@@ -50,7 +51,7 @@ class LoginRequest extends FormRequest
             ->where('is_deleted', 0)
             ->first();
 
-        if ($admin && $admin->password === md5($password)) {
+        if ($admin && LegacyHash::check($password, $admin->password, 'admin', $admin->id)) {
             $twoFactor = Schema::hasColumn('admin', 'two_factor_enabled') && (int) ($admin->two_factor_enabled ?? 0) === 1;
 
             if ($twoFactor && ! empty($admin->email)) {
@@ -110,7 +111,7 @@ class LoginRequest extends FormRequest
             ->where('is_deleted', 0)
             ->first();
 
-        if ($student && $student->password === md5($password)) {
+        if ($student && LegacyHash::check($password, $student->password, 'student', $student->id)) {
             session([
                 'client_type' => 'student',
                 'client_source' => 'student',
@@ -134,7 +135,7 @@ class LoginRequest extends FormRequest
             ->where('is_deleted', 0)
             ->first();
 
-        if ($teacher && $teacher->password === md5($password)) {
+        if ($teacher && LegacyHash::check($password, $teacher->password, 'teacher', $teacher->id)) {
             session([
                 'client_type' => 'faculty',
                 'client_source' => 'teacher',
@@ -159,7 +160,7 @@ class LoginRequest extends FormRequest
             ->where('is_deleted', 0)
             ->first();
 
-        if ($employee && $employee->password === md5($password)) {
+        if ($employee && LegacyHash::check($password, $employee->password, 'employee', $employee->id)) {
             session([
                 'client_type' => 'faculty',
                 'client_source' => 'employee',

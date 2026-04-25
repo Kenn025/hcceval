@@ -226,6 +226,8 @@ Route::prefix('portal')->name('portal.')->group(function () {
     // Student portal
     Route::middleware('student.auth')->group(function () {
         Route::get('/student', [StudentPortalController::class, 'dashboard'])->name('student.dashboard');
+        Route::get('/student/evaluate', [StudentPortalController::class, 'evaluateForm'])->name('student.evaluate');
+        Route::post('/student/evaluate', [StudentPortalController::class, 'submitEvaluation'])->name('student.evaluate.submit');
     });
 
     // Teacher / faculty portal
