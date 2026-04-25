@@ -2,7 +2,6 @@ import ConfirmDialog from '@/Components/ConfirmDialog';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { router } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
-import ConfirmDialog from '@/Components/ConfirmDialog';
 
 const TITLE_MAP = {
     'student-teacher': 'Questionnaire Distribution',

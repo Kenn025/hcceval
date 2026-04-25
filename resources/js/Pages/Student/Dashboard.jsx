@@ -7,6 +7,8 @@ import { useEffect, useState } from 'react';
 
 const SECTION_TITLES = {
     subjects:    'My Subjects',
+    program_chairs: 'Program Chairs',
+    employees: 'Employees',
     evaluations: 'My Evaluations',
     archive:     'Archive',
 };
@@ -72,12 +74,55 @@ function StudentInfoCard({ student, cycle }) {
     );
 }
 
+function SubjectStatusCard({ subjects }) {
+    const total = subjects.length;
+    const evaluated = subjects.filter((subject) => subject.already_evaluated).length;
+    const irregular = subjects.filter((subject) => subject.is_irregular).length;
+    const progress = total > 0 ? Math.round((evaluated / total) * 100) : 0;
+    const cards = [
+        { label: 'Progress', value: `${progress}%`, detail: `${evaluated} of ${total} evaluated`, icon: 'check-circle', color: 'blue' },
+        { label: 'Registered Subjects', value: total, detail: 'Current cycle', icon: 'subjects', color: 'emerald' },
+        { label: 'Irregular Subjects', value: irregular, detail: irregular === 1 ? 'Irregular load' : 'Irregular loads', icon: 'layers', color: 'amber' },
+    ];
+    const colors = {
+        blue: 'bg-blue-50 text-blue-700 ring-blue-100',
+        emerald: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
+        amber: 'bg-amber-50 text-amber-700 ring-amber-100',
+    };
+
+    return (
+        <div className="mb-5 grid gap-3 md:grid-cols-3">
+            {cards.map((card) => (
+                <div key={card.label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div className="flex items-center justify-between gap-3">
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{card.label}</p>
+                            <p className="mt-1 text-2xl font-bold text-slate-900">{card.value}</p>
+                            <p className="mt-0.5 text-xs text-slate-500">{card.detail}</p>
+                        </div>
+                        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ring-1 ${colors[card.color]}`}>
+                            <AppIcon name={card.icon} className="h-5 w-5" />
+                        </div>
+                    </div>
+                    {card.label === 'Progress' && (
+                        <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+                            <div className="h-full rounded-full bg-blue-600 transition-all" style={{ width: `${progress}%` }} />
+                        </div>
+                    )}
+                </div>
+            ))}
+        </div>
+    );
+}
+
 function SubjectsTab({ subjects, cycle, onStartEvaluation }) {
     if (!subjects.length) {
         return <EmptyState icon="subjects" message="No enrolled subjects for the current evaluation cycle." />;
     }
 
     return (
+        <>
+        <SubjectStatusCard subjects={subjects} />
         <div className="space-y-3">
             {subjects.map((s) => (
                 <div key={s.section_id ?? s.course_code} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300">
@@ -86,11 +131,14 @@ function SubjectsTab({ subjects, cycle, onStartEvaluation }) {
                             <p className="font-semibold text-slate-800 truncate">{s.course_name}</p>
                             <p className="mt-0.5 text-xs text-slate-500">{s.course_code}{s.section_name ? ` · ${s.section_name}` : ''}</p>
                         </div>
-                        {s.registration_status
-                            ? <Badge color="green">{s.registration_status}</Badge>
-                            : s.already_evaluated
-                                ? <Badge color="blue">Evaluated</Badge>
-                                : <Badge color="slate">Pending</Badge>}
+                        <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                            {s.is_irregular && <Badge color="amber">Irregular</Badge>}
+                            {s.registration_status
+                                ? <Badge color="green">{s.registration_status}</Badge>
+                                : s.already_evaluated
+                                    ? <Badge color="blue">Evaluated</Badge>
+                                    : <Badge color="slate">Pending</Badge>}
+                        </div>
                     </div>
                     <div className="mt-3 grid grid-cols-[1fr_auto] items-end gap-2">
                         <div className="flex flex-wrap gap-3 text-xs text-slate-500">
@@ -127,7 +175,12 @@ function SubjectsTab({ subjects, cycle, onStartEvaluation }) {
                 </div>
             ))}
         </div>
+        </>
     );
+}
+
+function EvaluationPlaceholderTab({ icon, message }) {
+    return <EmptyState icon={icon} message={message} />;
 }
 
 function EvaluationModal({ form, open, onClose }) {
@@ -335,7 +388,66 @@ function EvaluationModal({ form, open, onClose }) {
     );
 }
 
-function EvaluationsTab({ evaluations }) {
+function SubmittedEvaluationModal({ evaluation, open, onClose }) {
+    const ratingLabels = { 1: 'Poor', 2: 'Fair', 3: 'Good', 4: 'Very Good', 5: 'Excellent' };
+
+    return (
+        <Modal show={open} maxWidth="2xl" onClose={onClose}>
+            {evaluation && (
+                <div className="max-h-[86vh] overflow-hidden bg-white">
+                    <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
+                        <div className="flex items-start justify-between gap-4">
+                            <div className="min-w-0">
+                                <p className="text-xs font-semibold uppercase text-blue-600">Submitted Evaluation</p>
+                                <h3 className="mt-1 truncate text-lg font-bold text-slate-900">{evaluation.course_name || 'Subject Teacher Evaluation'}</h3>
+                                <p className="mt-1 text-sm text-slate-500">
+                                    {evaluation.course_code ? `${evaluation.course_code} · ` : ''}{evaluation.teacher_name || evaluation.evaluatee_name || 'Teacher'}
+                                </p>
+                            </div>
+                            <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-100">
+                                Close
+                            </button>
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
+                            {evaluation.submitted_at && (
+                                <Badge color="blue">{new Date(evaluation.submitted_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })}</Badge>
+                            )}
+                            {evaluation.overall_average !== null && evaluation.overall_average !== undefined && (
+                                <Badge color="green">Average {evaluation.overall_average}</Badge>
+                            )}
+                            <Badge color="purple">{CATEGORY_LABELS[evaluation.category] ?? evaluation.category}</Badge>
+                        </div>
+                    </div>
+
+                    <div className="max-h-[calc(86vh-116px)] overflow-y-auto px-5 py-4">
+                        <div className="space-y-3">
+                            {(evaluation.answers ?? []).map((answer, index) => (
+                                <div key={`${answer.question_id}-${index}`} className="rounded-lg border border-slate-200 bg-white p-4">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <p className="text-sm text-slate-700">
+                                            <span className="mr-1 font-semibold text-slate-500">{index + 1}.</span>{answer.question_text}
+                                        </p>
+                                        <div className="shrink-0 rounded-lg bg-emerald-50 px-3 py-1 text-center text-emerald-700 ring-1 ring-emerald-200">
+                                            <span className="block text-sm font-bold">{answer.rating}</span>
+                                            <span className="block text-[10px] leading-tight">{ratingLabels[answer.rating] ?? 'Rating'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                            <p className="text-xs font-semibold uppercase text-slate-400">Comments</p>
+                            <p className="mt-1 text-sm text-slate-700">{evaluation.comments || 'No comment provided.'}</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </Modal>
+    );
+}
+
+function EvaluationsTab({ evaluations, onView }) {
     if (!evaluations.length) {
         return <EmptyState icon="check-circle" message="No evaluation records found for the current cycle." />;
     }
@@ -349,7 +461,16 @@ function EvaluationsTab({ evaluations }) {
                             <p className="font-semibold text-slate-800 truncate">{e.course_name || e.evaluatee_name || '—'}</p>
                             {e.course_code && <p className="mt-0.5 text-xs text-slate-500">{e.course_code}</p>}
                         </div>
-                        <Badge color="blue">Submitted</Badge>
+                        <div className="flex shrink-0 items-center gap-2">
+                            <Badge color="blue">Submitted</Badge>
+                            <button
+                                type="button"
+                                onClick={() => onView?.(e)}
+                                className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                            >
+                                View
+                            </button>
+                        </div>
                     </div>
                     <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
                         {e.teacher_name && (
@@ -374,14 +495,13 @@ function EvaluationsTab({ evaluations }) {
     );
 }
 
-function ArchiveTab({ archive }) {
+function ArchiveTab({ archive, onView }) {
     if (!archive.length) {
         return <EmptyState icon="archive" message="No archived evaluation records yet." />;
     }
 
-    // Group by school_year + semester if items are flat, or just display them
     const grouped = archive.reduce((acc, item) => {
-        const key = `${item.school_year} ${item.semester_label ?? ''}`.trim();
+        const key = item.archive_group_label || `${item.school_year ?? 'Unknown Academic Year'} · ${item.semester_label ?? 'Unknown Term'}`;
         if (!acc[key]) acc[key] = [];
         acc[key].push(item);
         return acc;
@@ -392,11 +512,13 @@ function ArchiveTab({ archive }) {
             {Object.entries(grouped).map(([label, items]) => (
                 <div key={label} className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                     <div className="flex items-center gap-3 border-b border-slate-100 bg-slate-50 px-4 py-3">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
-                            <AppIcon name="archive" className="h-4 w-4" />
+                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50 text-amber-600 ring-1 ring-amber-100">
+                            <AppIcon name="folder" className="h-5 w-5" />
                         </div>
-                        <span className="text-sm font-semibold text-slate-700">{label}</span>
-                        <span className="ml-auto text-xs text-slate-400">{items.length} record{items.length !== 1 ? 's' : ''}</span>
+                        <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-slate-700">{label}</p>
+                            <p className="text-xs text-slate-400">{items.length} submitted evaluation{items.length !== 1 ? 's' : ''}</p>
+                        </div>
                     </div>
                     <div className="divide-y divide-slate-100">
                         {items.map((e) => (
@@ -408,6 +530,13 @@ function ArchiveTab({ archive }) {
                                 <div className="flex shrink-0 items-center gap-2">
                                     {e.category && <Badge color="purple">{CATEGORY_LABELS[e.category] ?? e.category}</Badge>}
                                     <Badge color="blue">Submitted</Badge>
+                                    <button
+                                        type="button"
+                                        onClick={() => onView?.(e)}
+                                        className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                                    >
+                                        View
+                                    </button>
                                 </div>
                             </div>
                         ))}
@@ -418,12 +547,15 @@ function ArchiveTab({ archive }) {
     );
 }
 
-export default function StudentDashboard({ student, cycle, subjects = [], evaluations = [], archive = [], evaluationForms = {} }) {
+export default function StudentDashboard({ student, cycle, subjects = [], programChairs = [], employees = [], evaluations = [], archive = [], evaluationForms = {} }) {
     const [activeNav, setActiveNav] = useState('subjects');
     const [selectedEvaluationKey, setSelectedEvaluationKey] = useState(null);
+    const [selectedSubmittedEvaluation, setSelectedSubmittedEvaluation] = useState(null);
 
     const counts = {
         subjects:    subjects.length,
+        program_chairs: programChairs.length,
+        employees: employees.length,
         evaluations: evaluations.length,
         archive:     archive.length,
     };
@@ -482,13 +614,30 @@ export default function StudentDashboard({ student, cycle, subjects = [], evalua
             </div>
 
             {activeNav === 'subjects'    && <SubjectsTab    subjects={subjects} cycle={cycle} onStartEvaluation={startEvaluation} />}
-            {activeNav === 'evaluations' && <EvaluationsTab evaluations={evaluations} />}
-            {activeNav === 'archive'     && <ArchiveTab     archive={archive} />}
+            {activeNav === 'program_chairs' && (
+                <EvaluationPlaceholderTab
+                    icon="shield"
+                    message="Program chair evaluations will appear here once they are connected."
+                />
+            )}
+            {activeNav === 'employees' && (
+                <EvaluationPlaceholderTab
+                    icon="briefcase"
+                    message="Employee evaluations will appear here once they are connected."
+                />
+            )}
+            {activeNav === 'evaluations' && <EvaluationsTab evaluations={evaluations} onView={setSelectedSubmittedEvaluation} />}
+            {activeNav === 'archive'     && <ArchiveTab     archive={archive} onView={setSelectedSubmittedEvaluation} />}
 
             <EvaluationModal
                 open={Boolean(selectedEvaluationForm)}
                 form={selectedEvaluationForm}
                 onClose={() => setSelectedEvaluationKey(null)}
+            />
+            <SubmittedEvaluationModal
+                open={Boolean(selectedSubmittedEvaluation)}
+                evaluation={selectedSubmittedEvaluation}
+                onClose={() => setSelectedSubmittedEvaluation(null)}
             />
         </PortalLayout>
     );

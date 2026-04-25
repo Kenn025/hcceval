@@ -58,7 +58,11 @@ const THEMES = {
 
 const NAV_ITEMS = {
     student: [
+        { key: "evaluation-section", type: "section", label: "Evaluation" },
         { key: "subjects", label: "My Subjects", icon: "subjects" },
+        { key: "program_chairs", label: "Program Chairs", icon: "shield" },
+        { key: "employees", label: "Employees", icon: "briefcase" },
+        { key: "submissions-section", type: "section", label: "Submissions" },
         { key: "evaluations", label: "My Evaluations", icon: "check-circle" },
         { key: "archive", label: "Archive", icon: "archive" },
     ],
@@ -70,7 +74,6 @@ const NAV_ITEMS = {
     ],
     employee: [
         { key: "ratings", label: "My Ratings", icon: "ratings" },
-        { key: "evaluate", label: "Evaluate", icon: "peer" },
         { key: "archive", label: "Archive", icon: "archive" },
     ],
 };
@@ -196,6 +199,20 @@ function PortalNavItem({ item, isActive, collapsed, onClick }) {
                 </div>
             )}
         </button>
+    );
+}
+
+function PortalNavSection({ label, collapsed }) {
+    if (collapsed) {
+        return <div className="mx-auto my-3 h-px w-8 rounded-full bg-white/15" />;
+    }
+
+    return (
+        <div className="px-4 pb-1 pt-4">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-white/35">
+                {label}
+            </p>
+        </div>
     );
 }
 
@@ -369,6 +386,16 @@ export default function PortalLayout({
             <nav ref={navRef} className="flex-1 overflow-y-auto px-2 pb-2">
                 <div className="space-y-0.5">
                     {navItems.map((item) => {
+                        if (item.type === "section") {
+                            return (
+                                <PortalNavSection
+                                    key={item.key}
+                                    label={item.label}
+                                    collapsed={sidebarCollapsed}
+                                />
+                            );
+                        }
+
                         const isActive = item.key === activeNav;
 
                         return (

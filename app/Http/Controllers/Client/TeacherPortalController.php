@@ -425,7 +425,7 @@ class TeacherPortalController extends Controller
             'school_year' => $data['school_year'],
             'term' => $terms[0] ?? $data['term'],
             'answers' => json_encode($data['answers']),
-            'comments' => $data['comments'] ?? null,
+            'comments' => json_encode(($data['comments'] ?? null) ? ['text' => $data['comments']] : []),
             'overall_average' => $avg,
             'submitted_at' => now(),
             'created_at' => now(),
