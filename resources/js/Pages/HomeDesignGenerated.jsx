@@ -117,7 +117,12 @@ const ProgressRing = ({
         ],
     });
 };
-function App({ loginUrl = "/login" }) {
+function App({
+    loginUrl = "/login",
+    loginSubmitUrl = "/login",
+    registerUrl = "/register",
+    stats: homepageStats = [],
+}) {
     const [isDarkMode, setIsDarkMode] = useState(() => {
         if (typeof window === "undefined") return false;
         return localStorage.getItem("hcceval-theme-mode") === "dark";
@@ -130,6 +135,48 @@ function App({ loginUrl = "/login" }) {
     const [selectedRole, setSelectedRole] = useState("");
     const goToLogin = () => {
         router.visit(loginUrl);
+    };
+    const submitLogin = (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.currentTarget);
+        router.post(
+            loginSubmitUrl,
+            {
+                identifier: String(formData.get("identifier") || "").trim(),
+                password: String(formData.get("password") || ""),
+                remember: Boolean(formData.get("remember")),
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => setLoginOpen(false),
+            },
+        );
+    };
+    const submitRegister = (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.currentTarget);
+        const firstName = String(formData.get("first_name") || "").trim();
+        const lastName = String(formData.get("last_name") || "").trim();
+        const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
+
+        router.post(
+            registerUrl,
+            {
+                name: fullName,
+                email: String(formData.get("email") || "").trim(),
+                password: String(formData.get("password") || ""),
+                password_confirmation: String(
+                    formData.get("password_confirmation") || "",
+                ),
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setRegisterOpen(false);
+                    setSelectedRole("");
+                },
+            },
+        );
     };
     useEffect(() => {
         document.body.className = isDarkMode ? "dark-mode" : "light-mode";
@@ -272,12 +319,16 @@ function App({ loginUrl = "/login" }) {
             desc: "Generate comprehensive PDF reports with actionable insights.",
         },
     ];
-    const stats = [
+    const defaultStats = [
         { value: 4, label: "User Roles", icon: "group" },
         { value: 12, label: "Campuses", icon: "branches" },
         { value: 5e3, label: "Evaluations", icon: "assignments" },
         { value: 98, label: "Satisfaction %", icon: "ratings" },
     ];
+    const stats =
+        Array.isArray(homepageStats) && homepageStats.length > 0
+            ? homepageStats
+            : defaultStats;
     const faqs = [
         {
             q: "How does multi-campus evaluation work?",
@@ -498,11 +549,11 @@ function App({ loginUrl = "/login" }) {
                     children: [
                         /* @__PURE__ */ jsxs("div", {
                             className:
-                                "flex justify-center",
+                                "grid lg:grid-cols-2 gap-12 items-center",
                             children: [
                                 /* @__PURE__ */ jsxs("div", {
                                     className:
-                                        "animate-slide-up max-w-4xl mx-auto text-center flex flex-col items-center",
+                                        "animate-slide-up ml-4 sm:ml-8 lg:ml-10",
                                     children: [
                                         /* @__PURE__ */ jsxs("div", {
                                             className:
@@ -523,7 +574,7 @@ function App({ loginUrl = "/login" }) {
                                                         color: "var(--accent)",
                                                     },
                                                     children:
-                                                        "Thesis Project 2025",
+                                                        "Thesis Project 2026",
                                                 }),
                                             ],
                                         }),
@@ -550,7 +601,7 @@ function App({ loginUrl = "/login" }) {
                                         }),
                                         /* @__PURE__ */ jsx("p", {
                                             className:
-                                                "text-lg mb-8 max-w-3xl mx-auto",
+                                                "text-lg mb-8 max-w-xl",
                                             style: {
                                                 color: "var(--text-secondary)",
                                             },
@@ -559,7 +610,7 @@ function App({ loginUrl = "/login" }) {
                                         }),
                                         /* @__PURE__ */ jsxs("div", {
                                             className:
-                                                "flex flex-wrap gap-4 mb-12 justify-center",
+                                                "flex flex-wrap gap-4 mb-12",
                                             children: [
                                                 /* @__PURE__ */ jsxs("button", {
                                                     onClick: goToLogin,
@@ -619,7 +670,7 @@ function App({ loginUrl = "/login" }) {
                                     ],
                                 }),
                                 /* @__PURE__ */ jsx("div", {
-                                    className: "hidden",
+                                    className: "flex justify-center",
                                     children: /* @__PURE__ */ jsxs("div", {
                                         className: "relative animate-float",
                                         children: [
@@ -2221,7 +2272,7 @@ function App({ loginUrl = "/login" }) {
                             }),
                             /* @__PURE__ */ jsxs("form", {
                                 className: "space-y-4",
-                                onSubmit: (e) => e.preventDefault(),
+                                onSubmit: submitLogin,
                                 children: [
                                     /* @__PURE__ */ jsxs("div", {
                                         children: [
@@ -2231,11 +2282,15 @@ function App({ loginUrl = "/login" }) {
                                                 style: {
                                                     color: "var(--text-primary)",
                                                 },
-                                                children: "Email",
+                                                children: "Email or Code",
                                             }),
                                             /* @__PURE__ */ jsx("input", {
-                                                type: "email",
-                                                placeholder: "Enter your email",
+                                                type: "text",
+                                                name: "identifier",
+                                                required: true,
+                                                autoComplete: "username",
+                                                placeholder:
+                                                    "Enter email or employee/student code",
                                                 className:
                                                     "neumorphic-input w-full",
                                             }),
@@ -2253,12 +2308,40 @@ function App({ loginUrl = "/login" }) {
                                             }),
                                             /* @__PURE__ */ jsx("input", {
                                                 type: "password",
+                                                name: "password",
+                                                required: true,
+                                                autoComplete:
+                                                    "current-password",
                                                 placeholder:
                                                     "Enter your password",
                                                 className:
                                                     "neumorphic-input w-full",
                                             }),
                                         ],
+                                    }),
+                                    /* @__PURE__ */ jsx("label", {
+                                        className:
+                                            "inline-flex items-center gap-2 text-sm",
+                                        style: {
+                                            color: "var(--text-secondary)",
+                                        },
+                                        children: /* @__PURE__ */ jsxs(
+                                            "span",
+                                            {
+                                                className:
+                                                    "inline-flex items-center gap-2",
+                                                children: [
+                                                    /* @__PURE__ */ jsx(
+                                                        "input",
+                                                        {
+                                                            type: "checkbox",
+                                                            name: "remember",
+                                                        },
+                                                    ),
+                                                    "Remember me",
+                                                ],
+                                            },
+                                        ),
                                     }),
                                     /* @__PURE__ */ jsxs("div", {
                                         children: [
@@ -2320,6 +2403,7 @@ function App({ loginUrl = "/login" }) {
                                             "Don't have an account?",
                                             " ",
                                             /* @__PURE__ */ jsx("button", {
+                                                type: "button",
                                                 onClick: () => {
                                                     setLoginOpen(false);
                                                     setRegisterOpen(true);
@@ -2384,7 +2468,7 @@ function App({ loginUrl = "/login" }) {
                             }),
                             /* @__PURE__ */ jsxs("form", {
                                 className: "space-y-4",
-                                onSubmit: (e) => e.preventDefault(),
+                                onSubmit: submitRegister,
                                 children: [
                                     /* @__PURE__ */ jsxs("div", {
                                         className: "grid grid-cols-2 gap-4",
@@ -2407,6 +2491,10 @@ function App({ loginUrl = "/login" }) {
                                                         "input",
                                                         {
                                                             type: "text",
+                                                            name: "first_name",
+                                                            required: true,
+                                                            autoComplete:
+                                                                "given-name",
                                                             placeholder:
                                                                 "First name",
                                                             className:
@@ -2433,6 +2521,10 @@ function App({ loginUrl = "/login" }) {
                                                         "input",
                                                         {
                                                             type: "text",
+                                                            name: "last_name",
+                                                            required: true,
+                                                            autoComplete:
+                                                                "family-name",
                                                             placeholder:
                                                                 "Last name",
                                                             className:
@@ -2455,6 +2547,9 @@ function App({ loginUrl = "/login" }) {
                                             }),
                                             /* @__PURE__ */ jsx("input", {
                                                 type: "email",
+                                                name: "email",
+                                                required: true,
+                                                autoComplete: "email",
                                                 placeholder: "Enter your email",
                                                 className:
                                                     "neumorphic-input w-full",
@@ -2557,8 +2652,34 @@ function App({ loginUrl = "/login" }) {
                                             }),
                                             /* @__PURE__ */ jsx("input", {
                                                 type: "password",
+                                                name: "password",
+                                                required: true,
+                                                autoComplete: "new-password",
                                                 placeholder:
                                                     "Create a password",
+                                                className:
+                                                    "neumorphic-input w-full",
+                                            }),
+                                        ],
+                                    }),
+                                    /* @__PURE__ */ jsxs("div", {
+                                        children: [
+                                            /* @__PURE__ */ jsx("label", {
+                                                className:
+                                                    "block text-sm font-bold mb-2",
+                                                style: {
+                                                    color: "var(--text-primary)",
+                                                },
+                                                children:
+                                                    "Confirm Password",
+                                            }),
+                                            /* @__PURE__ */ jsx("input", {
+                                                type: "password",
+                                                name: "password_confirmation",
+                                                required: true,
+                                                autoComplete: "new-password",
+                                                placeholder:
+                                                    "Confirm your password",
                                                 className:
                                                     "neumorphic-input w-full",
                                             }),
@@ -2580,6 +2701,7 @@ function App({ loginUrl = "/login" }) {
                                             "Already have an account?",
                                             " ",
                                             /* @__PURE__ */ jsx("button", {
+                                                type: "button",
                                                 onClick: () => {
                                                     setRegisterOpen(false);
                                                     setLoginOpen(true);
