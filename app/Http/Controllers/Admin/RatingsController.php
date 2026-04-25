@@ -3,9 +3,16 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Branch;
+use App\Models\Department;
+use App\Models\Program;
+use App\Models\Strand;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -19,6 +26,45 @@ class RatingsController extends Controller
             ->get()
             ->pluck('label')
             ->toArray();
+    }
+
+    private function activeAcademicYear(): ?object
+    {
+        return DB::table('academic_year')
+            ->select('id', 'from_year', 'to_year')
+            ->where('is_deleted', 0)
+            ->where('is_activated', 1)
+            ->orderByDesc('id')
+            ->first();
+    }
+
+    private function academicYearFromLabel(?string $label): ?object
+    {
+        $label = trim((string) $label);
+
+        if ($label === '') {
+            return $this->activeAcademicYear();
+        }
+
+        return DB::table('academic_year')
+            ->select('id', 'from_year', 'to_year')
+            ->whereRaw("CONCAT(from_year, '-', to_year) = ?", [$label])
+            ->orderByDesc('is_activated')
+            ->orderByDesc('id')
+            ->first();
+    }
+
+    private function peerQuestionnaireTypeId(): ?int
+    {
+        if (! Schema::hasTable('questionnaire_type')) {
+            return null;
+        }
+
+        $id = DB::table('questionnaire_type')
+            ->where('code', 'QTYPE-PEER')
+            ->value('id');
+
+        return $id ? (int) $id : null;
     }
 
     public function subjectRatings(Request $request)
@@ -48,16 +94,66 @@ class RatingsController extends Controller
 
     public function peerRatings(Request $request)
     {
+        $scopedId = $this->scopedBranchId();
+        $branchId = $scopedId ?? $request->input('branch_id');
+        $departmentGroup = $request->input('department_group', '');
+        $programGroup = $request->input('program_group', '');
+        $strandGroup = $request->input('strand_group', '');
+        $perPage = $request->integer('per_page', 15);
+        $perPage = in_array($perPage, [10, 15, 25, 50, 100], true) ? $perPage : 15;
+
         $ratings = $this->peerQuery($request)
-            ->orderByDesc('rp.id')
-            ->paginate(20)
+            ->paginate($perPage)
             ->withQueryString();
+
+        $ratings = $this->attachLatestPeerRatings(
+            $ratings,
+            $this->academicYearFromLabel($request->input('school_year')),
+            $this->peerQuestionnaireTypeId(),
+        );
 
         return Inertia::render('Admin/Ratings', [
             'ratings'    => $ratings,
             'ratingType' => 'peer',
-            'filters'    => ['search' => $request->input('search', ''), 'school_year' => $request->input('school_year', '')],
+            'filters'    => [
+                'search' => $request->input('search', ''),
+                'school_year' => $request->input('school_year', ''),
+                'branch_id' => $branchId,
+                'department_group' => $departmentGroup,
+                'program_group' => $programGroup,
+                'strand_group' => $strandGroup,
+                'per_page' => $perPage,
+            ],
             'schoolYears' => $this->schoolYears(),
+            'branches' => Branch::query()
+                ->select('id', 'name', 'code')
+                ->where('is_deleted', 0)
+                ->where('code', '!=', 'OVERALL')
+                ->when($scopedId, fn ($query) => $query->where('id', $scopedId))
+                ->orderBy('name')
+                ->get(),
+            'departments' => Department::query()
+                ->select('id', 'name', 'code', 'branch_id', 'is_activated')
+                ->where('is_deleted', 0)
+                ->where('is_activated', 1)
+                ->when($scopedId, fn ($query) => $query->where('branch_id', $scopedId))
+                ->orderBy('name')
+                ->get(),
+            'programs' => Program::query()
+                ->select('id', 'name', 'department_id')
+                ->where('is_deleted', 0)
+                ->when($scopedId, fn ($query) => $query->whereHas('department', fn ($department) => $department->where('branch_id', $scopedId)))
+                ->orderBy('name')
+                ->get(),
+            'strands' => Strand::query()
+                ->select('id', 'name', 'department_id')
+                ->where('is_deleted', 0)
+                ->when($scopedId, fn ($query) => $query->whereHas('department', fn ($department) => $department->where('branch_id', $scopedId)))
+                ->orderBy('name')
+                ->get(),
+            'isBranchAdmin' => $this->isBranchAdmin(),
+            'selectedBranchId' => $branchId ? (int) $branchId : null,
+            'scopedBranchId' => $scopedId,
         ]);
     }
 
@@ -204,12 +300,18 @@ class RatingsController extends Controller
 
     public function exportPeer(Request $request): StreamedResponse
     {
-        $rows = $this->peerQuery($request)->orderByDesc('rp.id')->get();
+        $rows = $this->attachLatestPeerRatings(
+            $this->peerQuery($request)->get(),
+            $this->academicYearFromLabel($request->input('school_year')),
+            $this->peerQuestionnaireTypeId(),
+        );
+
         return $this->streamCsv('peer-ratings', [
-            '#', 'Rater', 'Ratee', 'Rating', 'School Year',
+            '#', 'Teacher', 'Department', 'Program / Strand', 'Rating', 'Responses', 'School Year',
         ], $rows, fn ($r) => [
-            $r->rating_id, $r->rater_name, $r->ratee_name,
+            $r->rating_id, $r->teacher_name, $r->department_name, $r->program_name ?: $r->strand_name,
             $r->overall_rating ? number_format((float) $r->overall_rating, 2) : '',
+            $r->submission_count ?? 0,
             $r->school_year,
         ]);
     }
@@ -588,26 +690,579 @@ class RatingsController extends Controller
     {
         $search     = $request->input('search', '');
         $schoolYear = $request->input('school_year', '');
-        $branchId   = $this->scopedBranchId();
+        $branchId   = $this->scopedBranchId() ?? $request->input('branch_id');
+        $departmentGroup = strtolower(trim((string) $request->input('department_group', '')));
+        $programGroup  = strtolower(trim((string) $request->input('program_group', '')));
+        $strandGroup  = strtolower(trim((string) $request->input('strand_group', '')));
         $archived   = $request->boolean('archived');
 
-        return DB::table('ratings_peer as rp')
-            ->where('rp.is_archived', $archived ? 1 : 0)
-            ->leftJoin('teacher as t', 'rp.teacher_id', '=', 't.id')
+        $baseRatingQuery = DB::table('ratings_peer as rp')
             ->leftJoin('academic_year as ay', 'rp.academic_year_id', '=', 'ay.id')
+            ->whereColumn('rp.teacher_id', 't.id')
+            ->where('rp.is_archived', $archived ? 1 : 0)
+            ->when($schoolYear, fn ($query) => $query->whereRaw("CONCAT(ay.from_year, '-', ay.to_year) = ?", [$schoolYear]))
+            ->orderByDesc('ay.from_year')
+            ->orderByDesc('ay.to_year')
+            ->orderByDesc('rp.id');
+
+        return DB::table('teacher as t')
+            ->leftJoin('branch as b', 't.branch_id', '=', 'b.id')
+            ->leftJoin('department as d', 't.department_id', '=', 'd.id')
+            ->leftJoin('program as p', 't.program_id', '=', 'p.id')
+            ->leftJoin('strand as s', 't.strand_id', '=', 's.id')
             ->select(
-                'rp.id as rating_id',
-                DB::raw("CONCAT(t.firstname, ' ', t.lastname) as rater_name"),
-                DB::raw("CONCAT(t.firstname, ' ', t.lastname) as ratee_name"),
-                DB::raw("JSON_UNQUOTE(JSON_EXTRACT(rp.overall_ratings, '$.average')) as overall_rating"),
-                DB::raw("CONCAT(ay.from_year, '-', ay.to_year) as school_year")
+                't.id as teacher_id',
+                't.branch_id',
+                't.department_id',
+                't.program_id',
+                't.strand_id',
+                DB::raw("CONCAT(t.firstname, ' ', t.lastname) as teacher_name"),
+                't.firstname',
+                't.middlename',
+                't.lastname',
+                't.role',
+                'b.name as branch_name',
+                'd.name as department_name',
+                'd.code as department_code',
+                'p.name as program_name',
+                's.name as strand_name'
             )
+            ->where('t.is_deleted', 0)
+            ->whereRaw('LOWER(COALESCE(t.role, "")) NOT LIKE ?', ['%program chair%'])
             ->when($branchId, fn ($q) => $q->where('t.branch_id', $branchId))
+            ->when($departmentGroup !== '', fn ($q) => $q->whereRaw('LOWER(TRIM(COALESCE(d.name, ""))) = ?', [$departmentGroup]))
+            ->when($programGroup !== '', fn ($q) => $q->whereRaw('LOWER(TRIM(COALESCE(p.name, ""))) = ?', [$programGroup]))
+            ->when($strandGroup !== '', fn ($q) => $q->whereRaw('LOWER(TRIM(COALESCE(s.name, ""))) = ?', [$strandGroup]))
             ->when($search, fn ($q) => $q->where(function ($sub) use ($search) {
                 $sub->where('t.firstname', 'like', "%{$search}%")
-                    ->orWhere('t.lastname', 'like', "%{$search}%");
+                    ->orWhere('t.lastname', 'like', "%{$search}%")
+                    ->orWhere('d.name', 'like', "%{$search}%")
+                    ->orWhere('p.name', 'like', "%{$search}%")
+                    ->orWhere('s.name', 'like', "%{$search}%");
             }))
-            ->when($schoolYear, fn ($q) => $q->whereRaw("CONCAT(ay.from_year, '-', ay.to_year) = ?", [$schoolYear]));
+            ->orderBy('t.lastname')
+            ->orderBy('t.firstname');
+    }
+
+    private function attachLatestPeerRatings(iterable $rows, ?object $academicYear, ?int $questionnaireTypeId): iterable
+    {
+        if ($rows instanceof LengthAwarePaginator) {
+            $collection = $rows->getCollection();
+            $rows->setCollection($this->attachLatestPeerRatingsToCollection($collection, $academicYear, $questionnaireTypeId));
+
+            return $rows;
+        }
+
+        $collection = $rows instanceof Collection ? $rows : collect($rows);
+
+        return $this->attachLatestPeerRatingsToCollection($collection, $academicYear, $questionnaireTypeId);
+    }
+
+    private function attachLatestPeerRatingsToCollection(Collection $rows, ?object $academicYear, ?int $questionnaireTypeId): Collection
+    {
+        if ($rows->isEmpty()) {
+            return $rows;
+        }
+
+        $teacherAssignments = $this->resolvePeerQuestionnaireAssignments($rows, $academicYear, $questionnaireTypeId);
+        $latestRatings = $this->latestPeerSubmissionRatings($teacherAssignments, $academicYear, $questionnaireTypeId);
+        $questionnaireDetails = $this->peerQuestionnaireDetails(
+            collect($teacherAssignments)
+                ->pluck('questionnaire_id')
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values()
+                ->all()
+        );
+        $questionAverages = $this->peerQuestionAverages($teacherAssignments, $academicYear, $questionnaireTypeId);
+        $schoolYearLabel = $academicYear ? $academicYear->from_year . '-' . $academicYear->to_year : null;
+
+        return $rows->map(function ($row) use ($teacherAssignments, $latestRatings, $questionnaireDetails, $questionAverages, $schoolYearLabel) {
+            $teacherId = (int) ($row->teacher_id ?? 0);
+            $assignment = $teacherAssignments[$teacherId] ?? null;
+            $questionnaireId = $assignment['questionnaire_id'] ?? null;
+            $rating = $questionnaireId ? ($latestRatings[$teacherId . ':' . $questionnaireId] ?? null) : null;
+            $detailKey = $questionnaireId ? ($teacherId . ':' . $questionnaireId) : null;
+            $questionnaire = $questionnaireId ? ($questionnaireDetails[$questionnaireId] ?? null) : null;
+            $questionRatings = $detailKey ? ($questionAverages[$detailKey] ?? []) : [];
+
+            $row->rating_id = $rating['submission_id'] ?? null;
+            $row->overall_rating = $this->weightedPeerOverall($questionnaire, $questionRatings);
+            $row->submission_count = $rating['submission_count'] ?? 0;
+            $row->school_year = $rating ? ($rating['school_year'] ?? $schoolYearLabel) : null;
+            $row->questionnaire_id = $questionnaireId;
+            $row->questionnaire = $questionnaire;
+            $row->question_ratings = $questionRatings;
+
+            return $row;
+        });
+    }
+
+    private function resolvePeerQuestionnaireAssignments(Collection $rows, ?object $academicYear, ?int $questionnaireTypeId): array
+    {
+        if ($rows->isEmpty() || ! $academicYear || ! $questionnaireTypeId || ! Schema::hasTable('questionnaire_distribution') || ! Schema::hasTable('questionnaires')) {
+            return [];
+        }
+
+        $branchIds = $rows->pluck('branch_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        $distributions = DB::table('questionnaire_distribution as qd')
+            ->join('questionnaires as q', 'q.id', '=', 'qd.questionnaire_id')
+            ->select('qd.branch_id', 'qd.questionnaire_id', 'qd.items')
+            ->where('qd.is_deleted', 0)
+            ->where('q.is_deleted', 0)
+            ->where('q.questionnaire_type_id', $questionnaireTypeId)
+            ->where(function ($query) use ($academicYear) {
+                $query->where('qd.academic_year_id', (int) $academicYear->id)
+                    ->orWhereNull('qd.academic_year_id');
+            })
+            ->when(! empty($branchIds), fn ($query) => $query->whereIn('qd.branch_id', $branchIds))
+            ->orderByRaw('CASE WHEN qd.academic_year_id IS NULL THEN 1 ELSE 0 END')
+            ->orderByDesc('qd.id')
+            ->get();
+
+        $assignments = [];
+
+        foreach ($rows as $row) {
+            $teacherId = (int) ($row->teacher_id ?? 0);
+
+            if (! $teacherId) {
+                continue;
+            }
+
+            foreach ($distributions as $distribution) {
+                if ((int) ($distribution->branch_id ?? 0) !== (int) ($row->branch_id ?? 0)) {
+                    continue;
+                }
+
+                $items = json_decode($distribution->items ?? '{}', true) ?: [];
+
+                if ((int) ($items['department_id'] ?? 0) !== (int) ($row->department_id ?? 0)) {
+                    continue;
+                }
+
+                $questionnaireId = $this->matchPeerQuestionnaireIdForTeacher($row, $items, (int) $distribution->questionnaire_id);
+
+                if ($questionnaireId) {
+                    $assignments[$teacherId] = [
+                        'questionnaire_id' => $questionnaireId,
+                        'branch_id' => (int) ($row->branch_id ?? 0),
+                    ];
+                    break;
+                }
+            }
+        }
+
+        return $assignments;
+    }
+
+    private function matchPeerQuestionnaireIdForTeacher(object $teacher, array $items, int $defaultQuestionnaireId): ?int
+    {
+        $departmentKind = $this->peerDepartmentKind($teacher->department_name ?? null, $teacher->department_code ?? null);
+        $customGroups = collect($items['custom_scope_groups'] ?? [])
+            ->filter(fn ($group) => ! empty($group['questionnaire_id']))
+            ->values();
+
+        if ($departmentKind === 'college') {
+            $programId = (int) ($teacher->program_id ?? 0);
+
+            if (! $programId) {
+                return null;
+            }
+
+            foreach ($customGroups as $group) {
+                $scopeIds = collect($group['subject_ids'] ?? [])->map(fn ($id) => (int) $id)->all();
+
+                if (in_array($programId, $scopeIds, true)) {
+                    return (int) $group['questionnaire_id'];
+                }
+            }
+
+            $programIds = collect($items['program_ids'] ?? [])->map(fn ($id) => (int) $id)->all();
+
+            return in_array($programId, $programIds, true) ? $defaultQuestionnaireId : null;
+        }
+
+        if ($departmentKind === 'senior-high') {
+            $strandId = (int) ($teacher->strand_id ?? 0);
+
+            if (! $strandId) {
+                return null;
+            }
+
+            foreach ($customGroups as $group) {
+                $scopeIds = collect($group['subject_ids'] ?? [])->map(fn ($id) => (int) $id)->all();
+
+                if (in_array($strandId, $scopeIds, true)) {
+                    return (int) $group['questionnaire_id'];
+                }
+            }
+
+            $strandIds = collect($items['strand_ids'] ?? [])->map(fn ($id) => (int) $id)->all();
+
+            return in_array($strandId, $strandIds, true) ? $defaultQuestionnaireId : null;
+        }
+
+        return $defaultQuestionnaireId;
+    }
+
+    private function peerDepartmentKind(?string $name, ?string $code): string
+    {
+        $name = strtolower(trim((string) $name));
+        $code = strtolower(trim((string) $code));
+
+        if (str_contains($name, 'college') || str_contains($code, 'col')) {
+            return 'college';
+        }
+
+        if (str_contains($name, 'senior high') || str_contains($code, 'shs')) {
+            return 'senior-high';
+        }
+
+        if (str_contains($name, 'junior high') || str_contains($code, 'jhs')) {
+            return 'junior-high';
+        }
+
+        return 'elementary';
+    }
+
+    private function latestPeerSubmissionRatings(array $teacherAssignments, ?object $academicYear, ?int $questionnaireTypeId): array
+    {
+        if (empty($teacherAssignments) || ! $academicYear || ! $questionnaireTypeId || ! Schema::hasTable('evaluation_submissions')) {
+            return [];
+        }
+
+        $teacherIds = array_values(array_unique(array_map('intval', array_keys($teacherAssignments))));
+        $questionnaireIds = array_values(array_unique(array_map(
+            fn ($assignment) => (int) ($assignment['questionnaire_id'] ?? 0),
+            array_values($teacherAssignments)
+        )));
+        $branchIds = array_values(array_unique(array_map(
+            fn ($assignment) => (int) ($assignment['branch_id'] ?? 0),
+            array_values($teacherAssignments)
+        )));
+
+        $rows = DB::table('evaluation_submissions')
+            ->select('id', 'branch_id', 'academic_year_id', 'questionnaire_id', 'teacher_id', 'answers')
+            ->where('academic_year_id', (int) $academicYear->id)
+            ->where('questionnaire_type_id', $questionnaireTypeId)
+            ->whereIn('teacher_id', $teacherIds)
+            ->whereIn('questionnaire_id', $questionnaireIds)
+            ->whereIn('branch_id', $branchIds)
+            ->orderByDesc('id')
+            ->get();
+
+        $matched = [];
+
+        foreach ($rows as $row) {
+            $teacherId = (int) ($row->teacher_id ?? 0);
+            $questionnaireId = (int) ($row->questionnaire_id ?? 0);
+            $branchId = (int) ($row->branch_id ?? 0);
+            $assignment = $teacherAssignments[$teacherId] ?? null;
+
+            if (! $assignment || (int) ($assignment['questionnaire_id'] ?? 0) !== $questionnaireId || (int) ($assignment['branch_id'] ?? 0) !== $branchId) {
+                continue;
+            }
+
+            $key = $teacherId . ':' . $questionnaireId;
+            $questionRatings = $this->peerQuestionRatingsFromAnswers($row->answers);
+
+            if (! isset($matched[$key])) {
+                $matched[$key] = [
+                    'submission_id' => (int) $row->id,
+                    'school_year' => $academicYear->from_year . '-' . $academicYear->to_year,
+                    'submission_count' => 0,
+                    'question_totals' => [],
+                ];
+            }
+
+            $matched[$key]['submission_count']++;
+
+            foreach ($questionRatings as $questionId => $rating) {
+                $matched[$key]['question_totals'][$questionId]['sum'] = ($matched[$key]['question_totals'][$questionId]['sum'] ?? 0) + $rating;
+                $matched[$key]['question_totals'][$questionId]['count'] = ($matched[$key]['question_totals'][$questionId]['count'] ?? 0) + 1;
+            }
+        }
+
+        foreach ($matched as $key => $payload) {
+            unset($matched[$key]['question_totals']);
+        }
+
+        return $matched;
+    }
+
+    private function peerQuestionnaireDetails(array $questionnaireIds): array
+    {
+        $questionnaireIds = collect($questionnaireIds)
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($questionnaireIds) || ! Schema::hasTable('questionnaires') || ! Schema::hasTable('question')) {
+            return [];
+        }
+
+        $rows = DB::table('questionnaires as q')
+            ->leftJoin('questionnaire_type as qt', 'qt.id', '=', 'q.questionnaire_type_id')
+            ->select('q.id', 'q.code', 'q.title', 'q.items', 'q.comments', 'q.notes', 'qt.name as questionnaire_type_name')
+            ->whereIn('q.id', $questionnaireIds)
+            ->where('q.is_deleted', 0)
+            ->get();
+
+        $questionIds = $rows
+            ->flatMap(function ($row) {
+                $items = json_decode($row->items ?? '{}', true) ?: [];
+                $comments = json_decode($row->comments ?? '[]', true) ?: [];
+
+                $scaleIds = collect($items['scale_questions'] ?? [])
+                    ->flatMap(fn ($group) => collect($group['questions'] ?? [])
+                        ->map(fn ($question) => is_array($question) ? (int) ($question['question_id'] ?? 0) : (int) $question));
+
+                $commentIds = collect(data_get($items, 'comment_section.questions', []))
+                    ->map(fn ($question) => is_array($question) ? (int) ($question['question_id'] ?? 0) : (int) $question);
+
+                return $scaleIds->merge($commentIds)->merge(collect($comments)->map(fn ($id) => (int) $id));
+            })
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $questionMap = DB::table('question')
+            ->select('id', 'description')
+            ->whereIn('id', $questionIds)
+            ->get()
+            ->keyBy('id');
+
+        return $rows->mapWithKeys(function ($row) use ($questionMap) {
+            $items = json_decode($row->items ?? '{}', true) ?: [];
+            $legacyComments = json_decode($row->comments ?? '[]', true) ?: [];
+
+            $scaleQuestions = collect($items['scale_questions'] ?? [])
+                ->map(function ($group) use ($questionMap) {
+                    return [
+                        'class_name' => $group['class_name'] ?? '',
+                        'weight_percentage' => isset($group['weight_percentage']) ? (int) $group['weight_percentage'] : null,
+                        'questions' => collect($group['questions'] ?? [])
+                            ->map(function ($question) use ($questionMap) {
+                                $questionId = is_array($question) ? (int) ($question['question_id'] ?? 0) : (int) $question;
+
+                                return [
+                                    'question_id' => $questionId,
+                                    'description' => data_get($questionMap->get($questionId), 'description') ?? "Question #{$questionId}",
+                                ];
+                            })
+                            ->filter(fn ($question) => ! empty($question['question_id']))
+                            ->values()
+                            ->all(),
+                    ];
+                })
+                ->values()
+                ->all();
+
+            $commentSection = collect(data_get($items, 'comment_section.questions', []))
+                ->map(function ($question) use ($questionMap) {
+                    $questionId = is_array($question) ? (int) ($question['question_id'] ?? 0) : (int) $question;
+
+                    return [
+                        'question_id' => $questionId,
+                        'description' => data_get($questionMap->get($questionId), 'description') ?? "Question #{$questionId}",
+                    ];
+                })
+                ->filter(fn ($question) => ! empty($question['question_id']))
+                ->values()
+                ->all();
+
+            if (empty($commentSection) && ! empty($legacyComments)) {
+                $commentSection = collect($legacyComments)
+                    ->map(function ($questionId) use ($questionMap) {
+                        $questionId = (int) $questionId;
+
+                        return [
+                            'question_id' => $questionId,
+                            'description' => data_get($questionMap->get($questionId), 'description') ?? "Question #{$questionId}",
+                        ];
+                    })
+                    ->filter(fn ($question) => ! empty($question['question_id']))
+                    ->values()
+                    ->all();
+            }
+
+            return [(int) $row->id => [
+                'id' => (int) $row->id,
+                'questionnaire_code' => $row->code,
+                'title' => $row->title,
+                'questionnaire_type_name' => $row->questionnaire_type_name,
+                'notes' => $row->notes,
+                'scale_questions' => $scaleQuestions,
+                'comment_section' => $commentSection,
+            ]];
+        })->all();
+    }
+
+    private function peerQuestionAverages(array $teacherAssignments, ?object $academicYear, ?int $questionnaireTypeId): array
+    {
+        if (empty($teacherAssignments) || ! $academicYear || ! $questionnaireTypeId || ! Schema::hasTable('evaluation_submissions')) {
+            return [];
+        }
+
+        $teacherIds = array_values(array_unique(array_map('intval', array_keys($teacherAssignments))));
+        $questionnaireIds = array_values(array_unique(array_map(
+            fn ($assignment) => (int) ($assignment['questionnaire_id'] ?? 0),
+            array_values($teacherAssignments)
+        )));
+        $branchIds = array_values(array_unique(array_map(
+            fn ($assignment) => (int) ($assignment['branch_id'] ?? 0),
+            array_values($teacherAssignments)
+        )));
+
+        $rows = DB::table('evaluation_submissions')
+            ->select('id', 'branch_id', 'questionnaire_id', 'teacher_id', 'answers')
+            ->where('academic_year_id', (int) $academicYear->id)
+            ->where('questionnaire_type_id', $questionnaireTypeId)
+            ->whereIn('teacher_id', $teacherIds)
+            ->whereIn('questionnaire_id', $questionnaireIds)
+            ->whereIn('branch_id', $branchIds)
+            ->orderByDesc('id')
+            ->get();
+
+        $aggregates = [];
+
+        foreach ($rows as $row) {
+            $teacherId = (int) ($row->teacher_id ?? 0);
+            $questionnaireId = (int) ($row->questionnaire_id ?? 0);
+            $branchId = (int) ($row->branch_id ?? 0);
+            $assignment = $teacherAssignments[$teacherId] ?? null;
+
+            if (! $assignment || (int) ($assignment['questionnaire_id'] ?? 0) !== $questionnaireId || (int) ($assignment['branch_id'] ?? 0) !== $branchId) {
+                continue;
+            }
+
+            $key = $teacherId . ':' . $questionnaireId;
+            $answers = json_decode((string) ($row->answers ?? '[]'), true);
+
+            if (! is_array($answers)) {
+                continue;
+            }
+
+            foreach ($answers as $answer) {
+                $questionId = (int) ($answer['question_id'] ?? 0);
+                $rating = $answer['rating'] ?? null;
+
+                if (! $questionId || ! is_numeric($rating)) {
+                    continue;
+                }
+
+                $aggregates[$key][$questionId]['sum'] = ($aggregates[$key][$questionId]['sum'] ?? 0) + (float) $rating;
+                $aggregates[$key][$questionId]['count'] = ($aggregates[$key][$questionId]['count'] ?? 0) + 1;
+            }
+        }
+
+        return collect($aggregates)
+            ->map(function ($questions) {
+                return collect($questions)
+                    ->mapWithKeys(function ($stats, $questionId) {
+                        $count = (int) ($stats['count'] ?? 0);
+                        $sum = (float) ($stats['sum'] ?? 0);
+
+                        return [(string) $questionId => [
+                            'average' => $count > 0 ? round($sum / $count, 2) : null,
+                            'responses' => $count,
+                        ]];
+                    })
+                    ->all();
+            })
+            ->all();
+    }
+
+    private function peerOverallFromAnswers($answers): ?float
+    {
+        $ratings = collect($this->peerQuestionRatingsFromAnswers($answers))->values();
+
+        if ($ratings->isEmpty()) {
+            return null;
+        }
+
+        return round($ratings->avg(), 2);
+    }
+
+    private function peerQuestionRatingsFromAnswers($answers): array
+    {
+        $items = json_decode((string) $answers, true);
+
+        if (! is_array($items)) {
+            return [];
+        }
+
+        return collect($items)
+            ->filter(fn ($answer) => ! empty($answer['question_id']) && isset($answer['rating']) && is_numeric($answer['rating']))
+            ->mapWithKeys(fn ($answer) => [(int) $answer['question_id'] => (float) $answer['rating']])
+            ->all();
+    }
+
+    private function weightedPeerOverall(?array $questionnaire, array $questionRatings): ?float
+    {
+        $scaleGroups = collect($questionnaire['scale_questions'] ?? []);
+
+        if ($scaleGroups->isEmpty()) {
+            $flatRatings = collect($questionRatings)
+                ->pluck('average')
+                ->filter(fn ($value) => $value !== null)
+                ->map(fn ($value) => (float) $value)
+                ->values();
+
+            return $flatRatings->isNotEmpty() ? round($flatRatings->avg(), 2) : null;
+        }
+
+        $weightedTotal = 0.0;
+        $usedWeight = 0.0;
+
+        foreach ($scaleGroups as $group) {
+            $questions = collect($group['questions'] ?? []);
+            $groupRatings = $questions
+                ->map(function ($question) use ($questionRatings) {
+                    $questionId = (int) ($question['question_id'] ?? 0);
+                    $entry = $questionRatings[(string) $questionId] ?? $questionRatings[$questionId] ?? null;
+
+                    return $entry['average'] ?? null;
+                })
+                ->filter(fn ($value) => $value !== null)
+                ->map(fn ($value) => (float) $value)
+                ->values();
+
+            if ($groupRatings->isEmpty()) {
+                continue;
+            }
+
+            $weight = (float) ($group['weight_percentage'] ?? 0);
+            $groupAverage = (float) $groupRatings->avg();
+
+            if ($weight > 0) {
+                $weightedTotal += $groupAverage * ($weight / 100);
+                $usedWeight += $weight;
+            } else {
+                $weightedTotal += $groupAverage;
+                $usedWeight += 100;
+            }
+        }
+
+        if ($usedWeight <= 0) {
+            return null;
+        }
+
+        if ($usedWeight > 100) {
+            return round($weightedTotal / ($usedWeight / 100), 2);
+        }
+
+        return round($weightedTotal, 2);
     }
 
     private function employeeQuery(Request $request)

@@ -67,10 +67,16 @@ const NAV_ITEMS = {
         { key: "archive", label: "Archive", icon: "archive" },
     ],
     teacher: [
-        { key: "classes", label: "My Classes", icon: "teachers" },
-        { key: "ratings", label: "My Ratings", icon: "ratings" },
-        { key: "evaluate", label: "Evaluate", icon: "peer" },
-        { key: "archive", label: "Archive", icon: "archive" },
+        { key: "teacher-evaluation", type: "divider", label: "Evaluation" },
+        { key: "faculty_peer_evaluation", label: "Faculty Peer Evaluation", icon: "peer" },
+        { key: "school_heads_evaluation", label: "School Heads Evaluation", icon: "school" },
+        { key: "employee_evaluation", label: "Employee Evaluation", icon: "briefcase" },
+        { key: "teacher-ratings", type: "divider", label: "Ratings" },
+        { key: "my_subject_ratings", label: "My Subject Ratings", icon: "ratings" },
+        { key: "peer_ratings", label: "Peer Ratings", icon: "group" },
+        { key: "teacher-records", type: "divider", label: "Records and Archive" },
+        { key: "submissions", label: "Submissions", icon: "check-circle" },
+        { key: "archives", label: "Archives", icon: "archive" },
     ],
     employee: [
         { key: "ratings", label: "My Ratings", icon: "ratings" },
@@ -202,6 +208,15 @@ function PortalNavItem({ item, isActive, collapsed, onClick }) {
     );
 }
 
+function PortalNavDivider({ item, collapsed }) {
+    if (collapsed) {
+        return <div className="mx-auto my-2 h-px w-8 bg-white/10" />;
+    }
+
+    return (
+        <div className="px-3 pt-4 pb-2">
+            <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/35">
+                {item.label}
 function PortalNavSection({ label, collapsed }) {
     if (collapsed) {
         return <div className="mx-auto my-3 h-px w-8 rounded-full bg-white/15" />;
@@ -222,6 +237,8 @@ export default function PortalLayout({
     userType = "student",
     activeNav,
     onNavChange,
+    sidebarDetails = [],
+    sidebarBadge = null,
     children,
 }) {
     const theme = THEMES[userType] ?? THEMES.student;
@@ -365,20 +382,49 @@ export default function PortalLayout({
 
             {/* User card */}
             {!sidebarCollapsed && (
-                <div className="mx-3 mb-4 flex items-center gap-3 rounded-2xl bg-white/10 px-3 py-3 ring-1 ring-white/10 shadow-sm">
-                    <div
-                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${theme.avatarGradient} text-xs font-bold text-white shadow`}
-                    >
-                        {userInitials}
+                <div className="mx-3 mb-4 rounded-2xl bg-white/10 px-3 py-3 ring-1 ring-white/10 shadow-sm">
+                    <div className="flex items-start gap-3">
+                        <div
+                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${theme.avatarGradient} text-xs font-bold text-white shadow`}
+                        >
+                            {userInitials}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-bold text-white">
+                                {user?.name ?? ""}
+                            </p>
+                            <p className="truncate text-[10px] text-white/40 uppercase tracking-wider">
+                                {theme.portalLabel}
+                            </p>
+                        </div>
                     </div>
-                    <div className="min-w-0">
-                        <p className="truncate text-sm font-bold text-white">
-                            {user?.name ?? ""}
-                        </p>
-                        <p className="truncate text-[10px] text-white/40 uppercase tracking-wider">
-                            {user?.branch ?? ""}
-                        </p>
-                    </div>
+                    {sidebarDetails.length > 0 && (
+                        <div className="mt-3 space-y-1.5 border-t border-white/10 pt-3">
+                            {sidebarDetails.map((detail, index) => (
+                                <p
+                                    key={`${detail}-${index}`}
+                                    className="truncate text-[11px] text-white/65"
+                                >
+                                    {detail}
+                                </p>
+                            ))}
+                        </div>
+                    )}
+                    {sidebarBadge ? (
+                        <div className="mt-3">
+                            <span className="inline-flex items-center gap-2 rounded-full bg-blue-500/15 px-3 py-1.5 text-[11px] font-semibold text-blue-100 ring-1 ring-blue-300/20">
+                                <span className="h-2 w-2 rounded-full bg-blue-300" />
+                                {sidebarBadge}
+                            </span>
+                        </div>
+                    ) : null}
+                    {sidebarDetails.length === 0 && !sidebarBadge && (
+                        <div className="mt-1 min-w-0">
+                            <p className="truncate text-[10px] text-white/40 uppercase tracking-wider">
+                                {user?.branch ?? ""}
+                            </p>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -386,6 +432,11 @@ export default function PortalLayout({
             <nav ref={navRef} className="flex-1 overflow-y-auto px-2 pb-2">
                 <div className="space-y-0.5">
                     {navItems.map((item) => {
+                        if (item.type === "divider") {
+                            return (
+                                <PortalNavDivider
+                                    key={item.key}
+                                    item={item}
                         if (item.type === "section") {
                             return (
                                 <PortalNavSection

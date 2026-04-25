@@ -5,6 +5,80 @@ import AdminLayout from '@/Layouts/AdminLayout';
 import { router } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
+const normalizeLabel = (value) => String(value ?? '').trim().toLowerCase();
+
+const getDepartmentType = (departmentName) => {
+    const name = normalizeLabel(departmentName);
+
+    if (name.includes('college')) {
+        return 'college';
+    }
+
+    if (name.includes('senior high')) {
+        return 'shs';
+    }
+
+    if (name.includes('junior high')) {
+        return 'jhs';
+    }
+
+    if (name.includes('elementary')) {
+        return 'elem';
+    }
+
+    return null;
+};
+
+const uniqueByName = (items = []) => {
+    const seen = new Set();
+
+    return items.filter((item) => {
+        const key = normalizeLabel(item.name);
+
+        if (!key || seen.has(key)) {
+            return false;
+        }
+
+        seen.add(key);
+        return true;
+    });
+};
+
+const formatQuestionAverage = (questionRatings, questionId) => {
+    const entry = questionRatings?.[String(questionId)] ?? questionRatings?.[questionId];
+
+    if (!entry || entry.average == null) {
+        return '-';
+    }
+
+    return Number(entry.average).toFixed(2);
+};
+
+const classAverage = (questionRatings, questions = []) => {
+    const values = questions
+        .map((question) => {
+            const questionId = question?.question_id;
+            const entry = questionRatings?.[String(questionId)] ?? questionRatings?.[questionId];
+
+            return entry?.average != null ? Number(entry.average) : null;
+        })
+        .filter((value) => value != null);
+
+    if (!values.length) {
+        return null;
+    }
+
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
+};
+
+const ratingPercentage = (value) => {
+    if (value == null || Number.isNaN(Number(value))) {
+        return null;
+    }
+
+    return (Number(value) / 5) * 100;
+};
+
 const ROUTE_MAP = {
     subject: 'admin.subject-ratings',
     peer: 'admin.peer-ratings',
@@ -39,11 +113,12 @@ const SUBJECT_COLUMNS = [
 ];
 
 const PEER_COLUMNS = [
-    { key: 'rating_id', label: '#' },
-    { key: 'rater_name', label: 'Rater', render: (r) => r.rater_name ?? '-' },
-    { key: 'ratee_name', label: 'Ratee', render: (r) => r.ratee_name ?? '-' },
+    { key: 'teacher_name', label: 'Teacher', render: (r) => r.teacher_name ?? '-' },
+    { key: 'department_name', label: 'Department', render: (r) => r.department_name ?? '-' },
+    { key: 'program_name', label: 'Program / Strand', render: (r) => r.program_name ?? r.strand_name ?? '-' },
     { key: 'overall_rating', label: 'Rating', render: (r) => r.overall_rating ? Number(r.overall_rating).toFixed(2) : '-' },
-    { key: 'school_year', label: 'School Year' },
+    { key: 'submission_count', label: 'Responses', render: (r) => r.submission_count ?? 0 },
+    { key: 'school_year', label: 'School Year', render: (r) => r.school_year ?? '-' },
 ];
 
 const EMPLOYEE_COLUMNS = [
@@ -77,244 +152,129 @@ const COLUMNS_MAP = {
     branch: BRANCH_COLUMNS,
 };
 
-function SubjectRatingsBoard({
-    context,
+export default function Ratings({
+    ratings,
+    ratingType,
     filters,
-    onExport,
-    onPrint,
-    onCardClick,
+    schoolYears,
+    branches = [],
+    departments = [],
+    programs = [],
+    strands = [],
+    isBranchAdmin = false,
+    selectedBranchId = null,
+    scopedBranchId = null,
 }) {
-    const [search, setSearch] = useState(filters.search ?? '');
-    const activeBranchId = String(context?.selectedBranchId ?? '');
-    const activeDepartmentId = String(context?.selectedDepartmentId ?? '');
-    const activeProgramId = String(context?.selectedProgramId ?? '');
-    const activeStrandId = String(context?.selectedStrandId ?? '');
-    const subjects = context?.subjects ?? [];
-    const programs = context?.programs ?? [];
-    const strands = context?.strands ?? [];
-    const departments = context?.departments ?? [];
-    const branchOptions = context?.branches ?? [];
-    const showProgramFilter = context?.educationType === 'college';
-    const showStrandFilter = context?.educationType === 'shs';
-
-    const selectedBranchName = useMemo(
-        () => branchOptions.find((branch) => String(branch.id) === activeBranchId)?.name ?? 'Select branch',
-        [activeBranchId, branchOptions],
-    );
-
-    const visit = (nextFilters) => {
-        router.get(route('admin.subject-ratings'), {
-            ...filters,
-            ...nextFilters,
-            school_year: '',
-        }, {
-            preserveState: true,
-            replace: true,
-        });
-    };
-
-    const submitSearch = (event) => {
-        event.preventDefault();
-        visit({ search, page: 1 });
-    };
-
-    return (
-        <div className="space-y-4">
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_auto] lg:items-end">
-                    <div>
-                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Branch</label>
-                        <select
-                            value={activeBranchId}
-                            onChange={(event) => visit({
-                                branch_id: event.target.value,
-                                department_id: '',
-                                program_id: '',
-                                strand_id: '',
-                                page: 1,
-                            })}
-                            disabled={Boolean(context?.scopedBranchId)}
-                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none"
-                        >
-                            {branchOptions.map((branch) => (
-                                <option key={branch.id} value={branch.id}>{branch.name}</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                        <button
-                            type="button"
-                            onClick={onExport}
-                            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                        >
-                            Export CSV
-                        </button>
-                        <button
-                            type="button"
-                            onClick={onPrint}
-                            className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-                        >
-                            Print Summary
-                        </button>
-                    </div>
-                </div>
-
-                <div className="mt-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                    <div className="flex flex-wrap gap-2">
-                        {departments.map((department) => {
-                            const isActive = String(department.id) === activeDepartmentId;
-
-                            return (
-                                <button
-                                    key={department.id}
-                                    type="button"
-                                    onClick={() => visit({
-                                        department_id: department.id,
-                                        program_id: '',
-                                        strand_id: '',
-                                        page: 1,
-                                    })}
-                                    className={[
-                                        'rounded-lg border px-3 py-2 text-sm font-medium transition',
-                                        isActive
-                                            ? 'border-slate-900 bg-slate-900 text-white'
-                                            : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50',
-                                    ].join(' ')}
-                                >
-                                    {department.name}
-                                </button>
-                            );
-                        })}
-                    </div>
-
-                    {showProgramFilter && (
-                        <select
-                            value={activeProgramId}
-                            onChange={(event) => visit({ program_id: event.target.value, page: 1 })}
-                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none xl:w-72"
-                        >
-                            <option value="">All programs</option>
-                            {programs.map((program) => <option key={program.id} value={program.id}>{program.name}</option>)}
-                        </select>
-                    )}
-
-                    {showStrandFilter && (
-                        <select
-                            value={activeStrandId}
-                            onChange={(event) => visit({ strand_id: event.target.value, page: 1 })}
-                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none xl:w-72"
-                        >
-                            <option value="">All strands</option>
-                            {strands.map((strand) => <option key={strand.id} value={strand.id}>{strand.name}</option>)}
-                        </select>
-                    )}
-                </div>
-            </div>
-
-            <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-                <div className="flex flex-col gap-3 border-b border-slate-100 p-4 lg:flex-row lg:items-center lg:justify-between">
-                    <div>
-                        <h3 className="text-sm font-semibold text-slate-900">{selectedBranchName}</h3>
-                        <p className="text-xs text-slate-500">{subjects.length} {context?.educationLabel?.toLowerCase() ?? 'department'} subject{subjects.length === 1 ? '' : 's'}</p>
-                    </div>
-
-                    <form onSubmit={submitSearch} className="w-full lg:max-w-xl">
-                        <div className="flex gap-2">
-                            <input
-                                type="search"
-                                value={search}
-                                onChange={(event) => setSearch(event.target.value)}
-                                placeholder="Search subjects..."
-                                className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none"
-                            />
-                            <button
-                                type="submit"
-                                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                            >
-                                Search
-                            </button>
-                        </div>
-                    </form>
-                </div>
-
-                {subjects.length === 0 && (
-                    <div className="px-4 py-10 text-center text-sm text-slate-500">
-                        No subjects found.
-                    </div>
-                )}
-
-                <div className="space-y-4 p-4">
-                    {subjects.map((subject) => (
-                    <section key={subject.id} className="rounded-lg border border-slate-200 bg-white p-4">
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                            <div>
-                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{subject.code ?? 'Subject'}</p>
-                                <h3 className="mt-1 text-base font-semibold text-slate-900">{subject.name}</h3>
-                                {(subject.program_name || subject.strand_name) && (
-                                    <p className="mt-1 text-sm text-slate-500">{subject.program_name ?? subject.strand_name}</p>
-                                )}
-                            </div>
-                            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                                {subject.teacher_count} teacher{subject.teacher_count === 1 ? '' : 's'}
-                            </span>
-                        </div>
-
-                        {subject.teachers.length === 0 ? (
-                            <div className="mt-4 rounded-lg border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-500">
-                                No teachers assigned.
-                            </div>
-                        ) : (
-                            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                                {subject.teachers.map((teacher, index) => (
-                                    <button
-                                        key={`${subject.id}-${teacher.teacher_id ?? index}-${teacher.rating_id ?? 'assigned'}`}
-                                        type="button"
-                                        onClick={() => onCardClick({
-                                            ...teacher,
-                                            subject_name: subject.name,
-                                            subject_code: subject.code,
-                                            program_name: subject.program_name,
-                                            strand_name: subject.strand_name,
-                                        })}
-                                        className="rounded-lg border border-slate-200 bg-slate-50/70 p-4 text-left transition hover:border-blue-200 hover:bg-blue-50/60"
-                                    >
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div className="min-w-0">
-                                                <p className="truncate text-sm font-semibold text-slate-900">{teacher.teacher_name}</p>
-                                                <p className="mt-0.5 truncate text-xs text-slate-500">{teacher.teacher_role}</p>
-                                            </div>
-                                            <div className="rounded-lg bg-white px-2.5 py-1 text-sm font-bold text-blue-700 shadow-sm">
-                                                {teacher.overall_rating !== null ? Number(teacher.overall_rating).toFixed(2) : '-'}
-                                            </div>
-                                        </div>
-                                        <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
-                    <span>{teacher.submission_count} response{teacher.submission_count === 1 ? '' : 's'}</span>
-                                            <span>{teacher.semester ?? 'No rating yet'}</span>
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                    </section>
-                    ))}
-                </div>
-            </div>
-        </div>
-    );
-}
-
-export default function Ratings({ ratings, ratingType, filters, schoolYears, subjectRatingContext }) {
     const [selectedYear, setSelectedYear] = useState(filters.school_year ?? '');
     const [detailOpen, setDetailOpen] = useState(false);
     const [viewing, setViewing] = useState(null);
     const [confirmAction, setConfirmAction] = useState(null);
     const activeRoute = ROUTE_MAP[ratingType] ?? 'admin.subject-ratings';
     const columns = COLUMNS_MAP[ratingType] ?? SUBJECT_COLUMNS;
+    const activeBranchId = String(selectedBranchId ?? scopedBranchId ?? '');
+    const selectedFilterBranchId = String(filters.branch_id ?? activeBranchId ?? '');
+    const selectedDepartmentGroup = String(filters.department_group ?? '');
+    const selectedProgramGroup = String(filters.program_group ?? '');
+    const selectedStrandGroup = String(filters.strand_group ?? '');
+    const peerDepartments = useMemo(
+        () => departments.filter((department) => (
+            (!selectedFilterBranchId || String(department.branch_id) === selectedFilterBranchId)
+            && Boolean(department.is_activated)
+        )),
+        [departments, selectedFilterBranchId],
+    );
+    const peerFilterDepartments = useMemo(
+        () => uniqueByName(peerDepartments),
+        [peerDepartments],
+    );
+    const selectedDepartmentType = useMemo(
+        () => getDepartmentType(selectedDepartmentGroup),
+        [selectedDepartmentGroup],
+    );
+    const matchingDepartmentIds = useMemo(
+        () => peerDepartments
+            .filter((department) => !selectedDepartmentGroup || normalizeLabel(department.name) === normalizeLabel(selectedDepartmentGroup))
+            .map((department) => String(department.id)),
+        [peerDepartments, selectedDepartmentGroup],
+    );
+    const peerFilterPrograms = useMemo(
+        () => uniqueByName(programs.filter((program) => (
+            selectedDepartmentType === 'college'
+            && (!matchingDepartmentIds.length || matchingDepartmentIds.includes(String(program.department_id)))
+        ))),
+        [matchingDepartmentIds, programs, selectedDepartmentType],
+    );
+    const peerFilterStrands = useMemo(
+        () => uniqueByName(strands.filter((strand) => (
+            selectedDepartmentType === 'shs'
+            && (!matchingDepartmentIds.length || matchingDepartmentIds.includes(String(strand.department_id)))
+        ))),
+        [matchingDepartmentIds, selectedDepartmentType, strands],
+    );
 
     const handleYearFilter = (year) => {
         setSelectedYear(year);
-        router.get(route(activeRoute), { ...filters, school_year: year }, { preserveState: true, replace: true });
+        router.get(route(activeRoute), { ...filters, school_year: year, page: 1 }, { preserveState: true, replace: true });
+    };
+
+    const handlePeerBranchChange = (branchId) => {
+        router.get(route(activeRoute), {
+            ...filters,
+            branch_id: branchId,
+            department_group: '',
+            program_group: '',
+            strand_group: '',
+            school_year: selectedYear,
+            page: 1,
+        }, {
+            preserveState: true,
+            replace: true,
+        });
+    };
+
+    const handlePeerDepartmentChange = (departmentGroup) => {
+        router.get(route(activeRoute), {
+            ...filters,
+            branch_id: selectedFilterBranchId,
+            department_group: departmentGroup,
+            program_group: '',
+            strand_group: '',
+            school_year: selectedYear,
+            page: 1,
+        }, {
+            preserveState: true,
+            replace: true,
+        });
+    };
+
+    const handlePeerProgramChange = (programGroup) => {
+        router.get(route(activeRoute), {
+            ...filters,
+            branch_id: selectedFilterBranchId,
+            department_group: selectedDepartmentGroup,
+            program_group: programGroup,
+            strand_group: '',
+            school_year: selectedYear,
+            page: 1,
+        }, {
+            preserveState: true,
+            replace: true,
+        });
+    };
+
+    const handlePeerStrandChange = (strandGroup) => {
+        router.get(route(activeRoute), {
+            ...filters,
+            branch_id: selectedFilterBranchId,
+            department_group: selectedDepartmentGroup,
+            program_group: '',
+            strand_group: strandGroup,
+            school_year: selectedYear,
+            page: 1,
+        }, {
+            preserveState: true,
+            replace: true,
+        });
     };
 
     const openView = (row) => {
@@ -322,7 +282,18 @@ export default function Ratings({ ratings, ratingType, filters, schoolYears, sub
         setDetailOpen(true);
     };
 
-    const exportUrl  = route(EXPORT_ROUTE_MAP[ratingType] ?? EXPORT_ROUTE_MAP.subject, { ...filters, search: filters.search ?? '', school_year: selectedYear });
+    const printRatingDetail = () => {
+        window.print();
+    };
+
+    const exportUrl  = route(EXPORT_ROUTE_MAP[ratingType] ?? EXPORT_ROUTE_MAP.subject, {
+        search: filters.search ?? '',
+        school_year: selectedYear,
+        branch_id: filters.branch_id ?? '',
+        department_group: filters.department_group ?? '',
+        program_group: filters.program_group ?? '',
+        strand_group: filters.strand_group ?? '',
+    });
     const summaryUrl = route('admin.reports.summary', { school_year: selectedYear });
 
     const askExport = () => setConfirmAction({
@@ -389,33 +360,86 @@ export default function Ratings({ ratings, ratingType, filters, schoolYears, sub
                 )}
             </div>
 
-            {isSubjectRatings ? (
-                <SubjectRatingsBoard
-                    context={subjectRatingContext}
-                    filters={filters}
-                    onExport={askExport}
-                    onPrint={askPrint}
-                    onCardClick={openView}
-                />
-            ) : (
-                <ResourceTable
-                    columns={columns}
-                    data={ratings}
-                    filters={{ ...filters, school_year: selectedYear }}
-                    routeName={activeRoute}
-                    searchPlaceholder="Search ratings..."
-                    onRowClick={openView}
-                />
+            {ratingType === 'peer' && (
+                <div className="mb-4 space-y-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                        <div className="min-w-[220px]">
+                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Branch
+                            </label>
+                            <select
+                                value={selectedFilterBranchId}
+                                onChange={(e) => handlePeerBranchChange(e.target.value)}
+                                disabled={isBranchAdmin}
+                                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500"
+                            >
+                                {branches.map((branch) => (
+                                    <option key={branch.id} value={branch.id}>{branch.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    {peerFilterDepartments.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-2">
+                            {peerFilterDepartments.map((department) => (
+                                <button
+                                    key={department.name}
+                                    type="button"
+                                    onClick={() => handlePeerDepartmentChange(department.name)}
+                                    className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${normalizeLabel(selectedDepartmentGroup) === normalizeLabel(department.name) ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50'}`}
+                                >
+                                    {department.name}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    {(selectedDepartmentType === 'college' || selectedDepartmentType === 'shs') && (
+                        <div className="flex justify-end">
+                            {selectedDepartmentType === 'college' && (
+                                <select
+                                    value={selectedProgramGroup}
+                                    onChange={(e) => handlePeerProgramChange(e.target.value)}
+                                    className="min-w-[220px] rounded-full border border-slate-200 bg-white py-1.5 pl-4 pr-9 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                >
+                                    <option value="">All Programs</option>
+                                    {peerFilterPrograms.map((program) => (
+                                        <option key={program.name} value={program.name}>{program.name}</option>
+                                    ))}
+                                </select>
+                            )}
+
+                            {selectedDepartmentType === 'shs' && (
+                                <select
+                                    value={selectedStrandGroup}
+                                    onChange={(e) => handlePeerStrandChange(e.target.value)}
+                                    className="min-w-[220px] rounded-full border border-slate-200 bg-white py-1.5 pl-4 pr-9 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                >
+                                    <option value="">All Strands</option>
+                                    {peerFilterStrands.map((strand) => (
+                                        <option key={strand.name} value={strand.name}>{strand.name}</option>
+                                    ))}
+                                </select>
+                            )}
+                        </div>
+                    )}
+                </div>
             )}
+
+            <ResourceTable
+                columns={columns}
+                data={ratings}
+                filters={{ ...filters, school_year: selectedYear }}
+                routeName={activeRoute}
+                searchPlaceholder={ratingType === 'peer' ? 'Search teachers...' : 'Search ratings...'}
+                onRowClick={openView}
+                extraHeaderActions={null}
+            />
 
             <SlideOver open={detailOpen} onClose={() => setDetailOpen(false)} title="Rating Information">
                 {viewing && (
                     <div className="space-y-6">
-                        <div>
-                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Rating ID</p>
-                            <h3 className="mt-1 text-lg font-semibold text-slate-900">{viewing.rating_id ?? '-'}</h3>
-                        </div>
-
                         <div className="grid gap-4 sm:grid-cols-2">
                             {ratingType === 'subject' && (
                                 <>
@@ -427,15 +451,118 @@ export default function Ratings({ ratings, ratingType, filters, schoolYears, sub
                             )}
                             {ratingType === 'peer' && (
                                 <>
-                                    <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Rater</p><p className="mt-1 text-sm text-slate-900">{viewing.rater_name ?? '-'}</p></div>
-                                    <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Ratee</p><p className="mt-1 text-sm text-slate-900">{viewing.ratee_name ?? '-'}</p></div>
+                                    <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Teacher</p><p className="mt-1 text-sm text-slate-900">{viewing.teacher_name ?? '-'}</p></div>
+                                    <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Department</p><p className="mt-1 text-sm text-slate-900">{viewing.department_name ?? '-'}</p></div>
+                                    <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Program / Strand</p><p className="mt-1 text-sm text-slate-900">{viewing.program_name ?? viewing.strand_name ?? '-'}</p></div>
+                                    <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Responses</p><p className="mt-1 text-sm text-slate-900">{viewing.submission_count ?? 0}</p></div>
                                 </>
                             )}
                             {ratingType === 'employee' && (
                                 <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Employee</p><p className="mt-1 text-sm text-slate-900">{viewing.teacher_name ?? '-'}</p></div>
                             )}
-                            <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Overall Rating</p><p className="mt-1 text-sm text-slate-900">{viewing.overall_rating ? Number(viewing.overall_rating).toFixed(2) : '-'}</p></div>
+                            <div>
+                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Overall Rating</p>
+                                <p className="mt-1 text-sm text-slate-900">
+                                    {viewing.overall_rating
+                                        ? `${Number(viewing.overall_rating).toFixed(2)} (${ratingPercentage(viewing.overall_rating)?.toFixed(2)}%)`
+                                        : '-'}
+                                </p>
+                            </div>
                             <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">School Year</p><p className="mt-1 text-sm text-slate-900">{viewing.school_year ?? '-'}</p></div>
+                        </div>
+
+                        {ratingType === 'peer' && viewing.questionnaire && (
+                            <div className="space-y-4">
+                                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Questionnaire</p>
+                                    <p className="mt-1 text-sm font-semibold text-slate-900">
+                                        {viewing.questionnaire.title ?? '-'}
+                                    </p>
+                                    <p className="mt-1 text-sm text-slate-600">
+                                        {viewing.questionnaire.questionnaire_code ?? '-'} • {viewing.questionnaire.questionnaire_type_name ?? '-'}
+                                    </p>
+                                    <p className="mt-2 text-sm text-slate-600">
+                                        {viewing.questionnaire.notes ?? 'No notes provided.'}
+                                    </p>
+                                </div>
+
+                                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Items</p>
+                                    {Array.isArray(viewing.questionnaire.scale_questions) && viewing.questionnaire.scale_questions.length > 0 ? (
+                                        <div className="mt-3 space-y-4">
+                                            {viewing.questionnaire.scale_questions.map((group, groupIndex) => (
+                                                <div key={`${group.class_name}-${groupIndex}`} className="rounded-lg border border-slate-200 bg-white p-3">
+                                                    <div className="flex items-center justify-between gap-3">
+                                                        <p className="text-sm font-semibold text-slate-900">{group.class_name || `Class ${groupIndex + 1}`}</p>
+                                                        <div className="text-right">
+                                                            <p className="text-xs font-medium text-slate-500">
+                                                                {group.weight_percentage != null ? `${group.weight_percentage}%` : 'No weight'}
+                                                            </p>
+                                                            <p className="mt-1 text-xs font-semibold text-blue-700">
+                                                                Value Rating: {classAverage(viewing.question_ratings, group.questions) != null
+                                                                    ? Number(classAverage(viewing.question_ratings, group.questions)).toFixed(2)
+                                                                    : '-'}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    {Array.isArray(group.questions) && group.questions.length > 0 ? (
+                                                        <div className="mt-3 space-y-2">
+                                                            {group.questions.map((question, questionIndex) => (
+                                                                <div key={`${question.question_id}-${questionIndex}`} className="rounded-md bg-slate-50 px-3 py-2">
+                                                                    <div className="flex items-start justify-between gap-3">
+                                                                        <p className="text-sm text-slate-700">
+                                                                            {question.description || `Question #${question.question_id}`}
+                                                                        </p>
+                                                                        <span className="shrink-0 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                                                                            {formatQuestionAverage(viewing.question_ratings, question.question_id)}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <p className="mt-3 text-sm text-slate-500">No item questions in this class.</p>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="mt-1 text-sm text-slate-500">No questionnaire items found.</p>
+                                    )}
+                                </div>
+
+                                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Comments</p>
+                                    {Array.isArray(viewing.questionnaire.comment_section) && viewing.questionnaire.comment_section.length > 0 ? (
+                                        <div className="mt-3 space-y-2">
+                                            {viewing.questionnaire.comment_section.map((question, index) => (
+                                                <div key={`comment-section-${question.question_id}-${index}`} className="rounded-md bg-white px-3 py-2 text-sm text-slate-700">
+                                                    {question.description || `Question #${question.question_id}`}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="mt-1 text-sm text-slate-500">No comment questions found.</p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="flex gap-3 pt-2">
+                            <button
+                                type="button"
+                                onClick={() => setDetailOpen(false)}
+                                className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700"
+                            >
+                                Close
+                            </button>
+                            <button
+                                type="button"
+                                onClick={printRatingDetail}
+                                className="flex-1 rounded-lg bg-blue-600 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                            >
+                                Print as PDF
+                            </button>
                         </div>
                     </div>
                 )}

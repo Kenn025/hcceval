@@ -12,12 +12,12 @@ class Teacher extends Model
     protected $fillable = [
         'code', 'branch_id', 'department_id', 'program_id', 'strand_id',
         'firstname', 'middlename', 'lastname',
-        'email', 'password', 'role', 'is_activated', 'is_deleted',
+        'email', 'password', 'role', 'personal_info', 'is_activated', 'is_deleted',
     ];
 
     protected $hidden = ['password'];
 
-    protected $casts = ['is_activated' => 'boolean', 'is_deleted' => 'boolean'];
+    protected $casts = ['personal_info' => 'array', 'is_activated' => 'boolean', 'is_deleted' => 'boolean'];
 
     public function branch(): BelongsTo
     {

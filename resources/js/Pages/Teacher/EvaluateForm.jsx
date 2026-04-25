@@ -42,7 +42,7 @@ function StampButton({ value, selected, onClick }) {
     );
 }
 
-export default function TeacherEvaluateForm({ category, evaluatee, questions, cycle }) {
+export default function TeacherEvaluateForm({ category, questionnaireId, questionnaireTitle, evaluatee, questions, cycle }) {
     const [answers, setAnswers] = useState({});
     const [comment, setComment] = useState('');
     const [submitting, setSubmitting] = useState(false);
@@ -84,6 +84,7 @@ export default function TeacherEvaluateForm({ category, evaluatee, questions, cy
             route('portal.teacher.evaluate.submit'),
             {
                 category,
+                questionnaire_id: questionnaireId ?? null,
                 evaluatee_id: evaluatee.id,
                 academic_year_id: cycle.id,
                 school_year: cycle.school_year,
@@ -151,6 +152,11 @@ export default function TeacherEvaluateForm({ category, evaluatee, questions, cy
                                 {evaluatee?.role ?? 'Teacher'}
                                 {evaluatee?.scope ? ` · ${evaluatee.scope}` : ''}
                             </p>
+                            {questionnaireTitle && (
+                                <p className="mt-1.5 text-xs text-amber-100/80">
+                                    Assigned Questionnaire: {questionnaireTitle}
+                                </p>
+                            )}
                             <p className="mt-1.5 text-xs text-white/40">
                                 {cycle.school_year} · {cycle.semester}
                             </p>

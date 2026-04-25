@@ -355,6 +355,7 @@ class AssignmentController extends Controller
                     ->orWhereNull('qd.branch_id');
             }))
             ->get();
+        $questionnaireLookup = $distributions->keyBy('questionnaire_id');
 
         $map = [];
 
@@ -379,6 +380,46 @@ class AssignmentController extends Controller
                     'custom_subject_ids' => array_values(array_map('intval', $items['custom_subject_ids'] ?? [])),
                     'custom_scope_groups' => $customScopeGroups,
                 ];
+
+                if ($typeCode === self::TYPE_CODE_MAP['peer']) {
+                    $scopeConfig = $this->peerScopeConfig((int) $items['department_id']);
+                    $scopeKeyPrefix = $this->peerScopeKeyPrefix((string) ($scopeConfig['items_key'] ?? ''));
+                    $scopeIds = collect($items[$scopeConfig['items_key'] ?? ''] ?? [])
+                        ->map(fn ($id) => (int) $id)
+                        ->filter()
+                        ->values()
+                        ->all();
+
+                    if ($scopeKeyPrefix) {
+                        if (!empty($customScopeGroups)) {
+                            foreach ($customScopeGroups as $group) {
+                                $groupQuestionnaire = $questionnaireLookup->get((int) $group['questionnaire_id']);
+
+                                foreach (($group['subject_ids'] ?? []) as $peerScopeId) {
+                                    $map[$scopeKeyPrefix . '-' . (int) $peerScopeId] = [
+                                        'distribution_id' => $distribution->id,
+                                        'questionnaire_id' => (int) $group['questionnaire_id'],
+                                        'questionnaire_code' => $groupQuestionnaire->questionnaire_code ?? $distribution->questionnaire_code,
+                                        'questionnaire_title' => $groupQuestionnaire->questionnaire_title ?? $distribution->questionnaire_title,
+                                        'custom_subject_ids' => array_values(array_map('intval', $group['subject_ids'] ?? [])),
+                                        'custom_scope_groups' => $customScopeGroups,
+                                    ];
+                                }
+                            }
+                        } else {
+                            foreach ($scopeIds as $peerScopeId) {
+                                $map[$scopeKeyPrefix . '-' . $peerScopeId] = [
+                                    'distribution_id' => $distribution->id,
+                                    'questionnaire_id' => $distribution->questionnaire_id,
+                                    'questionnaire_code' => $distribution->questionnaire_code,
+                                    'questionnaire_title' => $distribution->questionnaire_title,
+                                    'custom_subject_ids' => $scopeIds,
+                                    'custom_scope_groups' => [],
+                                ];
+                            }
+                        }
+                    }
+                }
             }
 
             foreach (($items['program_ids'] ?? []) as $programId) {
@@ -589,6 +630,50 @@ class AssignmentController extends Controller
         };
     }
 
+    private function peerScopeIdsForDepartment(int $departmentId): array
+    {
+        $scopeConfig = $this->peerScopeConfig($departmentId);
+
+        if (! $scopeConfig) {
+            return [];
+        }
+
+        if ($scopeConfig['table'] === 'education_level') {
+            return DB::table('education_level')
+                ->select('id', 'year_level', 'section')
+                ->where('department_id', $departmentId)
+                ->where('is_deleted', 0)
+                ->orderByRaw('CAST(year_level AS UNSIGNED) asc')
+                ->orderBy('section')
+                ->orderBy('id')
+                ->get()
+                ->groupBy(fn ($level) => trim((string) $level->year_level))
+                ->map(fn ($levels) => (int) optional($levels->first())->id)
+                ->filter()
+                ->values()
+                ->all();
+        }
+
+        return DB::table($scopeConfig['table'])
+            ->where('department_id', $departmentId)
+            ->where('is_deleted', 0)
+            ->orderBy('name')
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+    }
+
+    private function peerScopeKeyPrefix(string $itemsKey): ?string
+    {
+        return match ($itemsKey) {
+            'program_ids' => 'program',
+            'strand_ids' => 'strand',
+            'year_level_ids' => 'level',
+            default => null,
+        };
+    }
+
     private function subjectIdsForDistributionScope(string $scopeType, int $scopeId): array
     {
         if (! Schema::hasTable('subject')) {
@@ -710,6 +795,179 @@ class AssignmentController extends Controller
             ]);
     }
 
+    private function updateTeacherQuestionnaireIds(array $teacherIds, ?int $questionnaireId): int
+    {
+        $teacherIds = collect($teacherIds)
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if (
+            empty($teacherIds)
+            || ! Schema::hasTable('teacher')
+            || ! Schema::hasColumn('teacher', 'questionnaire_id')
+        ) {
+            return 0;
+        }
+
+        return DB::table('teacher')
+            ->whereIn('id', $teacherIds)
+            ->where('is_deleted', 0)
+            ->update([
+                'questionnaire_id' => $questionnaireId,
+                'updated_at' => now(),
+            ]);
+    }
+
+    private function filterOutProgramChairTeacherIds(array $teacherIds): array
+    {
+        $teacherIds = collect($teacherIds)
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($teacherIds) || ! Schema::hasTable('teacher')) {
+            return $teacherIds;
+        }
+
+        return DB::table('teacher')
+            ->whereIn('id', $teacherIds)
+            ->where('is_deleted', 0)
+            ->where(function ($query) {
+                $query->whereNull('role')
+                    ->orWhereRaw('LOWER(role) NOT LIKE ?', ['%program chair%']);
+            })
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+    }
+
+    private function teacherIdsForScope(string $scopeType, int $scopeId): array
+    {
+        if (! Schema::hasTable('teacher')) {
+            return [];
+        }
+
+        if ($scopeType === 'teacher') {
+            return DB::table('teacher')
+                ->where('id', $scopeId)
+                ->where('is_deleted', 0)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+        }
+
+        if ($scopeType === 'department') {
+            return DB::table('teacher')
+                ->where('department_id', $scopeId)
+                ->where('is_deleted', 0)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+        }
+
+        if ($scopeType === 'program') {
+            return DB::table('teacher')
+                ->where('program_id', $scopeId)
+                ->where('is_deleted', 0)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+        }
+
+        if ($scopeType === 'strand') {
+            return DB::table('teacher')
+                ->where('strand_id', $scopeId)
+                ->where('is_deleted', 0)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+        }
+
+        if ($scopeType === 'level' && Schema::hasTable('education_level')) {
+            return DB::table('education_level')
+                ->whereIn('id', $this->getEquivalentYearLevelIds($scopeId))
+                ->where('is_deleted', 0)
+                ->pluck('teacher_id')
+                ->flatMap(fn ($ids) => json_decode($ids ?? '[]', true) ?: [])
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+        }
+
+        return [];
+    }
+
+    private function applyQuestionnaireToScopedTeachers(string $scopeType, int $scopeId, int $questionnaireId, bool $excludeProgramChairs = false): int
+    {
+        if ($questionnaireId <= 0) {
+            return 0;
+        }
+
+        $teacherIds = $this->teacherIdsForScope($scopeType, $scopeId);
+
+        if ($excludeProgramChairs) {
+            $teacherIds = $this->filterOutProgramChairTeacherIds($teacherIds);
+        }
+
+        return $this->updateTeacherQuestionnaireIds(
+            $teacherIds,
+            $questionnaireId,
+        );
+    }
+
+    private function syncPeerTeacherQuestionnaires(int $departmentId, array $items, ?int $fallbackQuestionnaireId = null): int
+    {
+        $scopeConfig = $this->peerScopeConfig($departmentId);
+
+        if (! $scopeConfig) {
+            return 0;
+        }
+
+        $updated = 0;
+        $departmentTeacherIds = $this->filterOutProgramChairTeacherIds(
+            $this->teacherIdsForScope('department', $departmentId)
+        );
+        $updated += $this->updateTeacherQuestionnaireIds($departmentTeacherIds, null);
+
+        $scopeType = $this->peerScopeKeyPrefix($scopeConfig['items_key']);
+        $customGroups = collect($items['custom_scope_groups'] ?? [])
+            ->filter(fn ($group) => !empty($group['questionnaire_id']))
+            ->values();
+
+        if ($customGroups->isNotEmpty() && $scopeType) {
+            foreach ($customGroups as $group) {
+                foreach (($group['subject_ids'] ?? []) as $peerScopeId) {
+                    $updated += $this->applyQuestionnaireToScopedTeachers(
+                        $scopeType,
+                        (int) $peerScopeId,
+                        (int) $group['questionnaire_id'],
+                        true,
+                    );
+                }
+            }
+
+            return $updated;
+        }
+
+        $questionnaireId = (int) ($fallbackQuestionnaireId ?? 0);
+
+        if ($questionnaireId <= 0) {
+            return $updated;
+        }
+
+        $updated += $this->applyQuestionnaireToScopedTeachers('department', $departmentId, $questionnaireId, true);
+
+        return $updated;
+    }
+
     public function index(Request $request)
     {
         return $this->renderAssignmentsPage($request, 'student-teacher');
@@ -807,6 +1065,16 @@ class AssignmentController extends Controller
             'custom_subject_ids' => [],
         ];
 
+        if ($validated['assignment_type'] === 'peer' && $validated['scope_type'] === 'department') {
+            $scopeConfig = $this->peerScopeConfig($scopeId);
+            $peerScopeIds = $this->peerScopeIdsForDepartment($scopeId);
+
+            if ($scopeConfig) {
+                $items[$scopeConfig['items_key']] = $peerScopeIds;
+                $items['custom_subject_ids'] = $peerScopeIds;
+            }
+        }
+
         if ($existingId) {
             DB::table('questionnaire_distribution')
                 ->where('id', $existingId)
@@ -852,6 +1120,22 @@ class AssignmentController extends Controller
             $scopeId,
             (int) $validated['questionnaire_id'],
         );
+
+        if ($validated['assignment_type'] === 'peer' && $validated['scope_type'] === 'department') {
+            $this->syncPeerTeacherQuestionnaires(
+                $scopeId,
+                $items,
+                (int) $validated['questionnaire_id'],
+            );
+        }
+
+        if ($validated['assignment_type'] === 'head' && $validated['scope_type'] === 'teacher') {
+            $this->applyQuestionnaireToScopedTeachers(
+                'teacher',
+                $scopeId,
+                (int) $validated['questionnaire_id'],
+            );
+        }
 
         $message = $validated['assignment_type'] === 'student-teacher'
             ? 'Questionnaire selected and applied to ' . $updatedSubjects . ' scoped subject' . ($updatedSubjects === 1 ? '.' : 's.')
@@ -1088,6 +1372,12 @@ class AssignmentController extends Controller
                     (int) ($group['questionnaire_id'] ?? 0),
                 );
             }
+        } elseif ($validated['assignment_type'] === 'peer' && $validated['scope_type'] === 'department') {
+            $this->syncPeerTeacherQuestionnaires(
+                (int) $validated['scope_id'],
+                $items,
+                !empty($validated['questionnaire_id']) ? (int) $validated['questionnaire_id'] : null,
+            );
         }
 
         if (
