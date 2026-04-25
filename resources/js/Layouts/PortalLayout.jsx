@@ -6,6 +6,8 @@ import { Head, router, useForm } from "@inertiajs/react";
 import { Moon, Sun } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+const PORTAL_SIDEBAR_SCROLL_KEY = "portal-sidebar-scroll";
+
 const THEMES = {
     student: {
         gradient:
@@ -72,6 +74,28 @@ const NAV_ITEMS = {
         { key: "archive", label: "Archive", icon: "archive" },
     ],
 };
+
+function keepActiveSidebarItemVisible(nav) {
+    const activeItem = nav.querySelector('[data-sidebar-active="true"]');
+    if (!activeItem) return;
+
+    const navRect = nav.getBoundingClientRect();
+    const itemRect = activeItem.getBoundingClientRect();
+    const isAboveView = itemRect.top < navRect.top;
+    const isBelowView = itemRect.bottom > navRect.bottom;
+
+    if (!isAboveView && !isBelowView) return;
+
+    const itemTop = itemRect.top - navRect.top + nav.scrollTop;
+    const targetTop = itemTop - (nav.clientHeight - itemRect.height) / 2;
+
+    nav.scrollTo({
+        top: Math.max(0, targetTop),
+        behavior: "auto",
+    });
+
+    sessionStorage.setItem(PORTAL_SIDEBAR_SCROLL_KEY, String(nav.scrollTop));
+}
 
 function SignOutButton({ collapsed, onClick }) {
     const tooltipRef = useSystemTooltip("Sign out", collapsed);
@@ -146,6 +170,7 @@ function PortalNavItem({ item, isActive, collapsed, onClick }) {
             ref={tooltipRef}
             type="button"
             onClick={onClick}
+            data-sidebar-active={isActive ? "true" : undefined}
             className={[
                 "group relative flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-[0.85rem] font-bold tracking-tight transition-all duration-200",
                 collapsed ? "justify-center px-0" : "",
@@ -235,17 +260,35 @@ export default function PortalLayout({
     useEffect(() => {
         const nav = navRef.current;
         if (!nav) return;
-        const saved = sessionStorage.getItem("portal-sidebar-scroll");
+
+        const saved = sessionStorage.getItem(PORTAL_SIDEBAR_SCROLL_KEY);
         if (saved) nav.scrollTop = parseInt(saved, 10);
+
+        const saveScroll = () => {
+            sessionStorage.setItem(
+                PORTAL_SIDEBAR_SCROLL_KEY,
+                String(nav.scrollTop),
+            );
+        };
+
+        nav.addEventListener("scroll", saveScroll, { passive: true });
+
         return () => {
-            if (navRef.current) {
-                sessionStorage.setItem(
-                    "portal-sidebar-scroll",
-                    String(navRef.current.scrollTop),
-                );
-            }
+            saveScroll();
+            nav.removeEventListener("scroll", saveScroll);
         };
     }, []);
+
+    useEffect(() => {
+        const nav = navRef.current;
+        if (!nav) return;
+
+        const frame = window.requestAnimationFrame(() =>
+            keepActiveSidebarItemVisible(nav),
+        );
+
+        return () => window.cancelAnimationFrame(frame);
+    }, [activeNav, collapsed, mobileOpen]);
 
     useEffect(() => {
         document.body.classList.toggle("overflow-hidden", mobileOpen);

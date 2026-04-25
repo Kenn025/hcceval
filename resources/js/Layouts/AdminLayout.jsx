@@ -6,8 +6,32 @@ import { Head, Link, usePage, useForm, router } from "@inertiajs/react";
 import { Moon, Sun } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+const SIDEBAR_SCROLL_KEY = "sidebar-scroll";
+
 function routeIsActive(routeName, currentRoute) {
     return Boolean(routeName && currentRoute && routeName === currentRoute);
+}
+
+function keepActiveSidebarItemVisible(nav) {
+    const activeItem = nav.querySelector('[data-sidebar-active="true"]');
+    if (!activeItem) return;
+
+    const navRect = nav.getBoundingClientRect();
+    const itemRect = activeItem.getBoundingClientRect();
+    const isAboveView = itemRect.top < navRect.top;
+    const isBelowView = itemRect.bottom > navRect.bottom;
+
+    if (!isAboveView && !isBelowView) return;
+
+    const itemTop = itemRect.top - navRect.top + nav.scrollTop;
+    const targetTop = itemTop - (nav.clientHeight - itemRect.height) / 2;
+
+    nav.scrollTo({
+        top: Math.max(0, targetTop),
+        behavior: "auto",
+    });
+
+    sessionStorage.setItem(SIDEBAR_SCROLL_KEY, String(nav.scrollTop));
 }
 
 function NavItem({ item, activeRoute, collapsed, onClick }) {
@@ -19,6 +43,7 @@ function NavItem({ item, activeRoute, collapsed, onClick }) {
             ref={tooltipRef}
             href={route(item.route)}
             onClick={onClick}
+            data-sidebar-active={isActive ? "true" : undefined}
             className={[
                 "group relative flex items-center gap-3 rounded-2xl px-4 py-3.5 text-[0.85rem] font-bold tracking-tight transition-all duration-200",
                 collapsed ? "justify-center px-0" : "",
@@ -78,6 +103,7 @@ function NavGroup({ group, activeRoute, collapsed, onItemClick }) {
             <button
                 type="button"
                 onClick={() => setOpen((v) => !v)}
+                data-sidebar-active={hasActive && !open ? "true" : undefined}
                 className={[
                     "flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-[0.85rem] font-bold tracking-tight transition-all duration-200",
                     hasActive
@@ -118,6 +144,9 @@ function NavGroup({ group, activeRoute, collapsed, onItemClick }) {
                                 key={item.route}
                                 href={route(item.route)}
                                 onClick={onItemClick}
+                                data-sidebar-active={
+                                    isActive ? "true" : undefined
+                                }
                                 className={[
                                     "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-all",
                                     isActive
@@ -267,21 +296,36 @@ export default function AdminLayout({
         return () => document.removeEventListener("mousedown", handler);
     }, [showUserMenu]);
 
-    // Preserve sidebar scroll position across page navigations
+    // Preserve sidebar scroll position across page navigations.
     useEffect(() => {
         const nav = navRef.current;
         if (!nav) return;
-        const saved = sessionStorage.getItem("sidebar-scroll");
+
+        const saved = sessionStorage.getItem(SIDEBAR_SCROLL_KEY);
         if (saved) nav.scrollTop = parseInt(saved, 10);
+
+        const saveScroll = () => {
+            sessionStorage.setItem(SIDEBAR_SCROLL_KEY, String(nav.scrollTop));
+        };
+
+        nav.addEventListener("scroll", saveScroll, { passive: true });
+
         return () => {
-            if (navRef.current) {
-                sessionStorage.setItem(
-                    "sidebar-scroll",
-                    String(navRef.current.scrollTop),
-                );
-            }
+            saveScroll();
+            nav.removeEventListener("scroll", saveScroll);
         };
     }, []);
+
+    useEffect(() => {
+        const nav = navRef.current;
+        if (!nav) return;
+
+        const frame = window.requestAnimationFrame(() =>
+            keepActiveSidebarItemVisible(nav),
+        );
+
+        return () => window.cancelAnimationFrame(frame);
+    }, [activeRoute, collapsed, mobileOpen]);
 
     useEffect(() => {
         document.body.classList.toggle("overflow-hidden", mobileOpen);
