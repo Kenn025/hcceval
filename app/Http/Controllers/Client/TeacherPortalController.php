@@ -774,6 +774,9 @@ class TeacherPortalController extends Controller
             'comments' => $hasLegacyEvaluatorColumns
                 ? ($data['comments'] ?? null)
                 : json_encode($data['comments'] ? ['text' => $data['comments']] : []),
+            'comments' => json_encode(($data['comments'] ?? null) ? ['text' => $data['comments']] : []),
+            'overall_average' => $avg,
+            'submitted_at' => now(),
             'created_at' => now(),
             'updated_at' => now(),
         ];

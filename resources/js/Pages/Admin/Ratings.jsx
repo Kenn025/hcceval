@@ -319,6 +319,8 @@ export default function Ratings({
         setConfirmAction(null);
     };
 
+    const isSubjectRatings = ratingType === 'subject' && subjectRatingContext;
+
     return (
         <AdminLayout title={TITLE_MAP[ratingType]} activeRoute={activeRoute} breadcrumbs={['Ratings & Reports']}>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -326,6 +328,7 @@ export default function Ratings({
                     <h2 className="text-base font-semibold text-slate-900">{TITLE_MAP[ratingType]}</h2>
                     <p className="text-sm text-slate-500">View and monitor {ratingType} evaluation results.</p>
                 </div>
+                {!isSubjectRatings && (
                 <div className="flex flex-wrap items-center gap-2">
                     {schoolYears?.length > 0 && (
                         <select
@@ -354,6 +357,7 @@ export default function Ratings({
                         Print Summary
                     </button>
                 </div>
+                )}
             </div>
 
             {ratingType === 'peer' && (
@@ -442,6 +446,7 @@ export default function Ratings({
                                     <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Teacher</p><p className="mt-1 text-sm text-slate-900">{viewing.teacher_name ?? '-'}</p></div>
                                     <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Subject</p><p className="mt-1 text-sm text-slate-900">{viewing.subject_name ?? '-'}</p></div>
                                     <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Semester</p><p className="mt-1 text-sm text-slate-900">{viewing.semester ?? '-'}</p></div>
+                                    <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Responses</p><p className="mt-1 text-sm text-slate-900">{viewing.submission_count ?? 0}</p></div>
                                 </>
                             )}
                             {ratingType === 'peer' && (

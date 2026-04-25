@@ -30,9 +30,10 @@ return new class extends Migration
                 $table->unsignedBigInteger('questionnaire_id')->nullable()->after('questionnaire_type_id')->index('es_questionnaire_idx');
             }
 
-            if (! Schema::hasColumn('evaluation_submissions', 'teacher_id')) {
-                $table->unsignedBigInteger('teacher_id')->nullable()->after('questionnaire_id')->index('es_teacher_idx');
+            if (! Schema::hasColumn('evaluation_submissions', 'subject_id')) {
+                $table->unsignedBigInteger('subject_id')->nullable()->after('questionnaire_id')->index('es_subject_idx');
             }
+
         });
 
         if (DB::getDriverName() === 'mysql') {
@@ -98,7 +99,7 @@ return new class extends Migration
         }
 
         Schema::table('evaluation_submissions', function (Blueprint $table) {
-            foreach (['teacher_id', 'questionnaire_id', 'questionnaire_type_id', 'branch_id'] as $column) {
+            foreach (['subject_id', 'questionnaire_id', 'questionnaire_type_id', 'branch_id'] as $column) {
                 if (Schema::hasColumn('evaluation_submissions', $column)) {
                     $table->dropColumn($column);
                 }

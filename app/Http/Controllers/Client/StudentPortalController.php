@@ -45,6 +45,19 @@ class StudentPortalController extends Controller
         };
     }
 
+    private function fullNameExpression(string $prefix = ''): string
+    {
+        $first = $prefix . 'firstname';
+        $middle = $prefix . 'middlename';
+        $last = $prefix . 'lastname';
+
+        if (DB::getDriverName() === 'sqlite') {
+            return "TRIM({$first} || ' ' || COALESCE({$middle}, '') || ' ' || {$last})";
+        }
+
+        return "TRIM(CONCAT({$first}, ' ', COALESCE({$middle}, ''), ' ', {$last}))";
+    }
+
     private function legacyRegisteredSubjects(Student $student, ?object $cycle): array
     {
         $yearLevel = $student->yearLevel;
@@ -108,7 +121,7 @@ class StudentPortalController extends Controller
         ])));
 
         return $subjectIds
-            ->map(function (int $subjectId) use ($subjects, $yearLevel, $student, $teacherNames, $semesterLabel, $sectionName, $cycle) {
+            ->map(function (int $subjectId) use ($subjects, $yearLevel, $student, $teacherNames, $semesterLabel, $sectionName, $cycle, $irregularSubjectIds) {
                 $subject = $subjects->get($subjectId);
 
                 if (! $subject) {
@@ -144,6 +157,7 @@ class StudentPortalController extends Controller
                     'semester_label' => $semesterLabel,
                     'already_evaluated' => $alreadyEvaluated,
                     'registration_status' => 'Registered',
+                    'is_irregular' => $irregularSubjectIds->contains($subjectId),
                     'can_evaluate' => ! empty($teacherId) && ! empty($questionnaireId),
                     'questionnaire_id' => $questionnaireId,
                 ];
@@ -380,9 +394,9 @@ class StudentPortalController extends Controller
         return $typeId ? (int) $typeId : null;
     }
 
-    private function studentHasEvaluationSubmission(Student $student, ?int $academicYearId, ?int $questionnaireId, ?int $teacherId): bool
+    private function studentHasEvaluationSubmission(Student $student, ?int $academicYearId, ?int $questionnaireId, ?int $subjectId): bool
     {
-        if (! $academicYearId || ! $questionnaireId || ! $teacherId || ! Schema::hasTable('evaluation_submissions')) {
+        if (! $academicYearId || ! $questionnaireId || ! $subjectId || ! Schema::hasTable('evaluation_submissions')) {
             return false;
         }
 
@@ -400,8 +414,124 @@ class StudentPortalController extends Controller
             ->whereIn('id', $submissionIds->all())
             ->where('academic_year_id', $academicYearId)
             ->where('questionnaire_id', $questionnaireId)
-            ->where('teacher_id', $teacherId)
+            ->where('subject_id', $subjectId)
             ->exists();
+    }
+
+    private function studentEvaluationRecords(Student $student, ?object $cycle, array $subjects): array
+    {
+        if (! Schema::hasTable('evaluation_submissions')) {
+            return ['current' => [], 'archive' => []];
+        }
+
+        $submissionIds = collect($student->evaluation_submission_ids ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($submissionIds->isEmpty()) {
+            return ['current' => [], 'archive' => []];
+        }
+
+        $subjectLookup = collect($subjects)
+            ->filter(fn ($subject) => ! empty($subject['questionnaire_id']) && ! empty($subject['course_id']))
+            ->mapWithKeys(fn ($subject) => [
+                ((int) $subject['questionnaire_id']) . ':' . ((int) $subject['course_id']) => $subject,
+            ]);
+
+        $questionIds = DB::table('evaluation_submissions')
+            ->whereIn('id', $submissionIds->all())
+            ->pluck('answers')
+            ->flatMap(function ($answers) {
+                return collect(json_decode($answers ?? '[]', true) ?: [])
+                    ->pluck('question_id')
+                    ->map(fn ($id) => (int) $id);
+            })
+            ->filter()
+            ->unique()
+            ->values();
+
+        $questionTexts = $questionIds->isNotEmpty() && Schema::hasTable('question')
+            ? DB::table('question')
+                ->whereIn('id', $questionIds->all())
+                ->pluck('description', 'id')
+            : collect();
+
+        $academicYearIds = DB::table('evaluation_submissions')
+            ->whereIn('id', $submissionIds->all())
+            ->pluck('academic_year_id')
+            ->filter()
+            ->unique()
+            ->values();
+        $academicYears = $academicYearIds->isNotEmpty() && Schema::hasTable('academic_year')
+            ? DB::table('academic_year')
+                ->whereIn('id', $academicYearIds->all())
+                ->select('id', 'from_year', 'to_year', 'term')
+                ->get()
+                ->keyBy('id')
+            : collect();
+
+        $activeAcademicYearId = $cycle ? (int) $cycle->id : null;
+        $records = DB::table('evaluation_submissions')
+            ->whereIn('id', $submissionIds->all())
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(function ($row) use ($subjectLookup, $questionTexts, $academicYears) {
+                $answers = collect(json_decode($row->answers ?? '[]', true) ?: [])
+                    ->map(function ($answer) use ($questionTexts) {
+                        $questionId = (int) ($answer['question_id'] ?? 0);
+                        $rating = (int) ($answer['rating'] ?? 0);
+
+                        return [
+                            'question_id' => $questionId,
+                            'question_text' => $questionTexts[$questionId] ?? ('Question #' . $questionId),
+                            'rating' => $rating,
+                        ];
+                    })
+                    ->values();
+
+                $comments = json_decode($row->comments ?? '{}', true) ?: [];
+                $subject = $subjectLookup->get(((int) $row->questionnaire_id) . ':' . ((int) $row->subject_id), []);
+                $academicYear = $academicYears->get((int) $row->academic_year_id);
+                $schoolYear = $academicYear
+                    ? "{$academicYear->from_year}-{$academicYear->to_year}"
+                    : ($subject['school_year'] ?? null);
+                $semesterLabel = $academicYear
+                    ? $this->semesterLabel($academicYear->term)
+                    : (isset($subject['term']) ? $this->semesterLabel($subject['term']) : null);
+                $ratings = $answers->pluck('rating')->filter();
+
+                return [
+                    'submission_id' => (int) $row->id,
+                    'category' => 'teacher_subject',
+                    'course_code' => $subject['course_code'] ?? null,
+                    'course_name' => $subject['course_name'] ?? null,
+                    'evaluatee_name' => $subject['teacher_name'] ?? 'Teacher',
+                    'teacher_name' => $subject['teacher_name'] ?? null,
+                    'questionnaire_id' => $row->questionnaire_id ? (int) $row->questionnaire_id : null,
+                    'academic_year_id' => $row->academic_year_id ? (int) $row->academic_year_id : null,
+                    'school_year' => $schoolYear,
+                    'semester_label' => $semesterLabel,
+                    'archive_group_label' => trim(($schoolYear ?? 'Unknown Academic Year') . ' · ' . ($semesterLabel ?? 'Unknown Term')),
+                    'submitted_at' => $row->created_at,
+                    'overall_average' => $ratings->isNotEmpty() ? round($ratings->avg(), 2) : null,
+                    'answers' => $answers->all(),
+                    'comments' => $comments['text'] ?? null,
+                ];
+            })
+            ->values();
+
+        return [
+            'current' => $records
+                ->filter(fn ($record) => $activeAcademicYearId && (int) $record['academic_year_id'] === $activeAcademicYearId)
+                ->values()
+                ->all(),
+            'archive' => $records
+                ->reject(fn ($record) => $activeAcademicYearId && (int) $record['academic_year_id'] === $activeAcademicYearId)
+                ->values()
+                ->all(),
+        ];
     }
 
     public function evaluateForm(Request $request): Response|RedirectResponse
@@ -445,7 +575,7 @@ class StudentPortalController extends Controller
                     'subj.questionnaire_id',
                     'subj.code as subject_code',
                     'subj.name as subject_name',
-                    DB::raw("TRIM(CONCAT(e.firstname, ' ', COALESCE(e.middlename, ''), ' ', e.lastname)) as teacher_name"),
+                    DB::raw($this->fullNameExpression('e.') . ' as teacher_name'),
                     DB::raw("COALESCE(e.role, 'Teacher') as teacher_role"),
                     DB::raw("'employee' as evaluatee_type")
                 )
@@ -600,7 +730,7 @@ class StudentPortalController extends Controller
             $student,
             (int) $data['academic_year_id'],
             $questionnaireId ?: null,
-            $subjectSection->teacher_employee_id ? (int) $subjectSection->teacher_employee_id : null,
+            $subjectSection->subject_id ? (int) $subjectSection->subject_id : null,
         );
 
         if ($already) {
@@ -621,7 +751,7 @@ class StudentPortalController extends Controller
                     'academic_year_id' => $data['academic_year_id'],
                     'questionnaire_type_id' => $questionnaireTypeId,
                     'questionnaire_id' => $questionnaireId ?: null,
-                    'teacher_id' => $subjectSection->teacher_employee_id,
+                    'subject_id' => $subjectSection->subject_id,
                     'answers' => json_encode($data['answers']),
                     'comments' => json_encode($comments ? ['text' => $comments] : []),
                     'created_at' => now(),
@@ -714,22 +844,29 @@ class StudentPortalController extends Controller
             $cycle &&
             Schema::hasTable('student_enrollments') &&
             Schema::hasTable('subject_sections') &&
-            Schema::hasTable('sections') &&
             Schema::hasTable('subject') &&
             Schema::hasTable('evaluation_submissions')
         ) {
             [$termA, $termB] = $this->termOptions($cycle->term ?? null);
             $schoolYear      = trim("{$cycle->from_year}-{$cycle->to_year}");
+            $sectionNameSelect = Schema::hasTable('sections')
+                ? 'sec.name as section_name'
+                : DB::raw('NULL as section_name');
 
             // My subjects for current cycle (read-only — no evaluate button)
-            $subjects = DB::table('student_enrollments as se')
+            $subjectsQuery = DB::table('student_enrollments as se')
                 ->join('subject_sections as ss', 'ss.id', '=', 'se.subject_section_id')
-                ->join('sections as sec', 'sec.id', '=', 'ss.section_id')
                 ->join('subject as subj', 'subj.id', '=', 'ss.subject_id')
-                ->leftJoin('employee as e', 'e.id', '=', 'ss.teacher_employee_id')
+                ->leftJoin('employee as e', 'e.id', '=', 'ss.teacher_employee_id');
+
+            if (Schema::hasTable('sections')) {
+                $subjectsQuery->leftJoin('sections as sec', 'sec.id', '=', 'ss.section_id');
+            }
+
+            $subjects = $subjectsQuery
                 ->select(
                     'ss.id as section_id',
-                    'sec.name as section_name',
+                    $sectionNameSelect,
                     'ss.school_year',
                     'ss.term',
                     'ss.schedule',
@@ -739,7 +876,7 @@ class StudentPortalController extends Controller
                     'subj.name as course_name',
                     'subj.questionnaire_id',
                     'ss.teacher_employee_id as teacher_id',
-                    DB::raw("TRIM(CONCAT(e.firstname, ' ', COALESCE(e.middlename, ''), ' ', e.lastname)) as teacher_name"),
+                    DB::raw($this->fullNameExpression('e.') . ' as teacher_name'),
                     DB::raw("COALESCE(e.role, 'teacher') as teacher_role")
                 )
                 ->where('se.student_id', $studentId)
@@ -767,18 +904,21 @@ class StudentPortalController extends Controller
                         'questionnaire_id' => $questionnaireId,
                         'semester_label' => $this->semesterLabel($row->term),
                         'already_evaluated' => $alreadyEvaluated,
+                        'is_irregular' => false,
                         'can_evaluate' => ! empty($questionnaireId) && ! empty($row->teacher_name),
                     ]);
                 })
                 ->toArray();
 
-            $evaluations = [];
-            $archive = [];
         }
 
         if (empty($subjects)) {
             $subjects = $this->legacyRegisteredSubjects($student, $cycle);
         }
+
+        $studentEvaluationRecords = $this->studentEvaluationRecords($student, $cycle, $subjects);
+        $evaluations = $studentEvaluationRecords['current'];
+        $archive = $studentEvaluationRecords['archive'];
 
         $evaluationForms = collect($subjects)
             ->filter(fn ($subject) => ! empty($subject['can_evaluate']) && empty($subject['already_evaluated']))

@@ -235,6 +235,7 @@ class StudentEvaluationTest extends TestCase
             'academic_year_id' => $ids['cycle_id'],
             'questionnaire_type_id' => $ids['questionnaire_type_id'],
             'questionnaire_id' => $ids['questionnaire_id'],
+            'subject_id' => $ids['subject_id'],
             'teacher_id' => $ids['teacher_employee_id'],
         ]);
 
@@ -255,6 +256,7 @@ class StudentEvaluationTest extends TestCase
             ->where('academic_year_id', $ids['cycle_id'])
             ->where('questionnaire_type_id', $ids['questionnaire_type_id'])
             ->where('questionnaire_id', $ids['questionnaire_id'])
+            ->where('subject_id', $ids['subject_id'])
             ->where('teacher_id', $ids['teacher_employee_id'])
             ->first();
 
@@ -268,6 +270,52 @@ class StudentEvaluationTest extends TestCase
         );
 
         $this->assertContains((int) $submission->id, $studentSubmissionIds);
+
+        $dashboard = $this->asStudent($ids['student_id'])
+            ->get(route('portal.student.dashboard'));
+
+        $dashboard->assertOk()
+            ->assertSee('Student/Dashboard')
+            ->assertSee('Evaluation Testing')
+            ->assertSee('Terry  Teacher')
+            ->assertSee('Explains lessons clearly')
+            ->assertSee('Strong instruction');
+
+        $oldCycleId = (int) DB::table('academic_year')->insertGetId([
+            'from_year' => 2025,
+            'to_year' => 2026,
+            'term' => '2nd Sem',
+            'is_activated' => 0,
+            'is_deleted' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $oldSubmissionId = (int) DB::table('evaluation_submissions')->insertGetId([
+            'branch_id' => $ids['branch_id'],
+            'academic_year_id' => $oldCycleId,
+            'questionnaire_type_id' => $ids['questionnaire_type_id'],
+            'questionnaire_id' => $ids['questionnaire_id'],
+            'teacher_id' => $ids['teacher_employee_id'],
+            'answers' => json_encode([
+                ['question_id' => 1, 'rating' => 4],
+                ['question_id' => 2, 'rating' => 4],
+            ]),
+            'comments' => json_encode(['text' => 'Older archive record']),
+            'created_at' => now()->subYear(),
+            'updated_at' => now()->subYear(),
+        ]);
+
+        DB::table('student')->where('id', $ids['student_id'])->update([
+            'evaluation_submission_ids' => json_encode([(int) $submission->id, $oldSubmissionId]),
+        ]);
+
+        $this->asStudent($ids['student_id'])
+            ->get(route('portal.student.dashboard'))
+            ->assertOk()
+            ->assertSee('2025-2026')
+            ->assertSee('2nd Semester')
+            ->assertSee('Older archive record');
 
         $secondStudentId = (int) DB::table('student')->insertGetId([
             'code' => 'STU-002',
