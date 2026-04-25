@@ -107,6 +107,7 @@ export default function Branches({ branches, filters }) {
     const [successNotification, setSuccessNotification] = useState(props.flash?.success ?? '');
     const [errorNotification, setErrorNotification] = useState('');
     const [adminEmailTouched, setAdminEmailTouched] = useState(false);
+    const [unlinkAdminTarget, setUnlinkAdminTarget] = useState(null);
 
     const { data, setData, errors, processing, reset, clearErrors } = useForm({
         code: '',
@@ -154,7 +155,26 @@ export default function Branches({ branches, filters }) {
             code: row.code,
             name: row.name,
             highest_department: row.highest_department ?? 'college',
-            department_levels: [],
+            department_levels: (row.departments ?? [])
+                .filter((department) => Boolean(department.is_activated))
+                .map((department) => {
+                    const departmentName = String(department.name ?? '').toLowerCase();
+                    const departmentCode = String(department.code ?? '').toLowerCase();
+
+                    if (departmentName.includes('elementary') || departmentCode.includes('elem')) {
+                        return 'elementary';
+                    }
+
+                    if (departmentName.includes('junior high') || departmentCode.includes('jhs')) {
+                        return 'junior_high';
+                    }
+
+                    if (departmentName.includes('senior high') || departmentCode.includes('shs')) {
+                        return 'senior_high';
+                    }
+
+                    return 'college';
+                }),
             admin_email: '',
             admin_password: '',
             address: row.address ?? '',
@@ -212,10 +232,8 @@ export default function Branches({ branches, filters }) {
             router.put(route('admin.branches') + '/' + editing.id, {
                 code: data.code,
                 name: data.name,
-                highest_department: data.highest_department,
+                department_levels: data.department_levels,
                 address: data.address,
-                is_main: data.is_main,
-                is_active: data.is_active,
             }, {
                 onSuccess: () => { setSlideOpen(false); reset(); },
                 onError: (formErrors) => setErrorNotification(getFirstErrorMessage(formErrors, 'Unable to update branch.')),
@@ -241,6 +259,21 @@ export default function Branches({ branches, filters }) {
         router.delete(route('admin.branches') + '/' + deleteTarget.id, {
             onSuccess: () => setDeleteTarget(null),
             onError: () => setErrorNotification('Unable to delete branch.'),
+        });
+    };
+
+    const confirmUnlinkAdmin = () => {
+        if (!editing || !unlinkAdminTarget) {
+            return;
+        }
+
+        setErrorNotification('');
+        router.delete(route('admin.branches.admins.unlink', [editing.id, unlinkAdminTarget.id]), {
+            onSuccess: () => {
+                setUnlinkAdminTarget(null);
+                setSlideOpen(false);
+            },
+            onError: () => setErrorNotification('Unable to unlink admin account.'),
         });
     };
 
@@ -302,8 +335,21 @@ export default function Branches({ branches, filters }) {
 
             <SlideOver open={slideOpen} onClose={() => setSlideOpen(false)} title={editing ? 'Edit Branch' : 'New Branch'}>
                 <form onSubmit={submit} className="space-y-4">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Branch Setup</p>
+                        <p className="mt-1 text-sm text-slate-600">
+                            {editing ? 'Update the campus branch details and status.' : 'Create a campus branch and prepare its admin access details.'}
+                        </p>
+                    </div>
+
                     <FormField label="Branch Code" error={errors.code} required>
-                        <TextInput value={data.code} onChange={(e) => setData('code', e.target.value)} placeholder="Auto-generated" readOnly={!editing} />
+                        <TextInput
+                            value={data.code}
+                            onChange={(e) => setData('code', e.target.value)}
+                            placeholder="Auto-generated"
+                            readOnly={!editing}
+                            className={!editing ? 'cursor-not-allowed bg-slate-50 text-slate-600' : ''}
+                        />
                     </FormField>
                     <FormField label="Branch Name" error={errors.name} required>
                         <TextInput value={data.name} onChange={(e) => setData('name', e.target.value)} placeholder="Main Campus" />
@@ -311,59 +357,166 @@ export default function Branches({ branches, filters }) {
                     <FormField label="Address" error={errors.address}>
                         <TextInput value={data.address} onChange={(e) => setData('address', e.target.value)} placeholder="Branch address" />
                     </FormField>
-                    {!editing && (
-                        <>
-                            <FormField label="Departments" error={errors.department_levels} required>
-                                <div className="grid grid-cols-2 gap-3 rounded-lg border border-slate-200 bg-white p-3">
-                                    {DEPARTMENT_OPTIONS.map((option) => {
-                                        const checked = (data.department_levels ?? []).includes(option.value);
 
-                                        return (
-                                            <label key={option.value} className="flex items-center gap-2 text-sm text-slate-700">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={checked}
-                                                    onChange={() => toggleDepartmentLevel(option.value)}
-                                                    className="rounded border-slate-300"
-                                                />
-                                                {option.label} Department
-                                            </label>
-                                        );
-                                    })}
+                    {editing ? (
+                        <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-4">
+                            <div>
+                                <p className="text-sm font-medium text-slate-900">Active Departments</p>
+                                <p className="text-xs text-slate-500">Configured departments currently active for this branch.</p>
+                            </div>
+
+                            {(editing.departments ?? []).filter((department) => Boolean(department.is_activated)).length > 0 ? (
+                                <div className="flex flex-wrap gap-2">
+                                    {(editing.departments ?? [])
+                                        .filter((department) => Boolean(department.is_activated))
+                                        .map((department) => (
+                                            <span
+                                                key={department.id}
+                                                className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-700"
+                                            >
+                                                {department.name}
+                                            </span>
+                                        ))}
                                 </div>
-                            </FormField>
-                            <FormField label="Admin Email" error={errors.admin_email} required>
-                                <TextInput
-                                    value={data.admin_email}
-                                    onChange={(e) => {
-                                        setAdminEmailTouched(true);
-                                        setData('admin_email', e.target.value);
-                                    }}
-                                    placeholder="Auto-generated"
-                                />
-                            </FormField>
-                            <FormField label="Admin Password" error={errors.admin_password} required>
-                                <TextInput value={data.admin_password} onChange={(e) => setData('admin_password', e.target.value)} placeholder="Auto-generated" />
-                            </FormField>
-                        </>
+                            ) : (
+                                <div className="rounded-lg border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-500">
+                                    No active departments configured for this branch yet.
+                                </div>
+                            )}
+
+                            <button
+                                type="button"
+                                onClick={() => router.get(route('admin.departments'), { branch_id: editing.id })}
+                                className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                            >
+                                Configure Departments
+                            </button>
+                        </div>
+                    ) : (
+                        <FormField label="Departments" error={errors.department_levels} required>
+                            <div className="grid grid-cols-2 gap-3 rounded-lg border border-slate-200 bg-white p-3">
+                                {DEPARTMENT_OPTIONS.map((option) => {
+                                    const checked = (data.department_levels ?? []).includes(option.value);
+
+                                    return (
+                                        <label key={option.value} className="flex items-center gap-2 text-sm text-slate-700">
+                                            <input
+                                                type="checkbox"
+                                                checked={checked}
+                                                onChange={() => toggleDepartmentLevel(option.value)}
+                                                className="rounded border-slate-300"
+                                            />
+                                            {option.label} Department
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        </FormField>
                     )}
-                    {editing && (
+
+                    {!editing && (
                         <FormField label="Highest Department" error={errors.highest_department}>
                             <SelectInput value={data.highest_department} onChange={(e) => setData('highest_department', e.target.value)}>
                                 {DEPARTMENT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                             </SelectInput>
                         </FormField>
                     )}
-                    <div className="flex items-center gap-3">
-                        <label className="flex items-center gap-2 text-sm text-slate-700">
-                            <input type="checkbox" checked={data.is_main} onChange={(e) => setData('is_main', e.target.checked)} className="rounded border-slate-300" />
-                            Main Campus
-                        </label>
-                        <label className="flex items-center gap-2 text-sm text-slate-700">
-                            <input type="checkbox" checked={data.is_active} onChange={(e) => setData('is_active', e.target.checked)} className="rounded border-slate-300" />
-                            Active
-                        </label>
+
+                    <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-4">
+                        <div>
+                            <p className="text-sm font-medium text-slate-900">{editing ? 'Linked Admin Accounts' : 'Branch Admin Access'}</p>
+                            <p className="text-xs text-slate-500">
+                                {editing ? 'Manage the admin accounts currently linked to this branch.' : 'These details will be used for the branch admin account.'}
+                            </p>
+                        </div>
+
+                        {editing ? (
+                            <div className="space-y-3">
+                                {(editing.admins ?? []).length > 0 ? (
+                                    editing.admins.map((admin) => (
+                                        <div key={admin.id} className="rounded-lg border border-slate-200 px-4 py-3">
+                                            <div className="flex items-start justify-between gap-4">
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-medium text-slate-900">{admin.name}</p>
+                                                    <p className="mt-1 text-xs text-slate-500">{admin.email}</p>
+                                                    <div className="mt-2 flex items-center gap-2">
+                                                        <span className="inline-flex rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                                                            {admin.role}
+                                                        </span>
+                                                        <StatusBadge active={Boolean(admin.is_activated)} />
+                                                    </div>
+                                                </div>
+                                                <div className="flex shrink-0 gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => router.get(route('admin.admin-users'), { search: admin.email, edit_id: admin.id })}
+                                                        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                                                    >
+                                                        Edit
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setUnlinkAdminTarget(admin)}
+                                                        className="rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50"
+                                                    >
+                                                        Unlink
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="rounded-lg border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-500">
+                                        No admin accounts are linked to this branch yet.
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <>
+                                <FormField label="Admin Email" error={errors.admin_email} required={!editing}>
+                                    <TextInput
+                                        value={data.admin_email}
+                                        onChange={(e) => {
+                                            if (editing) {
+                                                return;
+                                            }
+
+                                            setAdminEmailTouched(true);
+                                            setData('admin_email', e.target.value);
+                                        }}
+                                        placeholder="Auto-generated"
+                                        readOnly={editing}
+                                        className={editing ? 'cursor-not-allowed bg-slate-50 text-slate-600' : ''}
+                                    />
+                                </FormField>
+                                <FormField label="Admin Password" error={errors.admin_password} required={!editing}>
+                                    <TextInput
+                                        value={data.admin_password}
+                                        onChange={(e) => !editing && setData('admin_password', e.target.value)}
+                                        placeholder={editing ? 'Hidden for existing branch admin' : 'Auto-generated'}
+                                        readOnly={editing}
+                                        className={editing ? 'cursor-not-allowed bg-slate-50 text-slate-600' : ''}
+                                    />
+                                </FormField>
+                            </>
+                        )}
                     </div>
+
+                    {!editing && (
+                        <div className="rounded-xl border border-slate-200 bg-white p-4">
+                            <div className="flex items-center gap-6">
+                                <label className="flex items-center gap-2 text-sm text-slate-700">
+                                    <input type="checkbox" checked={data.is_main} onChange={(e) => setData('is_main', e.target.checked)} className="rounded border-slate-300" />
+                                    Main Campus
+                                </label>
+                                <label className="flex items-center gap-2 text-sm text-slate-700">
+                                    <input type="checkbox" checked={data.is_active} onChange={(e) => setData('is_active', e.target.checked)} className="rounded border-slate-300" />
+                                    Active
+                                </label>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="flex gap-3 pt-2">
                         <button type="button" onClick={() => setSlideOpen(false)} className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
                         <SubmitButton processing={processing} className="flex-1">
@@ -379,6 +532,13 @@ export default function Branches({ branches, filters }) {
                 onCancel={() => setDeleteTarget(null)}
                 title="Delete Branch"
                 message={`Are you sure you want to delete "${deleteTarget?.name}"? This cannot be undone.`}
+            />
+            <ConfirmDialog
+                open={Boolean(unlinkAdminTarget)}
+                onConfirm={confirmUnlinkAdmin}
+                onCancel={() => setUnlinkAdminTarget(null)}
+                title="Unlink Admin Account"
+                message={`Unlink admin "${unlinkAdminTarget?.name}" from this branch?`}
             />
         </AdminLayout>
     );

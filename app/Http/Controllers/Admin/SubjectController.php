@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\Department;
 use App\Models\Program;
+use App\Models\Strand;
 use App\Models\Subject;
 use App\Models\Teacher;
 use Illuminate\Http\Request;
@@ -22,6 +23,7 @@ class SubjectController extends Controller
         $scopedId = $this->scopedBranchId();
         $requestedBranchId = $request->integer('branch_id');
         $programId = $request->integer('program_id');
+        $strandId = $request->integer('strand_id');
         $isGenEd = $request->input('is_gened');
 
         $typeMap = [
@@ -63,6 +65,7 @@ class SubjectController extends Controller
             ->where('type', $subjectType)
             ->when($selectedBranchId, fn ($q) => $q->whereHas('department', fn ($department) => $department->where('branch_id', $selectedBranchId)))
             ->when($subjectType === 'college' && $programId, fn ($q) => $q->where('program_id', $programId))
+            ->when($subjectType === 'shs' && $strandId, fn ($q) => $q->where('strand_id', $strandId))
             ->when($isGenEd !== null && $isGenEd !== '', fn ($q) => $q->where('is_gened', (int) $isGenEd))
             ->when($search, function ($q) use ($search) {
                 $q->where(function ($query) use ($search) {
@@ -120,6 +123,7 @@ class SubjectController extends Controller
                 'search' => $search,
                 'branch_id' => $selectedBranchId,
                 'program_id' => $subjectType === 'college' ? $programId : null,
+                'strand_id' => $subjectType === 'shs' ? $strandId : null,
                 'is_gened' => $isGenEd,
             ],
             'educationType' => $educationType,
@@ -148,7 +152,16 @@ class SubjectController extends Controller
                 ))
                 ->orderBy('name')
                 ->get(),
-            'strands' => [],
+            'strands' => Strand::query()
+                ->select('id', 'name', 'department_id')
+                ->where('is_deleted', 0)
+                ->when($subjectType === 'shs', fn ($q) => $q->whereHas('department', fn ($department) => $department
+                    ->where('is_deleted', 0)
+                    ->where('is_activated', 1)
+                    ->when($scopedId, fn ($branchQuery) => $branchQuery->where('branch_id', $scopedId))
+                ))
+                ->orderBy('name')
+                ->get(),
             'teachers' => $teachers->values(),
         ]);
     }
@@ -204,8 +217,6 @@ class SubjectController extends Controller
             $validated['branch_id'] = $scopedId;
         }
 
-        $validated['strand_id'] = null;
-
         if ($validated['type'] === 'college') {
             if (empty($validated['program_id'])) {
                 throw ValidationException::withMessages([
@@ -226,8 +237,30 @@ class SubjectController extends Controller
             }
 
             $validated['department_id'] = $program->department_id;
+            $validated['strand_id'] = null;
+        } elseif ($validated['type'] === 'shs') {
+            $validated['program_id'] = null;
+            $validated['department_id'] = $this->resolveDepartmentIdForEducationType((int) $validated['branch_id'], $validated['type']);
+
+            if (empty($validated['strand_id'])) {
+                throw ValidationException::withMessages([
+                    'strand_id' => 'The selected strand is required.',
+                ]);
+            }
+
+            $strand = Strand::query()
+                ->where('id', $validated['strand_id'])
+                ->where('is_deleted', 0)
+                ->firstOrFail();
+
+            if ((int) $strand->department_id !== (int) $validated['department_id']) {
+                throw ValidationException::withMessages([
+                    'strand_id' => 'The selected strand must belong to the chosen branch.',
+                ]);
+            }
         } else {
             $validated['program_id'] = null;
+            $validated['strand_id'] = null;
             $validated['department_id'] = $this->resolveDepartmentIdForEducationType((int) $validated['branch_id'], $validated['type']);
         }
 

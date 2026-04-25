@@ -34,6 +34,7 @@ class ProgramController extends Controller
         $search = $request->input('search', '');
         $scopedId = $this->scopedBranchId();
         $requestedBranchId = $request->integer('branch_id');
+        $durationYears = $request->integer('duration_years');
         $programNameOptions = $this->programNameOptions();
 
         $branches = Branch::query()
@@ -63,6 +64,7 @@ class ProgramController extends Controller
             ])
             ->where('is_deleted', 0)
             ->when($selectedBranchId, fn ($q) => $q->whereHas('department', fn ($department) => $department->where('branch_id', $selectedBranchId)))
+            ->when($durationYears, fn ($q) => $q->where('duration_years', $durationYears))
             ->when($search, fn ($q) => $q->where('name', 'like', "%{$search}%"))
             ->orderBy('name')
             ->paginate(15)
@@ -109,11 +111,19 @@ class ProgramController extends Controller
 
         return Inertia::render('Admin/Programs', [
             'programs' => $programs,
-            'filters' => ['search' => $search, 'branch_id' => $selectedBranchId],
+            'filters' => ['search' => $search, 'branch_id' => $selectedBranchId, 'duration_years' => $durationYears],
             'branches' => $branches,
             'departments' => $departments,
             'chairs' => $chairs,
             'programNameOptions' => $programNameOptions,
+            'durationYearOptions' => Program::query()
+                ->where('is_deleted', 0)
+                ->select('duration_years')
+                ->distinct()
+                ->orderBy('duration_years')
+                ->pluck('duration_years')
+                ->filter()
+                ->values(),
             'isBranchAdmin' => $this->isBranchAdmin(),
             'scopedBranchId' => $scopedId,
             'selectedBranchId' => $selectedBranchId,

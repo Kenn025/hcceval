@@ -11,13 +11,14 @@ class EducationLevel extends Model
     protected $table = 'education_level';
 
     protected $fillable = [
-        'code', 'department_id', 'program_id', 'year_level', 'section',
-        'teacher_id', 'subject_id', 'is_activated', 'is_deleted',
+        'code', 'department_id', 'program_id', 'strand_id', 'year_level', 'section',
+        'teacher_id', 'subject_id', 'subject_teacher_map', 'is_activated', 'is_deleted',
     ];
 
     protected $casts = [
         'teacher_id' => 'array',
         'subject_id' => 'array',
+        'subject_teacher_map' => 'array',
         'is_activated' => 'boolean',
         'is_deleted' => 'boolean',
     ];
@@ -30,6 +31,11 @@ class EducationLevel extends Model
     public function program(): BelongsTo
     {
         return $this->belongsTo(Program::class);
+    }
+
+    public function strand(): BelongsTo
+    {
+        return $this->belongsTo(Strand::class);
     }
 
     public function departments(): HasMany

@@ -7,6 +7,8 @@ use App\Models\Branch;
 use App\Models\Department;
 use App\Models\EducationLevel;
 use App\Models\Program;
+use App\Models\Strand;
+use App\Models\Subject;
 use App\Models\Teacher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -16,11 +18,20 @@ use Inertia\Inertia;
 
 class YearLevelController extends Controller
 {
+    private const SUBJECT_TYPE_MAP = [
+        'college' => 'college',
+        'senior-high' => 'shs',
+        'junior-high' => 'jhs',
+        'grade-school' => 'elementary',
+    ];
+
     public function index(Request $request, string $educationType = 'college')
     {
         $search = $request->input('search', '');
         $scopedId = $this->scopedBranchId();
         $requestedBranchId = $request->integer('branch_id');
+        $selectedProgramId = $request->integer('program_id');
+        $selectedYearLevel = $request->input('year_level');
 
         $levelMap = [
             'college' => 'College',
@@ -30,6 +41,7 @@ class YearLevelController extends Controller
         ];
 
         $levelName = $levelMap[$educationType] ?? 'College';
+        $subjectType = self::SUBJECT_TYPE_MAP[$educationType] ?? 'college';
         $departmentFilter = match ($educationType) {
             'college' => fn ($query) => $query->where('name', 'like', '%College%')->orWhere('code', 'like', '%COL%'),
             'senior-high' => fn ($query) => $query->where('name', 'like', '%Senior High%')->orWhere('code', 'like', '%SHS%'),
@@ -56,10 +68,12 @@ class YearLevelController extends Controller
             ?? ($branches->contains('id', $requestedBranchId) ? $requestedBranchId : $branches->first()?->id);
 
         $yearLevels = EducationLevel::query()
-            ->with(['department:id,name,branch_id', 'department.branch:id,name', 'program:id,name'])
+            ->with(['department:id,name,branch_id', 'department.branch:id,name', 'program:id,name', 'strand:id,name'])
             ->where('is_deleted', 0)
             ->when($educationType === 'college', fn ($q) => $q->whereNotNull('program_id'))
             ->when($educationType !== 'college', fn ($q) => $q->whereNull('program_id'))
+            ->when($selectedProgramId && $educationType === 'college', fn ($q) => $q->where('program_id', $selectedProgramId))
+            ->when($selectedYearLevel, fn ($q) => $q->where('year_level', $selectedYearLevel))
             ->when($search, function ($q) use ($search) {
                 $q->where(function ($query) use ($search) {
                     $query->where('year_level', 'like', "%{$search}%")
@@ -75,6 +89,7 @@ class YearLevelController extends Controller
         $yearLevels->getCollection()->transform(function (EducationLevel $level) {
             $level->display_name = $this->displayName($level->year_level, $level->section, $level->program_id !== null);
             $level->adviser_teacher_id = data_get($level->teacher_id, '0');
+            $level->subject_teacher_map = is_array($level->subject_teacher_map) ? $level->subject_teacher_map : [];
 
             return $level;
         });
@@ -97,7 +112,12 @@ class YearLevelController extends Controller
 
         return Inertia::render('Admin/YearLevels', [
             'yearLevels' => $yearLevels,
-            'filters' => ['search' => $search, 'branch_id' => $selectedBranchId],
+            'filters' => [
+                'search' => $search,
+                'branch_id' => $selectedBranchId,
+                'program_id' => $selectedProgramId,
+                'year_level' => $selectedYearLevel,
+            ],
             'educationType' => $educationType,
             'educationLevelName' => $levelName,
             'branches' => $branches,
@@ -128,6 +148,42 @@ class YearLevelController extends Controller
                     'name' => $program->name,
                     'department_id' => $program->department_id,
                     'branch_id' => $program->department?->branch_id,
+                ]),
+            'strands' => Strand::query()
+                ->select('id', 'name', 'department_id')
+                ->where('is_deleted', 0)
+                ->whereHas('department', fn ($q) => $q
+                    ->where('is_deleted', 0)
+                    ->where('is_activated', 1)
+                    ->when($scopedId, fn ($branchQuery) => $branchQuery->where('branch_id', $scopedId))
+                    ->where(function ($departmentQuery) {
+                        $departmentQuery->where('name', 'like', '%Senior High%')
+                            ->orWhere('code', 'like', '%SHS%');
+                    }))
+                ->orderBy('name')
+                ->get(),
+            'subjects' => Subject::query()
+                ->select('id', 'name', 'code', 'department_id', 'program_id', 'strand_id', 'teacher_id')
+                ->with('department:id,branch_id')
+                ->where('is_deleted', 0)
+                ->where('is_activated', 1)
+                ->where('type', $subjectType)
+                ->when($scopedId, fn ($q) => $q->whereHas('department', fn ($department) => $department->where('branch_id', $scopedId)))
+                ->orderBy('name')
+                ->get()
+                ->map(fn (Subject $subject) => [
+                    'id' => $subject->id,
+                    'name' => $subject->name,
+                    'code' => $subject->code,
+                    'department_id' => $subject->department_id,
+                    'program_id' => $subject->program_id,
+                    'strand_id' => $subject->strand_id,
+                    'branch_id' => $subject->department?->branch_id,
+                    'teacher_ids' => collect($subject->teacher_id ?? [])
+                        ->filter()
+                        ->map(fn ($id) => (int) $id)
+                        ->values()
+                        ->all(),
                 ]),
             'advisers' => $advisers,
         ]);
@@ -172,12 +228,18 @@ class YearLevelController extends Controller
             ],
             'department_id' => 'nullable|exists:department,id',
             'program_id' => 'nullable|exists:program,id',
+            'strand_id' => 'nullable|exists:strand,id',
             'adviser_teacher_id' => 'nullable|exists:teacher,id',
+            'subject_ids' => 'nullable|array',
+            'subject_ids.*' => 'integer|exists:subject,id',
+            'subject_teacher_ids' => 'nullable|array',
             'year_level' => 'required|string|max:50',
             'section' => 'required|string|max:50',
         ]);
 
         $isCollege = ($validated['education_type'] ?? null) === 'college';
+        $isSeniorHigh = ($validated['education_type'] ?? null) === 'senior-high';
+        $subjectType = self::SUBJECT_TYPE_MAP[$validated['education_type'] ?? 'college'] ?? 'college';
 
         if ($scopedId !== null) {
             $validated['branch_id'] = $scopedId;
@@ -196,9 +258,127 @@ class YearLevelController extends Controller
                 ->firstOrFail();
 
             $validated['department_id'] = $program->department_id;
-        } else {
+            $validated['strand_id'] = null;
+
+            $validated['subject_id'] = collect($validated['subject_ids'] ?? [])
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+            $validated['subject_teacher_map'] = [];
+
+            $subjectTeacherIds = collect($validated['subject_teacher_ids'] ?? [])
+                ->mapWithKeys(fn ($teacherId, $subjectId) => [(int) $subjectId => $teacherId ? (int) $teacherId : null]);
+
+            foreach ($validated['subject_id'] as $subjectId) {
+                $subject = Subject::query()
+                    ->where('id', $subjectId)
+                    ->where('is_deleted', 0)
+                    ->where('is_activated', 1)
+                    ->where('type', 'college')
+                    ->firstOrFail();
+
+                if ((int) $subject->department_id !== (int) $validated['department_id'] || (int) ($subject->program_id ?? 0) !== (int) $validated['program_id']) {
+                    throw ValidationException::withMessages([
+                        'subject_ids' => 'Selected subjects must match the chosen program.',
+                    ]);
+                }
+
+                $assignedTeacherId = $subjectTeacherIds->get($subjectId);
+
+                if ($assignedTeacherId !== null) {
+                    $availableTeacherIds = collect($subject->teacher_id ?? [])
+                        ->filter()
+                        ->map(fn ($id) => (int) $id)
+                        ->values()
+                        ->all();
+
+                    if (! in_array($assignedTeacherId, $availableTeacherIds, true)) {
+                        throw ValidationException::withMessages([
+                            'subject_teacher_ids' => 'Selected subject teachers must come from the teachers assigned to each subject.',
+                        ]);
+                    }
+
+                    $validated['subject_teacher_map'][(string) $subjectId] = $assignedTeacherId;
+                }
+            }
+        } elseif ($isSeniorHigh) {
             $validated['program_id'] = null;
             $validated['department_id'] = $this->resolveDepartmentIdForEducationType((int) $validated['branch_id'], (string) ($validated['education_type'] ?? ''));
+
+            if (empty($validated['strand_id'])) {
+                throw ValidationException::withMessages([
+                    'strand_id' => 'The selected strand is required.',
+                ]);
+            }
+
+            $strand = Strand::query()
+                ->where('id', $validated['strand_id'])
+                ->where('is_deleted', 0)
+                ->firstOrFail();
+
+            if ((int) $strand->department_id !== (int) $validated['department_id']) {
+                throw ValidationException::withMessages([
+                    'strand_id' => 'The selected strand must belong to the senior high department of the chosen branch.',
+                ]);
+            }
+
+            $validated['subject_id'] = collect($validated['subject_ids'] ?? [])
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+            $validated['subject_teacher_map'] = [];
+
+            $subjectTeacherIds = collect($validated['subject_teacher_ids'] ?? [])
+                ->mapWithKeys(fn ($teacherId, $subjectId) => [(int) $subjectId => $teacherId ? (int) $teacherId : null]);
+
+            foreach ($validated['subject_id'] as $subjectId) {
+                $subject = Subject::query()
+                    ->where('id', $subjectId)
+                    ->where('is_deleted', 0)
+                    ->where('is_activated', 1)
+                    ->where('type', $subjectType)
+                    ->firstOrFail();
+
+                if ((int) $subject->department_id !== (int) $validated['department_id']) {
+                    throw ValidationException::withMessages([
+                        'subject_ids' => 'Selected subjects must belong to the senior high department.',
+                    ]);
+                }
+
+                if ((int) ($subject->strand_id ?? 0) !== (int) $validated['strand_id']) {
+                    throw ValidationException::withMessages([
+                        'subject_ids' => 'Selected subjects must match the chosen strand.',
+                    ]);
+                }
+
+                $assignedTeacherId = $subjectTeacherIds->get($subjectId);
+
+                if ($assignedTeacherId !== null) {
+                    $availableTeacherIds = collect($subject->teacher_id ?? [])
+                        ->filter()
+                        ->map(fn ($id) => (int) $id)
+                        ->values()
+                        ->all();
+
+                    if (! in_array($assignedTeacherId, $availableTeacherIds, true)) {
+                        throw ValidationException::withMessages([
+                            'subject_teacher_ids' => 'Selected subject teachers must come from the teachers assigned to each subject.',
+                        ]);
+                    }
+
+                    $validated['subject_teacher_map'][(string) $subjectId] = $assignedTeacherId;
+                }
+            }
+        } else {
+            $validated['program_id'] = null;
+            $validated['strand_id'] = null;
+            $validated['department_id'] = $this->resolveDepartmentIdForEducationType((int) $validated['branch_id'], (string) ($validated['education_type'] ?? ''));
+            $validated['subject_id'] = $yearLevel?->subject_id ?? [];
+            $validated['subject_teacher_map'] = $yearLevel?->subject_teacher_map ?? [];
         }
 
         if (empty($validated['department_id'])) {
@@ -236,6 +416,12 @@ class YearLevelController extends Controller
                 ]);
             }
 
+            if (! empty($validated['strand_id']) && ! in_array((int) $adviser->strand_id, [null, 0, (int) $validated['strand_id']], true)) {
+                throw ValidationException::withMessages([
+                    'adviser_teacher_id' => 'The selected adviser must match the chosen strand.',
+                ]);
+            }
+
             if (! empty($validated['program_id']) && ! in_array((int) $adviser->program_id, [null, 0, (int) $validated['program_id']], true)) {
                 throw ValidationException::withMessages([
                     'adviser_teacher_id' => 'The selected adviser must match the chosen program.',
@@ -246,10 +432,11 @@ class YearLevelController extends Controller
         $validated['teacher_id'] = ! empty($validated['adviser_teacher_id'])
             ? [(int) $validated['adviser_teacher_id']]
             : ($yearLevel?->teacher_id ?? []);
-        $validated['subject_id'] = $yearLevel?->subject_id ?? [];
         $validated['is_activated'] = $yearLevel?->is_activated ?? 1;
         $validated['is_deleted'] = 0;
         unset($validated['education_type'], $validated['adviser_teacher_id']);
+        unset($validated['subject_ids']);
+        unset($validated['subject_teacher_ids']);
         unset($validated['branch_id']);
 
         return $validated;

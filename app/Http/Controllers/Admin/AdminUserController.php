@@ -14,6 +14,7 @@ class AdminUserController extends Controller
     public function index(Request $request)
     {
         $search = $request->input('search', '');
+        $editId = $request->input('edit_id');
 
         $admins = Admin::query()
             ->with(['branch:id,name'])
@@ -32,7 +33,7 @@ class AdminUserController extends Controller
 
         return Inertia::render('Admin/AdminUsers', [
             'admins'   => $admins,
-            'filters'  => ['search' => $search],
+            'filters'  => ['search' => $search, 'edit_id' => $editId],
             'branches' => Branch::query()
                 ->select('id', 'name', 'code')
                 ->where('is_deleted', 0)

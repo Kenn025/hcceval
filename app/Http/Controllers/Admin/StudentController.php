@@ -32,7 +32,7 @@ class StudentController extends Controller
             ->get();
 
         $students = Student::query()
-            ->with(['branch:id,name', 'department:id,name', 'program:id,name', 'strand:id,name', 'yearLevel:id,year_level,section', 'irregSubject:id,code,name'])
+            ->with(['branch:id,name', 'department:id,name', 'program:id,name', 'strand:id,name', 'yearLevel:id,year_level,section,strand_id', 'irregSubject:id,code,name'])
             ->where('is_deleted', 0)
             ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
             ->when($departmentId, fn ($q) => $q->where('department_id', $departmentId))
@@ -77,7 +77,7 @@ class StudentController extends Controller
                 ->orderBy('name')
                 ->get(),
             'yearLevels'  => EducationLevel::query()
-                ->select('id', 'department_id', 'program_id', 'subject_id', 'year_level', 'section')
+                ->select('id', 'department_id', 'program_id', 'strand_id', 'subject_id', 'year_level', 'section')
                 ->selectRaw("CONCAT(year_level, ' - ', section) as name")
                 ->where('is_deleted', 0)
                 ->when($scopedId, fn ($q) => $q->whereHas('department', fn ($department) => $department->where('branch_id', $scopedId)))
