@@ -233,6 +233,8 @@ Route::prefix('portal')->name('portal.')->group(function () {
     // Teacher / faculty portal
     Route::middleware('teacher.auth')->group(function () {
         Route::get('/teacher', [TeacherPortalController::class, 'dashboard'])->name('teacher.dashboard');
+        Route::get('/teacher/evaluate', [TeacherPortalController::class, 'evaluateForm'])->name('teacher.evaluate');
+        Route::post('/teacher/evaluate', [TeacherPortalController::class, 'submitEvaluation'])->name('teacher.evaluate.submit');
     });
 
     // Employee portal

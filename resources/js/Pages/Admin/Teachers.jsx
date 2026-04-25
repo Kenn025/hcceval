@@ -17,6 +17,39 @@ const buildTeacherCode = (branch, nextTeacherCodes = {}) => {
     return nextTeacherCodes[String(branch.id)] ?? `TCH-${String(branch.code).replace(/[^A-Za-z0-9]/g, '').toUpperCase()}-00001`;
 };
 
+const getProgramStrandLabel = (row) => {
+    const departmentName = String(row.department?.name ?? '').toLowerCase();
+
+    if (departmentName.includes('junior high') || departmentName.includes('elementary')) {
+        return 'N/A';
+    }
+
+    return row.program?.name ?? row.strand?.name ?? '-';
+};
+
+const getDepartmentType = (department) => {
+    const departmentName = String(department?.name ?? '').toLowerCase();
+    const departmentCode = String(department?.code ?? '').toLowerCase();
+
+    if (departmentName.includes('college') || departmentCode.includes('col')) {
+        return 'college';
+    }
+
+    if (departmentName.includes('senior high') || departmentCode.includes('shs')) {
+        return 'senior-high';
+    }
+
+    if (departmentName.includes('junior high') || departmentCode.includes('jhs')) {
+        return 'junior-high';
+    }
+
+    if (departmentName.includes('elementary') || departmentCode.includes('elem')) {
+        return 'elementary';
+    }
+
+    return null;
+};
+
 export default function Teachers({ teachers, filters, branches, departments, programs, strands, nextTeacherCodes, isBranchAdmin, selectedBranchId, scopedBranchId }) {
     const [slideOpen, setSlideOpen] = useState(false);
     const [detailOpen, setDetailOpen] = useState(false);
@@ -60,6 +93,22 @@ export default function Teachers({ teachers, filters, branches, departments, pro
         )),
         [departments, filters.branch_id],
     );
+    const selectedDepartment = useMemo(
+        () => filteredDepartments.find((department) => String(department.id) === String(data.department_id)),
+        [data.department_id, filteredDepartments],
+    );
+    const selectedDepartmentType = useMemo(
+        () => getDepartmentType(selectedDepartment),
+        [selectedDepartment],
+    );
+    const filteredPrograms = useMemo(
+        () => programs.filter((program) => String(program.department_id) === String(data.department_id)),
+        [data.department_id, programs],
+    );
+    const filteredStrands = useMemo(
+        () => strands.filter((strand) => String(strand.department_id) === String(data.department_id)),
+        [data.department_id, strands],
+    );
     const generatedTeacherCode = editing ? data.employee_no : buildTeacherCode(selectedBranch, nextTeacherCodes);
 
     useEffect(() => {
@@ -73,6 +122,28 @@ export default function Teachers({ teachers, filters, branches, departments, pro
             setData('department_id', '');
         }
     }, [data.department_id, filteredDepartments, setData]);
+
+    useEffect(() => {
+        if (data.program_id && !filteredPrograms.some((program) => String(program.id) === String(data.program_id))) {
+            setData('program_id', '');
+        }
+    }, [data.program_id, filteredPrograms, setData]);
+
+    useEffect(() => {
+        if (data.strand_id && !filteredStrands.some((strand) => String(strand.id) === String(data.strand_id))) {
+            setData('strand_id', '');
+        }
+    }, [data.strand_id, filteredStrands, setData]);
+
+    useEffect(() => {
+        if (selectedDepartmentType !== 'college' && data.program_id) {
+            setData('program_id', '');
+        }
+
+        if (selectedDepartmentType !== 'senior-high' && data.strand_id) {
+            setData('strand_id', '');
+        }
+    }, [data.program_id, data.strand_id, selectedDepartmentType, setData]);
 
     const handleBranchChange = (branchId) => {
         setData('branch_id', branchId);
@@ -163,6 +234,7 @@ export default function Teachers({ teachers, filters, branches, departments, pro
         { key: 'full_name', label: 'Full Name', render: (row) => `${row.last_name}, ${row.first_name} ${row.middle_name ?? ''}`.trim() },
         { key: 'branch', label: 'Branch', render: (row) => row.branch?.name ?? '-' },
         { key: 'department', label: 'Department', render: (row) => row.department?.name ?? '-' },
+        { key: 'program_strand', label: 'Program / Strand', render: (row) => getProgramStrandLabel(row) },
         { key: 'role', label: 'Role' },
         { key: 'is_active', label: 'Status', render: (row) => <StatusBadge active={row.is_active} /> },
     ];
@@ -277,8 +349,8 @@ export default function Teachers({ teachers, filters, branches, departments, pro
                                 <p className="mt-1 text-sm text-slate-900">{viewing.department?.name ?? '-'}</p>
                             </div>
                             <div>
-                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Program</p>
-                                <p className="mt-1 text-sm text-slate-900">{viewing.program?.name ?? '-'}</p>
+                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Program / Strand</p>
+                                <p className="mt-1 text-sm text-slate-900">{getProgramStrandLabel(viewing)}</p>
                             </div>
                             <div>
                                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Role</p>
@@ -333,13 +405,41 @@ export default function Teachers({ teachers, filters, branches, departments, pro
                     <FormField label="Department" error={errors.department_id}>
                         <SelectInput
                             value={data.department_id}
-                            onChange={(e) => setData('department_id', e.target.value)}
+                            onChange={(e) => {
+                                setData('department_id', e.target.value);
+                                setData('program_id', '');
+                                setData('strand_id', '');
+                            }}
                             disabled={!data.branch_id}
                         >
                             <option value="">{data.branch_id ? 'Select department...' : 'Select branch first...'}</option>
                             {filteredDepartments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
                         </SelectInput>
                     </FormField>
+                    {selectedDepartmentType === 'college' && (
+                        <FormField label="Program" error={errors.program_id}>
+                            <SelectInput
+                                value={data.program_id}
+                                onChange={(e) => setData('program_id', e.target.value)}
+                                disabled={!data.department_id}
+                            >
+                                <option value="">Select program...</option>
+                                {filteredPrograms.map((program) => <option key={program.id} value={program.id}>{program.name}</option>)}
+                            </SelectInput>
+                        </FormField>
+                    )}
+                    {selectedDepartmentType === 'senior-high' && (
+                        <FormField label="Strand" error={errors.strand_id}>
+                            <SelectInput
+                                value={data.strand_id}
+                                onChange={(e) => setData('strand_id', e.target.value)}
+                                disabled={!data.department_id}
+                            >
+                                <option value="">Select strand...</option>
+                                {filteredStrands.map((strand) => <option key={strand.id} value={strand.id}>{strand.name}</option>)}
+                            </SelectInput>
+                        </FormField>
+                    )}
                     <FormField label="Role" error={errors.role}>
                         <SelectInput value={data.role} onChange={(e) => setData('role', e.target.value)}>
                             <option value="Teacher">Teacher</option>
