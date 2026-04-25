@@ -1,3 +1,4 @@
+import ConfirmDialog from '@/Components/ConfirmDialog';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { router } from '@inertiajs/react';
 import { useState } from 'react';
@@ -30,15 +31,21 @@ function AwardGroup({ title, items }) {
 
 export default function OutstandingAwards({ awards = [], filters, schoolYears }) {
     const [selectedYear, setSelectedYear] = useState(filters?.school_year ?? '');
+    const [confirmOpen, setConfirmOpen]   = useState(false);
+    const [recomputing, setRecomputing]   = useState(false);
 
     const filterYear = (y) => {
         setSelectedYear(y);
         router.get(route('admin.outstanding-awards'), { school_year: y }, { preserveState: true, replace: true });
     };
 
-    const recompute = () => {
-        if (!confirm('Recompute outstanding awards from current ratings?')) return;
-        router.post(route('admin.outstanding-awards.recompute'));
+    const recompute = () => setConfirmOpen(true);
+
+    const doRecompute = () => {
+        setRecomputing(true);
+        router.post(route('admin.outstanding-awards.recompute'), {}, {
+            onFinish: () => { setRecomputing(false); setConfirmOpen(false); },
+        });
     };
 
     return (
@@ -93,6 +100,17 @@ export default function OutstandingAwards({ awards = [], filters, schoolYears })
                     ))}
                 </div>
             )}
+
+            <ConfirmDialog
+                open={confirmOpen}
+                title="Recompute outstanding awards?"
+                message="This regenerates the top performers across all branches using current evaluation ratings, replacing the previous results. This action cannot be undone."
+                confirmLabel="Recompute"
+                tone="warning"
+                loading={recomputing}
+                onConfirm={doRecompute}
+                onCancel={() => setConfirmOpen(false)}
+            />
         </AdminLayout>
     );
 }

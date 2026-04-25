@@ -444,11 +444,11 @@ export default function Students({
     };
 
     const filterActions = (
-        <div className="flex items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 md:w-auto">
             <SelectInput
                 value={selectedFilterDepartmentId}
                 onChange={(e) => changeDepartmentFilter(e.target.value)}
-                className="w-56"
+                className="w-full md:w-56"
             >
                 <option value="">All departments</option>
                 {filterDepartments.map((department) => (
@@ -459,7 +459,7 @@ export default function Students({
                 value={selectedFilterProgramId}
                 onChange={(e) => changeProgramFilter(e.target.value)}
                 disabled={!selectedFilterDepartmentId}
-                className="w-56"
+                className="w-full md:w-56"
             >
                 <option value="">All programs</option>
                 {filterPrograms.map((program) => (

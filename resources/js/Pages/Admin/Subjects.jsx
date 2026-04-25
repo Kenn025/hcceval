@@ -375,8 +375,8 @@ export default function Subjects({
                 onEdit={openEdit}
                 onDelete={setDeleteTarget}
                 extraHeaderActions={educationType === 'college' ? (
-                    <div className="flex flex-wrap items-center justify-end gap-3">
-                        <div className="w-[220px]">
+                    <div className="flex w-full flex-wrap items-center gap-3 md:w-auto">
+                        <div className="w-full md:w-[220px]">
                             <SelectInput value={selectedFilterProgramId} onChange={(e) => changeProgramFilter(e.target.value)}>
                                 <option value="">All programs</option>
                                 {programs.map((program) => (
@@ -384,7 +384,7 @@ export default function Subjects({
                                 ))}
                             </SelectInput>
                         </div>
-                        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-1">
+                        <div className="flex w-full items-center gap-2 rounded-lg border border-slate-200 bg-white p-1 md:w-auto">
                             {[
                                 { label: 'All', value: '' },
                                 { label: 'Gen Ed', value: '1' },
@@ -393,7 +393,7 @@ export default function Subjects({
                                 <label
                                     key={option.label}
                                     className={[
-                                        'cursor-pointer rounded-md px-3 py-1.5 text-sm transition',
+                                        'flex-1 cursor-pointer rounded-md px-3 py-1.5 text-center text-sm transition md:flex-none',
                                         selectedGenEdFilter === option.value
                                             ? 'bg-slate-900 text-white'
                                             : 'text-slate-600 hover:bg-slate-50',
@@ -413,7 +413,7 @@ export default function Subjects({
                         </div>
                     </div>
                 ) : educationType === 'senior-high' ? (
-                    <div className="w-[220px]">
+                    <div className="w-full md:w-[220px]">
                         <SelectInput value={selectedFilterStrandId} onChange={(e) => changeStrandFilter(e.target.value)}>
                             <option value="">All strands</option>
                             {strands.map((strand) => (

@@ -486,13 +486,13 @@ export default function PortalLayout({
                                 : `${theme.headerBg ?? "bg-white"} ${theme.headerBorder ?? "border-slate-200"}`,
                         ].join(" ")}
                     >
-                        <div className="flex items-center justify-between gap-4 px-4 py-3 sm:px-6">
-                            <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex items-center justify-between gap-2 px-4 py-3 sm:gap-4 sm:px-6">
+                            <div className="flex min-w-0 items-center gap-2 sm:gap-3">
                                 <button
                                     type="button"
                                     onClick={() => setMobileOpen(true)}
                                     className={[
-                                        "flex h-9 w-9 items-center justify-center rounded-lg border transition-colors lg:hidden",
+                                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition-colors lg:hidden",
                                         isDarkMode
                                             ? "border-slate-700 text-slate-300"
                                             : "border-slate-200 text-slate-600",
@@ -503,7 +503,7 @@ export default function PortalLayout({
                                 <div className="min-w-0">
                                     <p
                                         className={[
-                                            "text-[11px] font-semibold uppercase tracking-wider transition-colors",
+                                            "hidden sm:block text-[11px] font-semibold uppercase tracking-wider transition-colors",
                                             isDarkMode
                                                 ? "text-slate-500"
                                                 : (theme.headerLabel ??
@@ -514,7 +514,7 @@ export default function PortalLayout({
                                     </p>
                                     <h1
                                         className={[
-                                            "truncate text-lg font-bold transition-colors",
+                                            "truncate text-base font-bold transition-colors sm:text-lg",
                                             isDarkMode
                                                 ? "text-slate-100"
                                                 : (theme.headerTitle ??
@@ -526,7 +526,7 @@ export default function PortalLayout({
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-5">
+                            <div className="flex shrink-0 items-center gap-2 sm:gap-5">
                                 <ThemeToggle
                                     isDarkMode={isDarkMode}
                                     onToggle={() => setIsDarkMode((v) => !v)}

@@ -56,6 +56,9 @@ class ProgramController extends Controller
         $selectedBranchId = $scopedId
             ?? ($branches->contains('id', $requestedBranchId) ? $requestedBranchId : $branches->first()?->id);
 
+        $perPage = $request->integer('per_page', 15);
+        $perPage = in_array($perPage, [10, 15, 25, 50, 100]) ? $perPage : 15;
+
         $programs = Program::query()
             ->with([
                 'department:id,name,branch_id',
@@ -67,7 +70,7 @@ class ProgramController extends Controller
             ->when($durationYears, fn ($q) => $q->where('duration_years', $durationYears))
             ->when($search, fn ($q) => $q->where('name', 'like', "%{$search}%"))
             ->orderBy('name')
-            ->paginate(15)
+            ->paginate($perPage)
             ->withQueryString();
 
         $offset = ($programs->currentPage() - 1) * $programs->perPage();
@@ -111,7 +114,12 @@ class ProgramController extends Controller
 
         return Inertia::render('Admin/Programs', [
             'programs' => $programs,
-            'filters' => ['search' => $search, 'branch_id' => $selectedBranchId, 'duration_years' => $durationYears],
+            'filters' => [
+                'search' => $search,
+                'branch_id' => $selectedBranchId,
+                'duration_years' => $durationYears,
+                'per_page' => $perPage
+            ],
             'branches' => $branches,
             'departments' => $departments,
             'chairs' => $chairs,

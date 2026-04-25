@@ -209,11 +209,11 @@ export default function Teachers({ teachers, filters, branches, departments, pro
                 onEdit={openEdit} 
                 onDelete={setDeleteTarget} 
                 extraHeaderActions={
-                    <div className="flex gap-2">
+                    <div className="flex w-full flex-wrap gap-2 md:w-auto">
                         <select
                             value={filters.department_id ?? ''}
                             onChange={(e) => handleFilterChange('department_id', e.target.value)}
-                            className="rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-8 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-8 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 md:w-auto"
                         >
                             <option value="">All Departments</option>
                             {filterDepartments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
@@ -221,7 +221,7 @@ export default function Teachers({ teachers, filters, branches, departments, pro
                         <select
                             value={filters.program_id ?? ''}
                             onChange={(e) => handleFilterChange('program_id', e.target.value)}
-                            className="rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-8 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-8 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 md:w-auto"
                         >
                             <option value="">All Programs</option>
                             {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}

@@ -369,11 +369,11 @@ export default function YearLevels({
     ];
 
     const collegeFilterActions = educationType === 'college' ? (
-        <div className="flex items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 md:w-auto">
             <SelectInput
                 value={String(filters.program_id ?? '')}
                 onChange={(e) => changeCollegeFilter('program_id', e.target.value)}
-                className="w-56"
+                className="w-full md:w-56"
             >
                 <option value="">All programs</option>
                 {filteredPrograms.map((program) => (
@@ -383,7 +383,7 @@ export default function YearLevels({
             <SelectInput
                 value={String(filters.year_level ?? '')}
                 onChange={(e) => changeCollegeFilter('year_level', e.target.value)}
-                className="w-40"
+                className="w-full md:w-40"
             >
                 <option value="">All years</option>
                 {collegeYearLevels.map((level) => (

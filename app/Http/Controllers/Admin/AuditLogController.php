@@ -21,7 +21,7 @@ class AuditLogController extends Controller
                     ->orWhere('target_type', 'like', "%{$search}%");
             }))
             ->orderByDesc('created_at')
-            ->paginate(30)
+            ->paginate($request->input('per_page', 30))
             ->withQueryString()
             ->through(fn ($r) => [
                 'id'          => $r->id,

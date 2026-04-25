@@ -16,6 +16,9 @@ class AdminUserController extends Controller
         $search = $request->input('search', '');
         $editId = $request->input('edit_id');
 
+        $perPage = $request->integer('per_page', 15);
+        $perPage = in_array($perPage, [10, 15, 25, 50, 100]) ? $perPage : 15;
+
         $admins = Admin::query()
             ->with(['branch:id,name'])
             ->where('is_deleted', 0)
@@ -28,12 +31,12 @@ class AdminUserController extends Controller
                 });
             })
             ->orderBy('name')
-            ->paginate(15)
+            ->paginate($perPage)
             ->withQueryString();
 
         return Inertia::render('Admin/AdminUsers', [
             'admins'   => $admins,
-            'filters'  => ['search' => $search, 'edit_id' => $editId],
+            'filters'  => ['search' => $search, 'edit_id' => $editId, 'per_page' => $perPage],
             'branches' => Branch::query()
                 ->select('id', 'name', 'code')
                 ->where('is_deleted', 0)
