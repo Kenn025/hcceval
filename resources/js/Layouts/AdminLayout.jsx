@@ -247,6 +247,7 @@ export default function AdminLayout({
     const sidebarW = collapsed ? "lg:w-20" : "lg:w-64";
     const mainPad = collapsed ? "lg:pl-20" : "lg:pl-64";
     const closeMobile = () => setMobileOpen(false);
+    const sidebarCollapsed = collapsed && !mobileOpen;
     const collapseTooltipRef = useSystemTooltip(
         collapsed ? "Expand sidebar" : "Collapse sidebar",
         true,
@@ -258,7 +259,7 @@ export default function AdminLayout({
             <div
                 className={[
                     "flex items-center gap-3 px-4 py-5",
-                    collapsed ? "justify-center px-2" : "",
+                    sidebarCollapsed ? "justify-center px-2" : "",
                 ].join(" ")}
             >
                 <Link
@@ -267,7 +268,7 @@ export default function AdminLayout({
                 >
                     <AppIcon name="graduation" className="h-5 w-5" />
                 </Link>
-                {!collapsed && (
+                {!sidebarCollapsed && (
                     <div className="min-w-0">
                         <p className="truncate text-sm font-bold tracking-wide text-white">
                             HCC Admin
@@ -280,7 +281,7 @@ export default function AdminLayout({
             </div>
 
             {/* User card */}
-            {!collapsed && (
+            {!sidebarCollapsed && (
                 <div className="mx-3 mb-4 flex items-center gap-3 rounded-2xl bg-white/10 px-3 py-3 ring-1 ring-white/10 shadow-sm">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-300 to-blue-500 text-xs font-bold text-white shadow">
                         {userInitials}
@@ -305,12 +306,12 @@ export default function AdminLayout({
                     .filter((s) => !s.roles || s.roles.includes(role))
                     .map((section) => (
                         <div key={section.title} className="mb-4">
-                            {!collapsed && (
+                            {!sidebarCollapsed && (
                                 <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-blue-400/70">
                                     {section.title}
                                 </p>
                             )}
-                            {collapsed && (
+                            {sidebarCollapsed && (
                                 <div className="my-2 border-t border-white/10" />
                             )}
 
@@ -320,7 +321,7 @@ export default function AdminLayout({
                                         key={item.route}
                                         item={item}
                                         activeRoute={activeRoute}
-                                        collapsed={collapsed}
+                                        collapsed={sidebarCollapsed}
                                         onClick={closeMobile}
                                     />
                                 ))}
@@ -329,7 +330,7 @@ export default function AdminLayout({
                                         key={group.title}
                                         group={group}
                                         activeRoute={activeRoute}
-                                        collapsed={collapsed}
+                                        collapsed={sidebarCollapsed}
                                         onItemClick={closeMobile}
                                     />
                                 ))}
@@ -341,7 +342,7 @@ export default function AdminLayout({
             {/* Bottom: logout only */}
             <div className="flex items-center justify-center border-t border-white/10 p-3">
                 <SignOutButton
-                    collapsed={collapsed}
+                    collapsed={sidebarCollapsed}
                     onClick={() => setShowLogoutConfirm(true)}
                 />
             </div>

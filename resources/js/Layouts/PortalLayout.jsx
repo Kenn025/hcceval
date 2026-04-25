@@ -211,6 +211,7 @@ export default function PortalLayout({
     const sidebarW = collapsed ? "lg:w-20" : "lg:w-64";
     const mainPad = collapsed ? "lg:pl-20" : "lg:pl-64";
     const closeMobile = () => setMobileOpen(false);
+    const sidebarCollapsed = collapsed && !mobileOpen;
     const collapseTooltipRef = useSystemTooltip(
         collapsed ? "Expand sidebar" : "Collapse sidebar",
         true,
@@ -222,13 +223,13 @@ export default function PortalLayout({
             <div
                 className={[
                     "flex items-center gap-3 px-4 py-5",
-                    collapsed ? "justify-center px-2" : "",
+                    sidebarCollapsed ? "justify-center px-2" : "",
                 ].join(" ")}
             >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white shadow-inner ring-1 ring-white/20">
                     <AppIcon name="graduation" className="h-5 w-5" />
                 </div>
-                {!collapsed && (
+                {!sidebarCollapsed && (
                     <div className="min-w-0">
                         <p className="truncate text-sm font-bold tracking-wide text-white">
                             HCC Portal
@@ -241,7 +242,7 @@ export default function PortalLayout({
             </div>
 
             {/* User card */}
-            {!collapsed && (
+            {!sidebarCollapsed && (
                 <div className="mx-3 mb-4 flex items-center gap-3 rounded-2xl bg-white/10 px-3 py-3 ring-1 ring-white/10 shadow-sm">
                     <div
                         className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${theme.avatarGradient} text-xs font-bold text-white shadow`}
@@ -270,7 +271,7 @@ export default function PortalLayout({
                                 key={item.key}
                                 item={item}
                                 isActive={isActive}
-                                collapsed={collapsed}
+                                collapsed={sidebarCollapsed}
                                 onClick={() => {
                                     onNavChange(item.key);
                                     closeMobile();
@@ -284,7 +285,7 @@ export default function PortalLayout({
             {/* Sign out */}
             <div className="flex items-center justify-center border-t border-white/10 p-3">
                 <SignOutButton
-                    collapsed={collapsed}
+                    collapsed={sidebarCollapsed}
                     onClick={() => setShowLogoutConfirm(true)}
                 />
             </div>
