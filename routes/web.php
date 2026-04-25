@@ -165,6 +165,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/admin/branches', [BranchController::class, 'store']);
         Route::put('/admin/branches/{branch}', [BranchController::class, 'update']);
         Route::delete('/admin/branches/{branch}', [BranchController::class, 'destroy']);
+        Route::delete('/admin/branches/{branch}/admins/{admin}', [BranchController::class, 'unlinkAdmin'])->name('admin.branches.admins.unlink');
 
         Route::get('/admin/evaluation-cycle', [EvaluationCycleController::class, 'index'])->name('admin.evaluation-cycle');
         Route::post('/admin/evaluation-cycle', [EvaluationCycleController::class, 'store']);

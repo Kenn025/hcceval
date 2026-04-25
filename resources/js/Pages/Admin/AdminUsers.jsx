@@ -7,7 +7,7 @@ import StatusBadge from '@/Components/Admin/StatusBadge';
 import AppIcon from '@/Components/AppIcon';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { router, useForm } from '@inertiajs/react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 const buildAdminCodePreview = (role, branchId, branches) => {
     if (!role) {
@@ -74,6 +74,18 @@ export default function AdminUsers({ admins, filters, branches }) {
         clearErrors(); setEditing(row); setSlideOpen(true);
     };
     const editFromDetails = () => viewing && openEdit(viewing);
+
+    useEffect(() => {
+        const editId = String(filters?.edit_id ?? '');
+        if (!editId || slideOpen || editing) {
+            return;
+        }
+
+        const matchedAdmin = admins?.data?.find((admin) => String(admin.id) === editId);
+        if (matchedAdmin) {
+            openEdit(matchedAdmin);
+        }
+    }, [admins?.data, editing, filters?.edit_id, slideOpen]);
 
     const submit = (e) => {
         e.preventDefault();

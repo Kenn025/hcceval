@@ -29,6 +29,14 @@ class BranchController extends Controller
                 });
             })
             ->withCount('departments')
+            ->with(['departments' => fn ($query) => $query
+                ->select('id', 'branch_id', 'code', 'name', 'is_activated')
+                ->where('is_deleted', 0)
+                ->orderBy('id')])
+            ->with(['admins' => fn ($query) => $query
+                ->select('id', 'branch_id', 'code', 'name', 'email', 'role', 'is_activated')
+                ->where('is_deleted', 0)
+                ->orderBy('name')])
             ->orderBy('name')
             ->paginate(15)
             ->withQueryString();
@@ -103,20 +111,37 @@ class BranchController extends Controller
         $validated = $request->validate([
             'code' => "required|string|max:50|unique:branch,code,{$branch->id},id",
             'name' => 'required|string|max:150',
-            'highest_department' => 'nullable|string|max:50',
+            'department_levels' => 'required|array|min:1',
+            'department_levels.*' => 'in:elementary,junior_high,senior_high,college',
             'address' => 'nullable|string',
-            'is_main' => 'boolean',
-            'is_active' => 'boolean',
         ]);
 
-        $branch->update([
-            'code' => $validated['code'],
-            'name' => $validated['name'],
-            'highest_department' => $validated['highest_department'] ?? null,
-            'address' => $validated['address'] ?? null,
-            'is_main' => ! empty($validated['is_main']),
-            'is_activated' => array_key_exists('is_active', $validated) ? (bool) $validated['is_active'] : $branch->is_activated,
-        ]);
+        DB::transaction(function () use ($branch, $validated) {
+            $departmentLevels = $validated['department_levels'];
+
+            $branch->update([
+                'code' => $validated['code'],
+                'name' => $validated['name'],
+                'highest_department' => $this->resolveHighestDepartment($departmentLevels),
+                'address' => $validated['address'] ?? null,
+            ]);
+
+            foreach (self::DEPARTMENT_LEVELS as $level) {
+                $department = Department::query()
+                    ->where('branch_id', $branch->id)
+                    ->where(function ($query) use ($level) {
+                        $query->where('code', 'like', '%' . $this->departmentSuffix($level))
+                            ->orWhere('name', $this->departmentLabel($level));
+                    })
+                    ->first();
+
+                if ($department) {
+                    $department->update([
+                        'is_activated' => in_array($level, $departmentLevels, true),
+                    ]);
+                }
+            }
+        });
 
         return back()->with('success', 'Branch updated successfully.');
     }
@@ -126,6 +151,17 @@ class BranchController extends Controller
         $branch->update(['is_deleted' => 1]);
 
         return back()->with('success', 'Branch deleted.');
+    }
+
+    public function unlinkAdmin(Branch $branch, Admin $admin)
+    {
+        abort_unless((int) $admin->branch_id === (int) $branch->id, 404);
+
+        $admin->update([
+            'is_deleted' => 1,
+        ]);
+
+        return back()->with('success', 'Admin account unlinked successfully.');
     }
 
     private function resolveHighestDepartment(array $departmentLevels): ?string

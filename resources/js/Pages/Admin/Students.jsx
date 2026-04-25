@@ -140,8 +140,9 @@ export default function Students({
         () => yearLevels.filter((yearLevel) => (
             (!data.department_id || String(yearLevel.department_id) === String(data.department_id))
             && (!data.program_id || String(yearLevel.program_id ?? '') === String(data.program_id))
+            && (!data.strand_id || String(yearLevel.strand_id ?? '') === String(data.strand_id))
         )),
-        [yearLevels, data.department_id, data.program_id],
+        [yearLevels, data.department_id, data.program_id, data.strand_id],
     );
     const selectedYearLevel = useMemo(
         () => yearLevels.find((yearLevel) => String(yearLevel.id) === String(data.year_level_id)),

@@ -72,6 +72,7 @@ export default function Subjects({
     scopedBranchId,
     departments,
     programs,
+    strands,
     teachers,
 }) {
     const [slideOpen, setSlideOpen] = useState(false);
@@ -84,6 +85,7 @@ export default function Subjects({
     const activeRoute = ROUTE_MAP[educationType] ?? 'admin.college.subjects';
     const activeBranchId = String(selectedBranchId ?? scopedBranchId ?? '');
     const selectedFilterProgramId = String(filters.program_id ?? '');
+    const selectedFilterStrandId = String(filters.strand_id ?? '');
     const selectedGenEdFilter = String(filters.is_gened ?? '');
     const activeBranch = branches.find((branch) => String(branch.id) === activeBranchId);
     const departmentMatchers = {
@@ -97,6 +99,7 @@ export default function Subjects({
         branch_id: activeBranchId,
         department_id: '',
         program_id: '',
+        strand_id: '',
         name: '',
         type: subjectType,
         is_gened: false,
@@ -127,6 +130,13 @@ export default function Subjects({
             return !data.branch_id || String(selectedDepartment?.branch_id ?? '') === String(data.branch_id);
         }),
         [data.branch_id, departments, programs],
+    );
+    const filteredStrands = useMemo(
+        () => strands.filter((strand) => {
+            const selectedDepartment = departments.find((department) => String(department.id) === String(strand.department_id));
+            return !data.branch_id || String(selectedDepartment?.branch_id ?? '') === String(data.branch_id);
+        }),
+        [data.branch_id, departments, strands],
     );
     const filteredTeachers = useMemo(
         () => teachers.filter((teacher) => (
@@ -162,6 +172,7 @@ export default function Subjects({
             branch_id: activeBranchId,
             department_id: '',
             program_id: '',
+            strand_id: '',
             name: '',
             type: subjectType,
             is_gened: false,
@@ -184,6 +195,7 @@ export default function Subjects({
             branch_id: String(row.department?.branch_id ?? activeBranchId ?? ''),
             department_id: String(row.department_id ?? ''),
             program_id: String(row.program_id ?? ''),
+            strand_id: String(row.strand_id ?? ''),
             name: row.name ?? '',
             type: row.type ?? subjectType,
             is_gened: Boolean(row.is_gened),
@@ -247,6 +259,7 @@ export default function Subjects({
             ...filters,
             branch_id: branchId,
             ...(educationType === 'college' ? { program_id: '' } : {}),
+            ...(educationType === 'senior-high' ? { strand_id: '' } : {}),
         }, {
             preserveState: true,
             replace: true,
@@ -273,6 +286,16 @@ export default function Subjects({
         });
     };
 
+    const changeStrandFilter = (strandId) => {
+        router.get(route(activeRoute), {
+            ...filters,
+            strand_id: strandId,
+        }, {
+            preserveState: true,
+            replace: true,
+        });
+    };
+
     const showsGenEd = educationType === 'college' || educationType === 'senior-high';
 
     const columns = educationType === 'college'
@@ -282,6 +305,16 @@ export default function Subjects({
             { key: 'program', label: 'Program', render: (row) => row.program?.name ?? '-' },
             { key: 'is_gened', label: 'Gen Ed', render: (row) => row.is_gened ? 'Yes' : 'No' },
         ]
+        : educationType === 'senior-high'
+            ? [
+                { key: 'code', label: 'Code' },
+                { key: 'name', label: 'Subject Name' },
+                { key: 'branch', label: 'Branch', render: (row) => row.department?.branch?.name ?? activeBranch?.name ?? '-' },
+                { key: 'department', label: 'Department', render: (row) => row.department?.name ?? '-' },
+                { key: 'strand', label: 'Strand', render: (row) => row.strand?.name ?? '-' },
+                { key: 'assigned_teachers', label: 'Assigned Teachers', render: (row) => (row.assigned_teacher_names?.join(', ') || '-') },
+                { key: 'is_activated', label: 'Status', render: (row) => <StatusBadge active={row.is_activated} /> },
+            ]
         : [
             { key: 'code', label: 'Code' },
             { key: 'name', label: 'Subject Name' },
@@ -379,6 +412,15 @@ export default function Subjects({
                             ))}
                         </div>
                     </div>
+                ) : educationType === 'senior-high' ? (
+                    <div className="w-[220px]">
+                        <SelectInput value={selectedFilterStrandId} onChange={(e) => changeStrandFilter(e.target.value)}>
+                            <option value="">All strands</option>
+                            {strands.map((strand) => (
+                                <option key={strand.id} value={strand.id}>{strand.name}</option>
+                            ))}
+                        </SelectInput>
+                    </div>
                 ) : null}
             />
 
@@ -415,7 +457,7 @@ export default function Subjects({
                     )}
 
                     <FormField label="Branch" error={errors.branch_id} required>
-                        <SelectInput value={data.branch_id} onChange={(e) => setData({ ...data, branch_id: e.target.value, department_id: '', program_id: '', teacher_ids: [''] })}>
+                        <SelectInput value={data.branch_id} onChange={(e) => setData({ ...data, branch_id: e.target.value, department_id: '', program_id: '', strand_id: '', teacher_ids: [''] })}>
                             <option value="">Select branch...</option>
                             {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
                         </SelectInput>
@@ -426,6 +468,15 @@ export default function Subjects({
                             <SelectInput value={data.program_id} onChange={(e) => setData('program_id', e.target.value)} disabled={!data.branch_id}>
                                 <option value="">Select program...</option>
                                 {filteredPrograms.map((program) => <option key={program.id} value={program.id}>{program.name}</option>)}
+                            </SelectInput>
+                        </FormField>
+                    )}
+
+                    {educationType === 'senior-high' && (
+                        <FormField label="Strand" error={errors.strand_id} required>
+                            <SelectInput value={data.strand_id} onChange={(e) => setData('strand_id', e.target.value)} disabled={!data.branch_id}>
+                                <option value="">Select strand...</option>
+                                {filteredStrands.map((strand) => <option key={strand.id} value={strand.id}>{strand.name}</option>)}
                             </SelectInput>
                         </FormField>
                     )}

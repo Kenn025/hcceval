@@ -17,6 +17,7 @@ export default function Programs({
     departments,
     chairs,
     programNameOptions,
+    durationYearOptions,
     scopedBranchId,
     isBranchAdmin,
     selectedBranchId,
@@ -97,6 +98,17 @@ export default function Programs({
         router.get(route('admin.college.programs'), {
             ...filters,
             branch_id: branchId,
+            duration_years: filters.duration_years ?? '',
+        }, {
+            preserveState: true,
+            replace: true,
+        });
+    };
+
+    const changeDurationFilter = (durationYears) => {
+        router.get(route('admin.college.programs'), {
+            ...filters,
+            duration_years: durationYears,
         }, {
             preserveState: true,
             replace: true,
@@ -132,6 +144,21 @@ export default function Programs({
         { key: 'is_activated', label: 'Status', render: (r) => <StatusBadge active={r.is_activated} /> },
     ];
 
+    const filterActions = (
+        <SelectInput
+            value={String(filters.duration_years ?? '')}
+            onChange={(e) => changeDurationFilter(e.target.value)}
+            className="w-44"
+        >
+            <option value="">All durations</option>
+            {durationYearOptions.map((duration) => (
+                <option key={duration} value={duration}>
+                    {duration} year(s)
+                </option>
+            ))}
+        </SelectInput>
+    );
+
     return (
         <AdminLayout title="College Programs" activeRoute="admin.college.programs" breadcrumbs={['Academic Setup', 'College']}>
             <div className="mb-4 flex items-center justify-between">
@@ -164,7 +191,17 @@ export default function Programs({
                 })}
             </div>
 
-            <ResourceTable columns={columns} data={programs} filters={filters} routeName="admin.college.programs" searchPlaceholder="Search programs..." onRowClick={openView} onEdit={openEdit} onDelete={setDeleteTarget} />
+            <ResourceTable
+                columns={columns}
+                data={programs}
+                filters={filters}
+                routeName="admin.college.programs"
+                searchPlaceholder="Search programs..."
+                onRowClick={openView}
+                onEdit={openEdit}
+                onDelete={setDeleteTarget}
+                extraHeaderActions={filterActions}
+            />
 
             <SlideOver open={detailOpen} onClose={() => setDetailOpen(false)} title="Program Information" width="max-w-lg">
                 {viewing && (

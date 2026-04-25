@@ -35,6 +35,23 @@ const getFirstErrorMessage = (formErrors, fallback) => {
     return fallback;
 };
 
+const parseTeacherMap = (value) => {
+    if (!value) {
+        return {};
+    }
+
+    if (typeof value === 'string') {
+        try {
+            const parsed = JSON.parse(value);
+            return parsed && typeof parsed === 'object' ? parsed : {};
+        } catch {
+            return {};
+        }
+    }
+
+    return typeof value === 'object' ? value : {};
+};
+
 function ErrorNotification({ message, onClose }) {
     if (!message) {
         return null;
@@ -73,6 +90,8 @@ export default function YearLevels({
     selectedBranchId,
     scopedBranchId,
     programs,
+    strands,
+    subjects,
     advisers,
 }) {
     const [slideOpen, setSlideOpen] = useState(false);
@@ -88,11 +107,15 @@ export default function YearLevels({
     const { data, setData, errors, processing, reset, clearErrors } = useForm({
         branch_id: activeBranchId,
         program_id: '',
+        strand_id: '',
         adviser_teacher_id: '',
+        subject_ids: [],
+        subject_teacher_ids: {},
         year_level: '',
         section: '',
         education_type: educationType,
     });
+    const [subjectSearch, setSubjectSearch] = useState('');
     const resolvedDepartment = useMemo(() => {
         if (!data.branch_id) {
             return null;
@@ -124,6 +147,68 @@ export default function YearLevels({
     const filteredPrograms = useMemo(
         () => programs.filter((program) => !data.branch_id || String(program.branch_id ?? activeBranchId) === String(data.branch_id)),
         [activeBranchId, data.branch_id, programs],
+    );
+    const filteredStrands = useMemo(
+        () => strands.filter((strand) => !resolvedDepartment || String(strand.department_id ?? '') === String(resolvedDepartment.id)),
+        [resolvedDepartment, strands],
+    );
+    const filteredSubjects = useMemo(
+        () => subjects.filter((subject) => {
+            const branchMatches = !data.branch_id || String(subject.branch_id ?? '') === String(data.branch_id);
+            const programMatches = educationType !== 'college'
+                ? true
+                : !data.program_id || String(subject.program_id ?? '') === String(data.program_id);
+            const strandMatches = educationType !== 'senior-high'
+                ? true
+                : !data.strand_id || String(subject.strand_id ?? '') === String(data.strand_id);
+
+            return branchMatches && programMatches && strandMatches;
+        }),
+        [data.branch_id, data.program_id, data.strand_id, educationType, subjects],
+    );
+    const searchedSubjects = useMemo(() => {
+        const search = subjectSearch.trim().toLowerCase();
+
+        if (!search) {
+            return filteredSubjects;
+        }
+
+        return filteredSubjects.filter((subject) => (
+            String(subject.name ?? '').toLowerCase().includes(search)
+            || String(subject.code ?? '').toLowerCase().includes(search)
+        ));
+    }, [filteredSubjects, subjectSearch]);
+    const selectedSubjectIds = useMemo(
+        () => (Array.isArray(data.subject_ids) ? data.subject_ids.map((id) => String(id)) : []),
+        [data.subject_ids],
+    );
+    const subjectMap = useMemo(
+        () => new Map(subjects.map((subject) => [String(subject.id), subject])),
+        [subjects],
+    );
+    const viewingSubjects = useMemo(() => {
+        if (!viewing || !Array.isArray(viewing.subject_id)) {
+            return [];
+        }
+
+        return viewing.subject_id
+            .map((id) => {
+                const subject = subjectMap.get(String(id));
+
+                if (!subject) {
+                    return null;
+                }
+
+                return {
+                    ...subject,
+                    assignedTeacherId: String(parseTeacherMap(viewing.subject_teacher_map)?.[String(id)] ?? ''),
+                };
+            })
+            .filter(Boolean);
+    }, [subjectMap, viewing]);
+    const teacherMap = useMemo(
+        () => new Map(advisers.map((teacher) => [String(teacher.id), teacher.full_name])),
+        [advisers],
     );
     const filteredAdvisers = useMemo(
         () => advisers.filter((adviser) => {
@@ -187,10 +272,14 @@ export default function YearLevels({
             branch_id: activeBranchId,
             program_id: '',
             adviser_teacher_id: '',
+            strand_id: '',
+            subject_ids: [],
+            subject_teacher_ids: {},
             year_level: '',
             section: '',
             education_type: educationType,
         });
+        setSubjectSearch('');
         clearErrors();
         setEditing(null);
         setSlideOpen(true);
@@ -201,11 +290,17 @@ export default function YearLevels({
         setData({
             branch_id: String(row.department?.branch_id ?? activeBranchId),
             program_id: String(row.program_id ?? ''),
+            strand_id: String(row.strand_id ?? ''),
             adviser_teacher_id: String(row.adviser_teacher_id ?? ''),
+            subject_ids: Array.isArray(row.subject_id) ? row.subject_id.map((id) => String(id)) : [],
+            subject_teacher_ids: Object.fromEntries(
+                Object.entries(parseTeacherMap(row.subject_teacher_map)).map(([subjectId, teacherId]) => [String(subjectId), String(teacherId)])
+            ),
             year_level: row.year_level ?? '',
             section: row.section ?? '',
             education_type: educationType,
         });
+        setSubjectSearch('');
         clearErrors();
         setEditing(row);
         setSlideOpen(true);
@@ -245,6 +340,18 @@ export default function YearLevels({
         router.get(route(activeRoute), {
             ...filters,
             branch_id: branchId,
+            program_id: filters.program_id ?? '',
+            year_level: filters.year_level ?? '',
+        }, {
+            preserveState: true,
+            replace: true,
+        });
+    };
+
+    const changeCollegeFilter = (key, value) => {
+        router.get(route(activeRoute), {
+            ...filters,
+            [key]: value,
         }, {
             preserveState: true,
             replace: true,
@@ -257,9 +364,34 @@ export default function YearLevels({
         { key: 'year_level', label: 'Year/Grade' },
         { key: 'section', label: 'Section' },
         { key: 'department', label: 'Department', render: (row) => row.department?.name ?? '-' },
-        { key: 'program', label: 'Program', render: (row) => stripCampusSuffix(row.program?.name) || '-' },
+        { key: 'program', label: educationType === 'senior-high' ? 'Strand' : 'Program', render: (row) => educationType === 'senior-high' ? (row.strand?.name ?? '-') : (stripCampusSuffix(row.program?.name) || '-') },
         { key: 'is_activated', label: 'Status', render: (row) => <StatusBadge active={row.is_activated} /> },
     ];
+
+    const collegeFilterActions = educationType === 'college' ? (
+        <div className="flex items-center gap-2">
+            <SelectInput
+                value={String(filters.program_id ?? '')}
+                onChange={(e) => changeCollegeFilter('program_id', e.target.value)}
+                className="w-56"
+            >
+                <option value="">All programs</option>
+                {filteredPrograms.map((program) => (
+                    <option key={program.id} value={program.id}>{stripCampusSuffix(program.name)}</option>
+                ))}
+            </SelectInput>
+            <SelectInput
+                value={String(filters.year_level ?? '')}
+                onChange={(e) => changeCollegeFilter('year_level', e.target.value)}
+                className="w-40"
+            >
+                <option value="">All years</option>
+                {collegeYearLevels.map((level) => (
+                    <option key={level.value} value={level.value}>{level.label}</option>
+                ))}
+            </SelectInput>
+        </div>
+    ) : null;
 
     const titleMap = {
         college: 'College Year Levels',
@@ -302,7 +434,17 @@ export default function YearLevels({
                 })}
             </div>
 
-            <ResourceTable columns={columns} data={yearLevels} filters={filters} routeName={activeRoute} searchPlaceholder="Search levels..." onRowClick={openView} onEdit={openEdit} onDelete={setDeleteTarget} />
+            <ResourceTable
+                columns={columns}
+                data={yearLevels}
+                filters={filters}
+                routeName={activeRoute}
+                searchPlaceholder="Search levels..."
+                onRowClick={openView}
+                onEdit={openEdit}
+                onDelete={setDeleteTarget}
+                extraHeaderActions={collegeFilterActions}
+            />
 
             <SlideOver open={detailOpen} onClose={() => setDetailOpen(false)} title="Level Information">
                 {viewing && (
@@ -318,10 +460,32 @@ export default function YearLevels({
                             <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Department</p><p className="mt-1 text-sm text-slate-900">{viewing.department?.name ?? '-'}</p></div>
                             <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{levelLabel}</p><p className="mt-1 text-sm text-slate-900">{viewing.year_level ?? '-'}</p></div>
                             <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Section</p><p className="mt-1 text-sm text-slate-900">{viewing.section ?? '-'}</p></div>
-                            <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Program</p><p className="mt-1 text-sm text-slate-900">{viewing.program?.name ?? '-'}</p></div>
+                            <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{educationType === 'senior-high' ? 'Strand' : 'Program'}</p><p className="mt-1 text-sm text-slate-900">{educationType === 'senior-high' ? (viewing.strand?.name ?? '-') : (viewing.program?.name ?? '-')}</p></div>
                             <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Adviser</p><p className="mt-1 text-sm text-slate-900">{viewing.adviser?.full_name ?? viewing.assigned_adviser_name ?? '-'}</p></div>
                             <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</p><div className="mt-1"><StatusBadge active={viewing.is_activated} /></div></div>
                         </div>
+
+                        {(educationType === 'college' || educationType === 'senior-high') && (
+                            <div>
+                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Assigned Subjects</p>
+                                {viewingSubjects.length > 0 ? (
+                                    <div className="mt-2 space-y-2">
+                                        {viewingSubjects.map((subject) => (
+                                            <div key={subject.id} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                                <p className="text-sm font-medium text-slate-800">{subject.name}</p>
+                                                <p className="text-xs text-slate-500">
+                                                    {subject.code || 'No subject code'}
+                                                    {' | '}
+                                                    {teacherMap.get(subject.assignedTeacherId) || 'No teacher selected'}
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="mt-1 text-sm text-slate-500">No subjects assigned.</p>
+                                )}
+                            </div>
+                        )}
 
                         <button type="button" onClick={editFromDetails} className="w-full rounded-lg bg-slate-900 py-2 text-sm font-medium text-white hover:bg-slate-800">
                             Edit Level
@@ -337,7 +501,10 @@ export default function YearLevels({
                             ...data,
                             branch_id: e.target.value,
                             program_id: '',
+                            strand_id: '',
                             adviser_teacher_id: '',
+                            subject_ids: [],
+                            subject_teacher_ids: {},
                         })}>
                             <option value="">Select branch...</option>
                             {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
@@ -351,10 +518,31 @@ export default function YearLevels({
                                     ...data,
                                     program_id: e.target.value,
                                     adviser_teacher_id: '',
+                                    subject_ids: [],
+                                    subject_teacher_ids: {},
                                 });
+                                setSubjectSearch('');
                             }}>
                                 <option value="">Select program...</option>
                                 {filteredPrograms.map((program) => <option key={program.id} value={program.id}>{program.name}</option>)}
+                            </SelectInput>
+                        </FormField>
+                    )}
+
+                    {educationType === 'senior-high' && (
+                        <FormField label="Strand" error={errors.strand_id} required>
+                            <SelectInput value={data.strand_id} onChange={(e) => {
+                                setData({
+                                    ...data,
+                                    strand_id: e.target.value,
+                                    adviser_teacher_id: '',
+                                    subject_ids: [],
+                                    subject_teacher_ids: {},
+                                });
+                                setSubjectSearch('');
+                            }} disabled={!data.branch_id || !resolvedDepartment}>
+                                <option value="">Select strand...</option>
+                                {filteredStrands.map((strand) => <option key={strand.id} value={strand.id}>{strand.name}</option>)}
                             </SelectInput>
                         </FormField>
                     )}
@@ -398,6 +586,100 @@ export default function YearLevels({
                             {filteredAdvisers.map((adviser) => <option key={adviser.id} value={adviser.id}>{adviser.full_name}</option>)}
                         </SelectInput>
                     </FormField>
+
+                    {(educationType === 'college' || educationType === 'senior-high') && (
+                        <FormField label="Assigned Subjects" error={errors.subject_ids}>
+                            <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                <p className="text-xs text-slate-500">
+                                    {educationType === 'college'
+                                        ? data.program_id
+                                            ? filteredSubjects.length > 0
+                                                ? `${filteredSubjects.length} subject(s) available for this program.`
+                                                : 'No subjects are available for the selected program yet.'
+                                            : 'Select a program first to assign subjects.'
+                                        : !data.strand_id
+                                            ? 'Select a strand first to assign subjects.'
+                                            : filteredSubjects.length > 0
+                                                ? `${filteredSubjects.length} subject(s) available for the selected strand.`
+                                                : 'No subjects are available for the selected strand yet.'}
+                                </p>
+
+                                {((educationType === 'college' && data.program_id) || (educationType === 'senior-high' && data.strand_id)) && filteredSubjects.length > 0 ? (
+                                    <TextInput
+                                        value={subjectSearch}
+                                        onChange={(e) => setSubjectSearch(e.target.value)}
+                                        placeholder="Search subject name or code..."
+                                    />
+                                ) : null}
+
+                                {((educationType === 'college' && data.program_id) || (educationType === 'senior-high' && data.strand_id)) && filteredSubjects.length > 0 ? (
+                                    <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+                                        {searchedSubjects.length > 0 ? searchedSubjects.map((subject) => {
+                                            const subjectKey = String(subject.id);
+                                            const isSelected = selectedSubjectIds.includes(subjectKey);
+                                            const teacherOptions = advisers.filter((teacher) => (subject.teacher_ids ?? []).includes(Number(teacher.id)));
+
+                                            return (
+                                                <div key={subject.id} className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+                                                    <label className="flex items-start gap-3">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isSelected}
+                                                            onChange={() => {
+                                                                const nextSubjectIds = isSelected
+                                                                    ? selectedSubjectIds.filter((id) => id !== subjectKey)
+                                                                    : [...selectedSubjectIds, subjectKey];
+                                                                const nextTeacherIds = { ...(data.subject_teacher_ids ?? {}) };
+
+                                                                if (isSelected) {
+                                                                    delete nextTeacherIds[subjectKey];
+                                                                }
+
+                                                                setData('subject_ids', nextSubjectIds);
+                                                                setData('subject_teacher_ids', nextTeacherIds);
+                                                            }}
+                                                            className="mt-1 rounded border-slate-300"
+                                                        />
+                                                        <div className="min-w-0 flex-1">
+                                                            <p className="text-sm font-medium text-slate-900">{subject.name}</p>
+                                                            <p className="text-xs text-slate-500">{subject.code || 'No subject code'}</p>
+                                                        </div>
+                                                    </label>
+
+                                                    {isSelected ? (
+                                                        <div className="mt-3 pl-7">
+                                                            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-500">Assigned Teacher</p>
+                                                            <SelectInput
+                                                                value={String(data.subject_teacher_ids?.[subjectKey] ?? '')}
+                                                                onChange={(e) => setData('subject_teacher_ids', {
+                                                                    ...(data.subject_teacher_ids ?? {}),
+                                                                    [subjectKey]: e.target.value,
+                                                                })}
+                                                            >
+                                                                <option value="">Select teacher...</option>
+                                                                {teacherOptions.map((teacher) => (
+                                                                    <option key={teacher.id} value={teacher.id}>{teacher.full_name}</option>
+                                                                ))}
+                                                            </SelectInput>
+                                                            <p className="mt-1 text-xs text-slate-500">
+                                                                {teacherOptions.length > 0
+                                                                    ? 'Choose one teacher assigned to this subject.'
+                                                                    : 'No teachers are assigned to this subject yet.'}
+                                                            </p>
+                                                        </div>
+                                                    ) : null}
+                                                </div>
+                                            );
+                                        }) : (
+                                            <div className="rounded-lg border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-500">
+                                                No subjects match your search.
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : null}
+                            </div>
+                        </FormField>
+                    )}
 
                     <div className="flex gap-3 pt-2">
                         <button type="button" onClick={() => setSlideOpen(false)} className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700">Cancel</button>
