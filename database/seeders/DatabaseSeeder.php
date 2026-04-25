@@ -31,6 +31,7 @@ class DatabaseSeeder extends Seeder
 
         DB::table('student')->delete();
         DB::table('employee')->delete();
+        DB::table('employee_department')->delete();
         DB::table('teacher')->delete();
         DB::table('admin')->delete();
         DB::table('education_level')->delete();
@@ -74,6 +75,22 @@ class DatabaseSeeder extends Seeder
                 'is_activated' => 1,
                 'is_deleted' => 0,
             ],
+        ]);
+
+        DB::table('employee_department')->insert([
+            ['id' => 1, 'branch_id' => null, 'code' => 'EMP-DEPT-UTILITY', 'name' => 'Utility', 'description' => 'Facilities, custodial, and general utility services.', 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 2, 'branch_id' => null, 'code' => 'EMP-DEPT-RECORDS', 'name' => 'Records', 'description' => 'Records management and document processing.', 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 3, 'branch_id' => null, 'code' => 'EMP-DEPT-REGISTRAR', 'name' => 'Registrar', 'description' => 'Student registration and enrollment services.', 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 4, 'branch_id' => null, 'code' => 'EMP-DEPT-FINANCE', 'name' => 'Finance', 'description' => 'Finance and accounting operations.', 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 5, 'branch_id' => null, 'code' => 'EMP-DEPT-CASHIER', 'name' => 'Cashier', 'description' => 'Payment collection and cashiering services.', 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 6, 'branch_id' => null, 'code' => 'EMP-DEPT-GUIDANCE', 'name' => 'Guidance', 'description' => 'Guidance and counseling support.', 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 7, 'branch_id' => null, 'code' => 'EMP-DEPT-LIBRARY', 'name' => 'Library', 'description' => 'Library services and learning resources.', 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 8, 'branch_id' => null, 'code' => 'EMP-DEPT-IT', 'name' => 'Information Technology', 'description' => 'IT systems, network, and technical support.', 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 9, 'branch_id' => null, 'code' => 'EMP-DEPT-HR', 'name' => 'Human Resources', 'description' => 'Personnel records and HR operations.', 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 10, 'branch_id' => null, 'code' => 'EMP-DEPT-SECURITY', 'name' => 'Security', 'description' => 'Campus safety and security services.', 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 11, 'branch_id' => null, 'code' => 'EMP-DEPT-CLINIC', 'name' => 'Clinic', 'description' => 'Health and clinic services.', 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 12, 'branch_id' => null, 'code' => 'EMP-DEPT-MAINT', 'name' => 'Maintenance', 'description' => 'Building maintenance and repairs.', 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 13, 'branch_id' => null, 'code' => 'EMP-DEPT-ADMIN', 'name' => 'Admin Office', 'description' => 'Administrative office support.', 'is_activated' => 1, 'is_deleted' => 0],
         ]);
 
         DB::table('academic_year')->insert([
@@ -176,14 +193,14 @@ class DatabaseSeeder extends Seeder
         ]);
 
         DB::table('employee')->insert([
-            ['id' => 1, 'code' => 'EMP-HCCSR-01', 'firstname' => 'Leo', 'middlename' => 'A', 'lastname' => 'Rivera', 'role' => 'Registrar', 'personal_info' => json_encode(['contact' => '09280000001', 'office' => 'Registrar']), 'email' => 'e1_sr@mail.com', 'password' => md5('password'), 'department_id' => 1, 'program_id' => 1, 'strand_id' => null, 'branch_id' => 2, 'is_activated' => 1, 'is_deleted' => 0],
-            ['id' => 2, 'code' => 'EMP-HCCSR-02', 'firstname' => 'Grace', 'middlename' => 'B', 'lastname' => 'Fernandez', 'role' => 'Cashier', 'personal_info' => json_encode(['contact' => '09280000002', 'office' => 'Finance']), 'email' => 'e2_sr@mail.com', 'password' => md5('password'), 'department_id' => 1, 'program_id' => 2, 'strand_id' => null, 'branch_id' => 2, 'is_activated' => 1, 'is_deleted' => 0],
-            ['id' => 3, 'code' => 'EMP-HCCSR-03', 'firstname' => 'Rico', 'middlename' => 'C', 'lastname' => 'Domingo', 'role' => 'Guidance Staff', 'personal_info' => json_encode(['contact' => '09280000003', 'office' => 'Guidance']), 'email' => 'e3_sr@mail.com', 'password' => md5('password'), 'department_id' => 2, 'program_id' => null, 'strand_id' => 1, 'branch_id' => 2, 'is_activated' => 1, 'is_deleted' => 0],
-            ['id' => 4, 'code' => 'EMP-HCCSR-04', 'firstname' => 'Sheena', 'middlename' => 'D', 'lastname' => 'Morales', 'role' => 'Librarian', 'personal_info' => json_encode(['contact' => '09280000004', 'office' => 'Library']), 'email' => 'e4_sr@mail.com', 'password' => md5('password'), 'department_id' => 6, 'program_id' => null, 'strand_id' => null, 'branch_id' => 2, 'is_activated' => 1, 'is_deleted' => 0],
-            ['id' => 5, 'code' => 'EMP-CHCC-01', 'firstname' => 'Ian', 'middlename' => 'F', 'lastname' => 'Ramos', 'role' => 'Registrar', 'personal_info' => json_encode(['contact' => '09280000005', 'office' => 'Registrar']), 'email' => 'e1_chcc@mail.com', 'password' => md5('password'), 'department_id' => 3, 'program_id' => 5, 'strand_id' => null, 'branch_id' => 3, 'is_activated' => 1, 'is_deleted' => 0],
-            ['id' => 6, 'code' => 'EMP-CHCC-02', 'firstname' => 'Joy', 'middlename' => 'G', 'lastname' => 'Salazar', 'role' => 'Cashier', 'personal_info' => json_encode(['contact' => '09280000006', 'office' => 'Finance']), 'email' => 'e2_chcc@mail.com', 'password' => md5('password'), 'department_id' => 3, 'program_id' => 6, 'strand_id' => null, 'branch_id' => 3, 'is_activated' => 1, 'is_deleted' => 0],
-            ['id' => 7, 'code' => 'EMP-CHCC-03', 'firstname' => 'Ken', 'middlename' => 'H', 'lastname' => 'Bautista', 'role' => 'Guidance Staff', 'personal_info' => json_encode(['contact' => '09280000007', 'office' => 'Guidance']), 'email' => 'e3_chcc@mail.com', 'password' => md5('password'), 'department_id' => 4, 'program_id' => null, 'strand_id' => 5, 'branch_id' => 3, 'is_activated' => 1, 'is_deleted' => 0],
-            ['id' => 8, 'code' => 'EMP-CHCC-04', 'firstname' => 'Lorna', 'middlename' => 'I', 'lastname' => 'Vega', 'role' => 'Librarian', 'personal_info' => json_encode(['contact' => '09280000008', 'office' => 'Library']), 'email' => 'e4_chcc@mail.com', 'password' => md5('password'), 'department_id' => 8, 'program_id' => null, 'strand_id' => null, 'branch_id' => 3, 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 1, 'code' => 'EMP-HCCSR-01', 'firstname' => 'Leo', 'middlename' => 'A', 'lastname' => 'Rivera', 'role' => 'Registrar', 'personal_info' => json_encode(['contact' => '09280000001', 'office' => 'Registrar']), 'email' => 'e1_sr@mail.com', 'password' => md5('password'), 'department_id' => 1, 'employee_department_id' => 3, 'program_id' => 1, 'strand_id' => null, 'branch_id' => 2, 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 2, 'code' => 'EMP-HCCSR-02', 'firstname' => 'Grace', 'middlename' => 'B', 'lastname' => 'Fernandez', 'role' => 'Cashier', 'personal_info' => json_encode(['contact' => '09280000002', 'office' => 'Finance']), 'email' => 'e2_sr@mail.com', 'password' => md5('password'), 'department_id' => 1, 'employee_department_id' => 5, 'program_id' => 2, 'strand_id' => null, 'branch_id' => 2, 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 3, 'code' => 'EMP-HCCSR-03', 'firstname' => 'Rico', 'middlename' => 'C', 'lastname' => 'Domingo', 'role' => 'Guidance Staff', 'personal_info' => json_encode(['contact' => '09280000003', 'office' => 'Guidance']), 'email' => 'e3_sr@mail.com', 'password' => md5('password'), 'department_id' => 2, 'employee_department_id' => 6, 'program_id' => null, 'strand_id' => 1, 'branch_id' => 2, 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 4, 'code' => 'EMP-HCCSR-04', 'firstname' => 'Sheena', 'middlename' => 'D', 'lastname' => 'Morales', 'role' => 'Librarian', 'personal_info' => json_encode(['contact' => '09280000004', 'office' => 'Library']), 'email' => 'e4_sr@mail.com', 'password' => md5('password'), 'department_id' => 6, 'employee_department_id' => 7, 'program_id' => null, 'strand_id' => null, 'branch_id' => 2, 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 5, 'code' => 'EMP-CHCC-01', 'firstname' => 'Ian', 'middlename' => 'F', 'lastname' => 'Ramos', 'role' => 'Registrar', 'personal_info' => json_encode(['contact' => '09280000005', 'office' => 'Registrar']), 'email' => 'e1_chcc@mail.com', 'password' => md5('password'), 'department_id' => 3, 'employee_department_id' => 3, 'program_id' => 5, 'strand_id' => null, 'branch_id' => 3, 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 6, 'code' => 'EMP-CHCC-02', 'firstname' => 'Joy', 'middlename' => 'G', 'lastname' => 'Salazar', 'role' => 'Cashier', 'personal_info' => json_encode(['contact' => '09280000006', 'office' => 'Finance']), 'email' => 'e2_chcc@mail.com', 'password' => md5('password'), 'department_id' => 3, 'employee_department_id' => 5, 'program_id' => 6, 'strand_id' => null, 'branch_id' => 3, 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 7, 'code' => 'EMP-CHCC-03', 'firstname' => 'Ken', 'middlename' => 'H', 'lastname' => 'Bautista', 'role' => 'Guidance Staff', 'personal_info' => json_encode(['contact' => '09280000007', 'office' => 'Guidance']), 'email' => 'e3_chcc@mail.com', 'password' => md5('password'), 'department_id' => 4, 'employee_department_id' => 6, 'program_id' => null, 'strand_id' => 5, 'branch_id' => 3, 'is_activated' => 1, 'is_deleted' => 0],
+            ['id' => 8, 'code' => 'EMP-CHCC-04', 'firstname' => 'Lorna', 'middlename' => 'I', 'lastname' => 'Vega', 'role' => 'Librarian', 'personal_info' => json_encode(['contact' => '09280000008', 'office' => 'Library']), 'email' => 'e4_chcc@mail.com', 'password' => md5('password'), 'department_id' => 8, 'employee_department_id' => 7, 'program_id' => null, 'strand_id' => null, 'branch_id' => 3, 'is_activated' => 1, 'is_deleted' => 0],
         ]);
 
         DB::table('subject')->insert([
@@ -342,6 +359,227 @@ class DatabaseSeeder extends Seeder
                 ]),
                 'comments' => json_encode([3]),
                 'notes' => 'Baseline evaluation questionnaire seeded for Concepcion branch.',
+                'is_activated' => 1,
+                'is_deleted' => 0,
+            ],
+            [
+                'id' => 3,
+                'branch_id' => 2,
+                'code' => 'QUES-PEER-SR',
+                'title' => 'Santa Rosa Peer to Peer Evaluation Form',
+                'questionnaire_type_id' => 2,
+                'question_choices_id' => 1,
+                'items' => json_encode([
+                    'scale_questions' => [
+                        [
+                            'class_name' => 'Professionalism',
+                            'weight_percentage' => 30,
+                            'questions' => [1, 6],
+                        ],
+                        [
+                            'class_name' => 'Instructional Delivery',
+                            'weight_percentage' => 30,
+                            'questions' => [2],
+                        ],
+                        [
+                            'class_name' => 'Room Management',
+                            'weight_percentage' => 20,
+                            'questions' => [4],
+                        ],
+                        [
+                            'class_name' => 'Communication',
+                            'weight_percentage' => 20,
+                            'questions' => [5],
+                        ],
+                    ],
+                    'comment_section' => [
+                        'questions' => [
+                            ['question_id' => 3],
+                        ],
+                    ],
+                ]),
+                'comments' => json_encode([3]),
+                'notes' => 'Default peer-to-peer evaluation questionnaire for Santa Rosa branch.',
+                'is_activated' => 1,
+                'is_deleted' => 0,
+            ],
+            [
+                'id' => 4,
+                'branch_id' => 3,
+                'code' => 'QUES-PEER-CH',
+                'title' => 'Concepcion Peer to Peer Evaluation Form',
+                'questionnaire_type_id' => 2,
+                'question_choices_id' => 1,
+                'items' => json_encode([
+                    'scale_questions' => [
+                        [
+                            'class_name' => 'Professionalism',
+                            'weight_percentage' => 35,
+                            'questions' => [1, 6],
+                        ],
+                        [
+                            'class_name' => 'Instructional Delivery',
+                            'weight_percentage' => 35,
+                            'questions' => [2],
+                        ],
+                        [
+                            'class_name' => 'Communication',
+                            'weight_percentage' => 30,
+                            'questions' => [5],
+                        ],
+                    ],
+                    'comment_section' => [
+                        'questions' => [
+                            ['question_id' => 3],
+                        ],
+                    ],
+                ]),
+                'comments' => json_encode([3]),
+                'notes' => 'Default peer-to-peer evaluation questionnaire for Concepcion branch.',
+                'is_activated' => 1,
+                'is_deleted' => 0,
+            ],
+            [
+                'id' => 5,
+                'branch_id' => 2,
+                'code' => 'QUES-HEAD-SR',
+                'title' => 'Santa Rosa School Heads Evaluation Form',
+                'questionnaire_type_id' => 3,
+                'question_choices_id' => 1,
+                'items' => json_encode([
+                    'scale_questions' => [
+                        [
+                            'class_name' => 'Professionalism',
+                            'weight_percentage' => 35,
+                            'questions' => [1, 6],
+                        ],
+                        [
+                            'class_name' => 'Instructional Leadership',
+                            'weight_percentage' => 35,
+                            'questions' => [2, 4],
+                        ],
+                        [
+                            'class_name' => 'Communication',
+                            'weight_percentage' => 30,
+                            'questions' => [5],
+                        ],
+                    ],
+                    'comment_section' => [
+                        'questions' => [
+                            ['question_id' => 3],
+                        ],
+                    ],
+                ]),
+                'comments' => json_encode([3]),
+                'notes' => 'Default school-head evaluation questionnaire for Santa Rosa branch.',
+                'is_activated' => 1,
+                'is_deleted' => 0,
+            ],
+            [
+                'id' => 6,
+                'branch_id' => 3,
+                'code' => 'QUES-HEAD-CH',
+                'title' => 'Concepcion School Heads Evaluation Form',
+                'questionnaire_type_id' => 3,
+                'question_choices_id' => 1,
+                'items' => json_encode([
+                    'scale_questions' => [
+                        [
+                            'class_name' => 'Professionalism',
+                            'weight_percentage' => 35,
+                            'questions' => [1, 6],
+                        ],
+                        [
+                            'class_name' => 'Instructional Leadership',
+                            'weight_percentage' => 35,
+                            'questions' => [2, 4],
+                        ],
+                        [
+                            'class_name' => 'Communication',
+                            'weight_percentage' => 30,
+                            'questions' => [5],
+                        ],
+                    ],
+                    'comment_section' => [
+                        'questions' => [
+                            ['question_id' => 3],
+                        ],
+                    ],
+                ]),
+                'comments' => json_encode([3]),
+                'notes' => 'Default school-head evaluation questionnaire for Concepcion branch.',
+                'is_activated' => 1,
+                'is_deleted' => 0,
+            ],
+            [
+                'id' => 7,
+                'branch_id' => 2,
+                'code' => 'QUES-EMP-SR',
+                'title' => 'Santa Rosa Employee Feedback Evaluation Form',
+                'questionnaire_type_id' => 4,
+                'question_choices_id' => 1,
+                'items' => json_encode([
+                    'scale_questions' => [
+                        [
+                            'class_name' => 'Professionalism',
+                            'weight_percentage' => 35,
+                            'questions' => [1, 6],
+                        ],
+                        [
+                            'class_name' => 'Service Delivery',
+                            'weight_percentage' => 35,
+                            'questions' => [2, 4],
+                        ],
+                        [
+                            'class_name' => 'Communication',
+                            'weight_percentage' => 30,
+                            'questions' => [5],
+                        ],
+                    ],
+                    'comment_section' => [
+                        'questions' => [
+                            ['question_id' => 3],
+                        ],
+                    ],
+                ]),
+                'comments' => json_encode([3]),
+                'notes' => 'Default employee feedback questionnaire for Santa Rosa branch.',
+                'is_activated' => 1,
+                'is_deleted' => 0,
+            ],
+            [
+                'id' => 8,
+                'branch_id' => 3,
+                'code' => 'QUES-EMP-CH',
+                'title' => 'Concepcion Employee Feedback Evaluation Form',
+                'questionnaire_type_id' => 4,
+                'question_choices_id' => 1,
+                'items' => json_encode([
+                    'scale_questions' => [
+                        [
+                            'class_name' => 'Professionalism',
+                            'weight_percentage' => 35,
+                            'questions' => [1, 6],
+                        ],
+                        [
+                            'class_name' => 'Service Delivery',
+                            'weight_percentage' => 35,
+                            'questions' => [2, 4],
+                        ],
+                        [
+                            'class_name' => 'Communication',
+                            'weight_percentage' => 30,
+                            'questions' => [5],
+                        ],
+                    ],
+                    'comment_section' => [
+                        'questions' => [
+                            ['question_id' => 3],
+                        ],
+                    ],
+                ]),
+                'comments' => json_encode([3]),
+                'notes' => 'Default employee feedback questionnaire for Concepcion branch.',
                 'is_activated' => 1,
                 'is_deleted' => 0,
             ],

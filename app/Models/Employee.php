@@ -10,7 +10,7 @@ class Employee extends Model
     protected $table = 'employee';
 
     protected $fillable = [
-        'code', 'branch_id', 'department_id', 'program_id', 'strand_id',
+        'code', 'branch_id', 'department_id', 'employee_department_id', 'program_id', 'strand_id',
         'firstname', 'middlename', 'lastname',
         'email', 'password', 'role', 'is_activated', 'is_deleted',
     ];
@@ -27,6 +27,11 @@ class Employee extends Model
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);
+    }
+
+    public function employeeDepartment(): BelongsTo
+    {
+        return $this->belongsTo(EmployeeDepartment::class);
     }
 
     public function program(): BelongsTo
