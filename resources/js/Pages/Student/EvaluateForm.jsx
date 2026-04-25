@@ -10,14 +10,14 @@ const CATEGORY_LABELS = {
   employee:        'Employee Evaluation',
 };
 
-export default function EvaluateForm({ category, evaluatee, subjectSectionId, subjectInfo, questions, cycle }) {
+export default function EvaluateForm({ category, questionnaireId, evaluatee, subjectSectionId, subjectId, subjectInfo, questions, cycle }) {
   const [answers,    setAnswers]    = useState({});
   const [comment,    setComment]    = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errors,     setErrors]     = useState({});
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const allAnswered = questions.every(q => answers[q.question_id]);
+  const allAnswered = questions.length > 0 && questions.every(q => answers[q.question_id]);
 
   function setRating(qid, rating) {
     setAnswers(prev => ({ ...prev, [qid]: rating }));
@@ -40,8 +40,10 @@ export default function EvaluateForm({ category, evaluatee, subjectSectionId, su
     setSubmitting(true);
     router.post(route('portal.student.evaluate.submit'), {
       category,
+      questionnaire_id:   questionnaireId ?? null,
       evaluatee_id:       evaluatee.id,
       subject_section_id: subjectSectionId ?? null,
+      subject_id:         subjectId ?? null,
       academic_year_id:   cycle.id,
       school_year:        cycle.school_year,
       term:               cycle.term ?? cycle.semester,

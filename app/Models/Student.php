@@ -12,7 +12,7 @@ class Student extends Model
     protected $fillable = [
         'code', 'branch_id', 'department_id', 'program_id',
         'strand_id', 'education_level_id', 'subject_id', 'removed_subject_map',
-        'is_irreg', 'irreg_subject_id', 'irreg_subject_map',
+        'is_irreg', 'irreg_subject_id', 'irreg_subject_map', 'evaluation_submission_ids',
         'firstname', 'middlename', 'lastname',
         'email', 'password', 'is_activated', 'is_deleted',
     ];
@@ -23,6 +23,7 @@ class Student extends Model
         'subject_id' => 'array',
         'removed_subject_map' => 'array',
         'irreg_subject_map' => 'array',
+        'evaluation_submission_ids' => 'array',
         'is_irreg' => 'boolean',
         'is_activated' => 'boolean',
         'is_deleted' => 'boolean',
@@ -83,6 +84,7 @@ class Student extends Model
         $attributes['is_irreg'] = (bool) ($attributes['is_irreg'] ?? false);
         $attributes['irreg_subject_id'] = $attributes['irreg_subject_id'] ?? null;
         $attributes['irreg_subject_map'] = $attributes['irreg_subject_map'] ?? [];
+        $attributes['evaluation_submission_ids'] = $attributes['evaluation_submission_ids'] ?? [];
         $attributes['is_active'] = (bool) ($attributes['is_activated'] ?? false);
         $attributes['status'] = ($attributes['is_activated'] ?? false) ? 'Active' : 'Inactive';
 

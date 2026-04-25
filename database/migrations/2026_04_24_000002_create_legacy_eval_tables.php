@@ -179,6 +179,7 @@ return new class extends Migration
             $table->boolean('is_irreg')->default(false);
             $table->unsignedBigInteger('irreg_subject_id')->nullable();
             $table->json('irreg_subject_map')->nullable();
+            $table->json('evaluation_submission_ids')->nullable();
             $table->boolean('is_activated')->default(true);
             $table->boolean('is_deleted')->default(false);
             $table->timestamps();

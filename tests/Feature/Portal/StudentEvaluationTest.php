@@ -156,12 +156,46 @@ class StudentEvaluationTest extends TestCase
             ],
         ]);
 
+        $questionnaireTypeId = (int) DB::table('questionnaire_type')->insertGetId([
+            'code' => 'QTYPE-SUBJECT-TEST',
+            'name' => 'Subject Teacher Test Form',
+            'is_activated' => 1,
+            'is_deleted' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $questionnaireId = (int) DB::table('questionnaires')->insertGetId([
+            'code' => 'QUES-STU-TEST',
+            'title' => 'Student Evaluation Test Questionnaire',
+            'questionnaire_type_id' => $questionnaireTypeId,
+            'items' => json_encode([
+                'scale_questions' => [[
+                    'class_name' => 'Teaching',
+                    'weight_percentage' => 100,
+                    'questions' => [1, 2],
+                ]],
+            ]),
+            'comments' => json_encode([]),
+            'is_activated' => 1,
+            'is_deleted' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('subject')->where('id', $subjectId)->update([
+            'questionnaire_id' => $questionnaireId,
+        ]);
+
         return [
             'cycle_id' => $cycleId,
             'student_id' => $studentId,
             'teacher_employee_id' => $teacherEmployeeId,
             'subject_id' => $subjectId,
             'subject_section_id' => $subjectSectionId,
+            'branch_id' => $branchId,
+            'questionnaire_type_id' => $questionnaireTypeId,
+            'questionnaire_id' => $questionnaireId,
         ];
     }
 
@@ -183,6 +217,7 @@ class StudentEvaluationTest extends TestCase
                 'category' => 'teacher_subject',
                 'evaluatee_id' => $ids['teacher_employee_id'],
                 'subject_section_id' => $ids['subject_section_id'],
+                'questionnaire_id' => $ids['questionnaire_id'],
                 'academic_year_id' => $ids['cycle_id'],
                 'school_year' => '2026-2027',
                 'term' => '1st Sem',
@@ -196,14 +231,11 @@ class StudentEvaluationTest extends TestCase
         $response->assertRedirect(route('portal.student.dashboard'));
 
         $this->assertDatabaseHas('evaluation_submissions', [
-            'evaluator_id' => $ids['student_id'],
-            'evaluator_type' => 'student',
-            'evaluatee_id' => $ids['teacher_employee_id'],
-            'evaluatee_type' => 'employee',
-            'subject_section_id' => $ids['subject_section_id'],
-            'category' => 'teacher_subject',
-            'school_year' => '2026-2027',
-            'term' => '1st Sem',
+            'branch_id' => $ids['branch_id'],
+            'academic_year_id' => $ids['cycle_id'],
+            'questionnaire_type_id' => $ids['questionnaire_type_id'],
+            'questionnaire_id' => $ids['questionnaire_id'],
+            'teacher_id' => $ids['teacher_employee_id'],
         ]);
 
         $row = DB::table('ratings_subject')
@@ -217,5 +249,74 @@ class StudentEvaluationTest extends TestCase
 
         $overall = json_decode($row->overall_ratings, true);
         $this->assertEqualsWithDelta(4.5, (float) $overall['average'], 0.01);
+
+        $submission = DB::table('evaluation_submissions')
+            ->where('branch_id', $ids['branch_id'])
+            ->where('academic_year_id', $ids['cycle_id'])
+            ->where('questionnaire_type_id', $ids['questionnaire_type_id'])
+            ->where('questionnaire_id', $ids['questionnaire_id'])
+            ->where('teacher_id', $ids['teacher_employee_id'])
+            ->first();
+
+        $this->assertNotNull($submission, 'evaluation_submissions row should exist after student submission');
+        $this->assertCount(2, json_decode($submission->answers, true));
+        $this->assertSame(['text' => 'Strong instruction'], json_decode($submission->comments, true));
+
+        $studentSubmissionIds = json_decode(
+            DB::table('student')->where('id', $ids['student_id'])->value('evaluation_submission_ids'),
+            true
+        );
+
+        $this->assertContains((int) $submission->id, $studentSubmissionIds);
+
+        $secondStudentId = (int) DB::table('student')->insertGetId([
+            'code' => 'STU-002',
+            'firstname' => 'Casey',
+            'lastname' => 'Student',
+            'email' => 'casey.student@hcc.local',
+            'password' => bcrypt('test12345'),
+            'branch_id' => $ids['branch_id'],
+            'is_activated' => 1,
+            'is_deleted' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('student_enrollments')->insert([
+            'student_id' => $secondStudentId,
+            'subject_section_id' => $ids['subject_section_id'],
+            'status' => 'enrolled',
+        ]);
+
+        $this->asStudent($secondStudentId)
+            ->post(route('portal.student.evaluate.submit'), [
+                'category' => 'teacher_subject',
+                'evaluatee_id' => $ids['teacher_employee_id'],
+                'subject_section_id' => $ids['subject_section_id'],
+                'questionnaire_id' => $ids['questionnaire_id'],
+                'academic_year_id' => $ids['cycle_id'],
+                'school_year' => '2026-2027',
+                'term' => '1st Sem',
+                'answers' => [
+                    ['question_id' => 1, 'rating' => 5],
+                    ['question_id' => 2, 'rating' => 5],
+                ],
+                'comments' => 'Also submitted',
+            ])
+            ->assertRedirect(route('portal.student.dashboard'));
+
+        $this->assertSame(2, DB::table('evaluation_submissions')
+            ->where('academic_year_id', $ids['cycle_id'])
+            ->where('questionnaire_id', $ids['questionnaire_id'])
+            ->where('teacher_id', $ids['teacher_employee_id'])
+            ->count());
+
+        $secondSubmissionIds = json_decode(
+            DB::table('student')->where('id', $secondStudentId)->value('evaluation_submission_ids'),
+            true
+        );
+
+        $this->assertCount(1, $secondSubmissionIds);
+        $this->assertNotContains((int) $submission->id, $secondSubmissionIds);
     }
 }
