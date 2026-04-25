@@ -43,6 +43,10 @@ class EmployeePortalController extends Controller
 
     private function ratingsForCycle(int $employeeId, string $schoolYear, array $terms): array
     {
+        if (! Schema::hasTable('evaluation_submissions')) {
+            return [];
+        }
+
         $rows = DB::table('evaluation_submissions as es')
             ->select(
                 'es.category',
@@ -85,6 +89,10 @@ class EmployeePortalController extends Controller
 
     private function pendingTargets(int $employeeId, string $schoolYear, array $terms): array
     {
+        if (! Schema::hasTable('evaluation_submissions')) {
+            return [];
+        }
+
         $me = DB::table('employee')->where('id', $employeeId)->first();
         if (! $me) {
             return [];
@@ -125,6 +133,11 @@ class EmployeePortalController extends Controller
         $evaluateeId = (int) $request->query('evaluatee_id');
         $category    = $request->query('category', 'peer_employee');
         $cycle       = $this->activeCycle();
+
+        if (! Schema::hasTable('evaluation_submissions')) {
+            return redirect()->route('portal.employee.dashboard')
+                ->with('error', 'Submissions storage is not available yet.');
+        }
 
         if (! $cycle) {
             return redirect()->route('portal.employee.dashboard')->with('error', 'No active evaluation cycle.');

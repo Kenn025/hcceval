@@ -22,9 +22,22 @@ class ClientLoginController extends Controller
         }
 
         if (session('client_type') === 'faculty' && session('client_id')) {
+            $source = session('client_source');
+
+            if ($source === 'employee') {
+                return redirect()->route('portal.employee.dashboard');
+            }
+
+            if ($source === 'teacher') {
+                return redirect()->route('portal.teacher.dashboard');
+            }
+
+            // Backward compatibility for old sessions that only have client_role.
             $role = session('client_role', 'FACULTY');
             return redirect()->route(
-                strtoupper($role) === 'EMPLOYEE' ? 'portal.employee.dashboard' : 'portal.teacher.dashboard'
+                strtoupper(trim((string) $role)) === 'EMPLOYEE'
+                    ? 'portal.employee.dashboard'
+                    : 'portal.teacher.dashboard'
             );
         }
 
