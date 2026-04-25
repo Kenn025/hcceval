@@ -171,6 +171,7 @@ class EmployeePortalController extends Controller
                 'id'          => $cycle->id,
                 'school_year' => "{$cycle->from_year}-{$cycle->to_year}",
                 'semester'    => $this->semesterLabel($cycle->term),
+                'term'        => $cycle->term,
             ],
         ]);
     }

@@ -24,11 +24,11 @@
 | 2 | Performance Efficiency  | 60%   | Needs evidence |
 | 3 | Compatibility           | 70%   | Demonstrable |
 | 4 | Usability               | 85%   | ConfirmDialog wired across destructive actions (Export, Print, Recompute, Submit Evaluation, Mark-all-read, Clear) |
-| 5 | Reliability             | 60%   | Core portal/auth coverage added; 2 high-value tests still missing |
+| 5 | Reliability             | 70%   | Five defense-priority feature tests are now passing |
 | 6 | Security                | 80%   | MD5 migration done — bcrypt with on-login rehash |
 | 7 | Maintainability         | 80%   | Pass-ready |
 | 8 | Portability             | 50%   | Deploy doc required |
-|   | **Weighted average**    | **74%** | **Pass-ready — finish remaining top-5 items to reach 90%+** |
+|   | **Weighted average**    | **76%** | **Pass-ready — finish remaining top-5 items to reach 90%+** |
 
 ---
 
@@ -134,7 +134,7 @@ Build a 1-page `/help` route with a static manual + screenshots, and wire `Confi
 
 ## 5. Reliability — *does it stay up; does it recover from failure?*
 
-**Score: 60% — improved, but still one of the weaker categories.**
+**Score: 70% — materially improved, with defense-ready test evidence now in place.**
 
 ### Done
 - Soft deletes (`is_deleted`) prevent accidental data loss
@@ -142,24 +142,27 @@ Build a 1-page `/help` route with a static manual + screenshots, and wire `Confi
 - Audit log captures every admin action
 - 2FA + login throttling (5 attempts) protects accounts
 - Notifications wrapped in `try/catch` — broken SMTP will not 500 the request
-- Feature tests now cover employee peer/head submissions, duplicate-submit blocking, login lockout, and admin 2FA challenge
+- Feature tests now cover:
+1. Student submits subject evaluation -> `ratings_subject` aggregates
+2. Employee submits peer evaluation -> `ratings_employee` aggregates
+3. Employee submits head evaluation -> `ratings_head` aggregates
+4. Duplicate employee submission is blocked
+5. Login lockout triggers after 5 failed attempts
+6. Admin 2FA challenge is required when enabled
+7. Admin opens an active cycle -> `app_notifications` written and evaluation-window emails attempted
 
 ### Partial
 - Some controllers use raw `DB::table()` updates without a transaction — concurrent submissions to `ratings_*` tables could miscount.
-- Full PHPUnit suite is green (`php artisan test`: 31 passing tests / 123 assertions), but ratings/reporting coverage is still thin outside the employee portal path.
+- Full PHPUnit suite is green (`php artisan test`: 33 passing tests / 140 assertions), but ratings/reporting coverage is still thin outside the core submission and auth flows.
 
 ### Missing
-- Still missing 2 of the 5 high-value defense tests: student submits subject evaluation, and admin opens cycle notifications/emails.
 - No backup/restore strategy documented.
 - No error monitoring (Sentry, Bugsnag, Flare).
 - No `php artisan health:check` or status endpoint.
+- No regression coverage yet for outstanding-awards computation, report exports, or archive/restore flows.
 
 ### Recommendation
-Finish the remaining **2 feature tests** before defense:
-1. Student submits evaluation -> `ratings_subject` row created/updated
-2. Admin opens cycle -> notifications written to `app_notifications` + emails attempted
-
-The employee evaluation flow, duplicate-submit guard, login lockout, and admin 2FA challenge are now covered.
+Shift the next reliability push to backup/restore notes, a lightweight health endpoint, and one more regression test around awards/report exports if time permits.
 
 ---
 
@@ -256,7 +259,7 @@ Ranked by **impact divided by effort**.
 | # | Fix                                                          | Categories Improved          | Effort   |
 |---|--------------------------------------------------------------|------------------------------|----------|
 | 1 | ~~Migrate passwords from MD5 -> bcrypt (with on-login rehash)~~ **DONE** | Security                     | shipped  |
-| 2 | Write 5 feature tests for evaluation flows *(3/5 shipped)*   | Reliability                  | 1-2 hrs  |
+| 2 | ~~Write 5 feature tests for evaluation flows~~ **DONE**      | Reliability                  | shipped  |
 | 3 | ~~Add missing sidebar nav entries + wire `ConfirmDialog`~~ **DONE** | Functional + Usability       | shipped  |
 | 4 | Write README + DEPLOY.md + minimal docker-compose            | Maintainability + Portability| 2 hrs    |
 | 5 | Set `APP_DEBUG=false` for demo + configure real SMTP         | Security + Functional        | 30 min   |
@@ -321,3 +324,4 @@ If a request implies any of these, the AI must stop and ask the user to confirm:
 | 2026-04-26 | Claude           | Priority #1 shipped: MD5 -> bcrypt with on-login rehash + `auth:rehash` command. Security 65% -> 80%. Overall 68% -> 70%. |
 | 2026-04-26 | Claude           | Priority #3 shipped: sidebar nav entries (Audit Logs, Outstanding Awards, Head/Branch Ratings, Employee Archives) + `ConfirmDialog` wired into Export, Print Summary, Recompute Awards, Submit Evaluation (Student/Teacher/Employee), Mark-all-read, Clear notifications. Functional 90% -> 95%, Usability 75% -> 85%. Overall 70% -> 74%. |
 | 2026-04-26 | Codex            | Added employee portal evaluation tests, admin login lockout + 2FA tests, fixed `ratings_head` to aggregate department-head evaluations against `employee` records, and confirmed the full PHPUnit suite is green (31 tests / 123 assertions). |
+| 2026-04-26 | Codex            | Completed Priority #2: added student subject-evaluation and evaluation-cycle notification tests, wired the missing student submission backend, aligned `ratings_subject` with employee-backed subject teachers, and confirmed the full PHPUnit suite is green (33 tests / 140 assertions). |

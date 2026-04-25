@@ -44,7 +44,7 @@ export default function EvaluateForm({ category, evaluatee, subjectSectionId, su
       subject_section_id: subjectSectionId ?? null,
       academic_year_id:   cycle.id,
       school_year:        cycle.school_year,
-      term:               cycle.semester,
+      term:               cycle.term ?? cycle.semester,
       answers:            Object.entries(answers).map(([qid, rating]) => ({ question_id: parseInt(qid), rating })),
       comments:           comment || null,
     }, {

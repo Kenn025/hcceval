@@ -1,5 +1,6 @@
 import AppIcon from '@/Components/AppIcon';
 import PortalLayout from '@/Layouts/PortalLayout';
+import { router } from '@inertiajs/react';
 import { useState } from 'react';
 
 const SECTION_TITLES = {
@@ -69,7 +70,7 @@ function StudentInfoCard({ student, cycle }) {
     );
 }
 
-function SubjectsTab({ subjects }) {
+function SubjectsTab({ subjects, cycle }) {
     if (!subjects.length) {
         return <EmptyState icon="subjects" message="No enrolled subjects for the current evaluation cycle." />;
     }
@@ -106,7 +107,18 @@ function SubjectsTab({ subjects }) {
                                 </span>
                             )}
                         </div>
-                        <Badge color="blue">{s.semester_label}</Badge>
+                        <div className="flex items-center gap-2">
+                            <Badge color="blue">{s.semester_label}</Badge>
+                            {cycle?.is_open && !s.already_evaluated && (
+                                <button
+                                    type="button"
+                                    onClick={() => router.visit(route('portal.student.evaluate', { subject_section_id: s.section_id, category: 'teacher_subject' }))}
+                                    className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                                >
+                                    Evaluate
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
             ))}
@@ -241,7 +253,7 @@ export default function StudentDashboard({ student, cycle, subjects = [], evalua
                 )}
             </div>
 
-            {activeNav === 'subjects'    && <SubjectsTab    subjects={subjects} />}
+            {activeNav === 'subjects'    && <SubjectsTab    subjects={subjects} cycle={cycle} />}
             {activeNav === 'evaluations' && <EvaluationsTab evaluations={evaluations} />}
             {activeNav === 'archive'     && <ArchiveTab     archive={archive} />}
         </PortalLayout>

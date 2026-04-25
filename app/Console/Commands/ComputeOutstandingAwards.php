@@ -65,15 +65,15 @@ class ComputeOutstandingAwards extends Command
     private function topTeachers(int $academicYearId, int $branchId, int $limit): array
     {
         return DB::table('ratings_subject as rs')
-            ->join('teacher as t', 'rs.teacher_id', '=', 't.id')
+            ->join('employee as e', 'rs.employee_id', '=', 'e.id')
             ->where('rs.academic_year_id', $academicYearId)
-            ->where('t.branch_id', $branchId)
+            ->where('e.branch_id', $branchId)
             ->select(
-                't.id',
-                DB::raw("CONCAT(t.firstname, ' ', t.lastname) as name"),
+                'e.id',
+                DB::raw("CONCAT(e.firstname, ' ', e.lastname) as name"),
                 DB::raw("AVG(JSON_UNQUOTE(JSON_EXTRACT(rs.overall_ratings, '$.average'))) as score")
             )
-            ->groupBy('t.id', 't.firstname', 't.lastname')
+            ->groupBy('e.id', 'e.firstname', 'e.lastname')
             ->orderByDesc('score')
             ->limit($limit)
             ->get()
@@ -103,10 +103,10 @@ class ComputeOutstandingAwards extends Command
     private function topPrograms(int $academicYearId, int $branchId, int $limit): array
     {
         return DB::table('ratings_subject as rs')
-            ->join('teacher as t', 'rs.teacher_id', '=', 't.id')
-            ->join('program as p', 'p.id', '=', 't.program_id')
+            ->join('employee as e', 'rs.employee_id', '=', 'e.id')
+            ->join('program as p', 'p.id', '=', 'e.program_id')
             ->where('rs.academic_year_id', $academicYearId)
-            ->where('t.branch_id', $branchId)
+            ->where('e.branch_id', $branchId)
             ->select(
                 'p.id',
                 'p.name',
@@ -123,10 +123,10 @@ class ComputeOutstandingAwards extends Command
     private function topStrands(int $academicYearId, int $branchId, int $limit): array
     {
         return DB::table('ratings_subject as rs')
-            ->join('teacher as t', 'rs.teacher_id', '=', 't.id')
-            ->join('strand as s', 's.id', '=', 't.strand_id')
+            ->join('employee as e', 'rs.employee_id', '=', 'e.id')
+            ->join('strand as s', 's.id', '=', 'e.strand_id')
             ->where('rs.academic_year_id', $academicYearId)
-            ->where('t.branch_id', $branchId)
+            ->where('e.branch_id', $branchId)
             ->select(
                 's.id',
                 's.name',
