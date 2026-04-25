@@ -1,0 +1,14 @@
+[Unit]
+Description=HCC Eval Laravel Queue Worker
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+Restart=always
+RestartSec=5
+WorkingDirectory=/var/www/hcceval
+ExecStart=/usr/bin/php artisan queue:work --verbose --tries=1 --timeout=0
+
+[Install]
+WantedBy=multi-user.target
