@@ -11,7 +11,10 @@ use App\Models\EducationLevel;
 use App\Models\Program;
 use App\Models\Strand;
 use App\Models\Student;
+use App\Models\Subject;
+use App\Models\Teacher;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class StudentController extends Controller
@@ -51,6 +54,100 @@ class StudentController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
+        $teachers = Teacher::query()
+            ->select('id', 'firstname', 'middlename', 'lastname')
+            ->where('is_deleted', 0)
+            ->where('is_activated', 1)
+            ->when($scopedId, fn ($q) => $q->where('branch_id', $scopedId))
+            ->orderBy('lastname')
+            ->orderBy('firstname')
+            ->get()
+            ->map(fn (Teacher $teacher) => [
+                'id' => $teacher->id,
+                'full_name' => $teacher->full_name,
+            ]);
+
+        $teacherNames = $teachers->pluck('full_name', 'id');
+        $subjectCollection = Subject::query()
+            ->select('id', 'code', 'name', 'department_id', 'program_id', 'strand_id', 'type', 'teacher_id')
+            ->where('is_deleted', 0)
+            ->where('is_activated', 1)
+            ->when($scopedId, fn ($q) => $q->whereHas('department', fn ($department) => $department->where('branch_id', $scopedId)))
+            ->orderBy('name')
+            ->get();
+
+        $subjectReference = $subjectCollection
+            ->keyBy('id')
+            ->map(function (Subject $subject) use ($teacherNames) {
+                $teacherIds = collect($subject->teacher_id ?? [])
+                    ->filter()
+                    ->map(fn ($id) => (int) $id)
+                    ->values();
+
+                return [
+                    'id' => $subject->id,
+                    'code' => $subject->code,
+                    'name' => $subject->name,
+                    'department_id' => $subject->department_id,
+                    'program_id' => $subject->program_id,
+                    'strand_id' => $subject->strand_id,
+                    'type' => $subject->type,
+                    'teacher_id' => $teacherIds->all(),
+                    'assigned_teacher_names' => $teacherIds
+                        ->map(fn ($id) => $teacherNames[$id] ?? null)
+                        ->filter()
+                        ->values()
+                        ->all(),
+                ];
+            });
+
+        $students->getCollection()->transform(function (Student $student) use ($subjectReference, $teacherNames) {
+            $removedMap = collect($student->removed_subject_map ?? []);
+            $irregMap = collect($student->irreg_subject_map ?? []);
+
+            $student->removed_subjects = $removedMap
+                ->map(function ($teacherId, $subjectId) use ($subjectReference, $teacherNames) {
+                    $subject = $subjectReference->get((int) $subjectId);
+
+                    if (! $subject) {
+                        return null;
+                    }
+
+                    return [
+                        'id' => $subject['id'],
+                        'code' => $subject['code'],
+                        'name' => $subject['name'],
+                        'teacher_id' => $teacherId ? (int) $teacherId : null,
+                        'teacher_name' => $teacherId ? ($teacherNames[(int) $teacherId] ?? null) : null,
+                    ];
+                })
+                ->filter()
+                ->values()
+                ->all();
+
+            $student->irregular_subjects = $irregMap
+                ->map(function ($teacherId, $subjectId) use ($subjectReference, $teacherNames) {
+                    $subject = $subjectReference->get((int) $subjectId);
+
+                    if (! $subject) {
+                        return null;
+                    }
+
+                    return [
+                        'id' => $subject['id'],
+                        'code' => $subject['code'],
+                        'name' => $subject['name'],
+                        'teacher_id' => $teacherId ? (int) $teacherId : null,
+                        'teacher_name' => $teacherId ? ($teacherNames[(int) $teacherId] ?? null) : null,
+                    ];
+                })
+                ->filter()
+                ->values()
+                ->all();
+
+            return $student;
+        });
+
         return Inertia::render('Admin/Students', [
             'students'    => $students,
             'filters'     => [
@@ -81,20 +178,15 @@ class StudentController extends Controller
                 ->orderBy('name')
                 ->get(),
             'yearLevels'  => EducationLevel::query()
-                ->select('id', 'department_id', 'program_id', 'strand_id', 'subject_id', 'year_level', 'section')
+                ->select('id', 'department_id', 'program_id', 'strand_id', 'subject_id', 'subject_teacher_map', 'year_level', 'section')
                 ->selectRaw("CONCAT(year_level, ' - ', section) as name")
                 ->where('is_deleted', 0)
                 ->when($scopedId, fn ($q) => $q->whereHas('department', fn ($department) => $department->where('branch_id', $scopedId)))
                 ->orderBy('year_level')
                 ->orderBy('section')
                 ->get(),
-            'subjects' => \App\Models\Subject::query()
-                ->select('id', 'code', 'name', 'department_id', 'program_id', 'strand_id', 'type')
-                ->where('is_deleted', 0)
-                ->where('is_activated', 1)
-                ->when($scopedId, fn ($q) => $q->whereHas('department', fn ($department) => $department->where('branch_id', $scopedId)))
-                ->orderBy('name')
-                ->get(),
+            'subjects' => $subjectReference->values(),
+            'teachers' => $teachers->values(),
             'nextStudentCodes' => array_merge(
                 ['default' => $this->generateStudentCode()],
                 $branches
@@ -142,9 +234,13 @@ class StudentController extends Controller
             'program_id' => $validated['program_id'] ?? null,
             'strand_id' => $validated['strand_id'] ?? null,
             'education_level_id' => $validated['year_level_id'] ?? null,
-            'subject_id' => array_values(array_map('intval', $validated['subject_ids'] ?? [])),
+            'subject_id' => [],
+            'removed_subject_map' => $validated['removed_subject_map'] ?? [],
             'is_irreg' => (bool) ($validated['is_irreg'] ?? false),
-            'irreg_subject_id' => !empty($validated['is_irreg']) ? ($validated['irreg_subject_id'] ?? null) : null,
+            'irreg_subject_id' => ! empty($validated['is_irreg'])
+                ? collect($validated['irreg_subject_map'] ?? [])->keys()->map(fn ($id) => (int) $id)->first()
+                : null,
+            'irreg_subject_map' => ! empty($validated['is_irreg']) ? ($validated['irreg_subject_map'] ?? []) : [],
             'firstname' => $validated['first_name'],
             'middlename' => $validated['middle_name'] ?? null,
             'lastname' => $validated['last_name'],
@@ -211,17 +307,18 @@ class StudentController extends Controller
     protected function studentPayloadFromRequest(Request $request): array
     {
         $scopedBranchId = $this->scopedBranchId();
-        
-        return [
+
+        $payload = [
             'student_no' => $request->input('student_no'),
             'branch_id' => $scopedBranchId ?? $request->input('branch_id'),
             'department_id' => $request->input('department_id'),
             'program_id' => $request->input('program_id'),
             'strand_id' => $request->input('strand_id'),
             'year_level_id' => $request->input('year_level_id'),
-            'subject_ids' => $request->input('subject_ids', []),
+            'removed_subject_ids' => $request->input('removed_subject_ids', []),
             'is_irreg' => $request->boolean('is_irreg'),
-            'irreg_subject_id' => $request->input('irreg_subject_id'),
+            'irreg_subject_ids' => $request->input('irreg_subject_ids', []),
+            'irreg_subject_teacher_ids' => $request->input('irreg_subject_teacher_ids', []),
             'first_name' => $request->input('first_name'),
             'middle_name' => $request->input('middle_name'),
             'last_name' => $request->input('last_name'),
@@ -230,5 +327,136 @@ class StudentController extends Controller
             'password' => $request->input('password'),
             'status' => $request->input('status', 'active'),
         ];
+
+        return $this->normalizeStudentSubjectSelections($payload);
+    }
+
+    protected function normalizeStudentSubjectSelections(array $payload): array
+    {
+        $yearLevel = ! empty($payload['year_level_id'])
+            ? EducationLevel::query()
+                ->select('id', 'department_id', 'program_id', 'strand_id', 'subject_id', 'subject_teacher_map')
+                ->where('id', $payload['year_level_id'])
+                ->where('is_deleted', 0)
+                ->first()
+            : null;
+
+        if (
+            $yearLevel &&
+            (
+                (int) $yearLevel->department_id !== (int) ($payload['department_id'] ?? 0)
+                || (! empty($payload['program_id']) && (int) ($yearLevel->program_id ?? 0) !== (int) $payload['program_id'])
+                || (! empty($payload['strand_id']) && (int) ($yearLevel->strand_id ?? 0) !== (int) $payload['strand_id'])
+            )
+        ) {
+            throw ValidationException::withMessages([
+                'year_level_id' => 'The selected year level does not match the current department, program, or strand.',
+            ]);
+        }
+
+        $regularSubjectIds = collect($yearLevel?->subject_id ?? [])
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->values();
+
+        $removedSubjectIds = collect($payload['removed_subject_ids'] ?? [])
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $invalidRemoved = $removedSubjectIds->diff($regularSubjectIds);
+
+        if ($invalidRemoved->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'removed_subject_ids' => 'Removed subjects must come from the selected year level.',
+            ]);
+        }
+
+        $payload['removed_subject_map'] = $removedSubjectIds
+            ->mapWithKeys(function (int $subjectId) use ($yearLevel) {
+                $teacherId = data_get($yearLevel?->subject_teacher_map ?? [], (string) $subjectId);
+
+                if (! $teacherId) {
+                    $subject = Subject::query()
+                        ->select('id', 'teacher_id')
+                        ->where('id', $subjectId)
+                        ->where('is_deleted', 0)
+                        ->where('is_activated', 1)
+                        ->first();
+
+                    $teacherId = collect($subject?->teacher_id ?? [])
+                        ->filter()
+                        ->map(fn ($id) => (int) $id)
+                        ->first();
+                }
+
+                return [(string) $subjectId => $teacherId ? (int) $teacherId : null];
+            })
+            ->all();
+
+        $irregularSubjectIds = collect($payload['irreg_subject_ids'] ?? [])
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $regularSubjectSet = $regularSubjectIds
+            ->diff($removedSubjectIds)
+            ->values();
+
+        $payload['irreg_subject_map'] = [];
+
+        if (! empty($payload['is_irreg'])) {
+            foreach ($irregularSubjectIds as $subjectId) {
+                if ($regularSubjectSet->contains($subjectId)) {
+                    throw ValidationException::withMessages([
+                        'irreg_subject_ids' => 'Irregular subjects must not already belong to the active regular year-level subjects.',
+                    ]);
+                }
+
+                $subject = Subject::query()
+                    ->select('id', 'department_id', 'program_id', 'strand_id', 'teacher_id')
+                    ->where('id', $subjectId)
+                    ->where('is_deleted', 0)
+                    ->where('is_activated', 1)
+                    ->firstOrFail();
+
+                if ((int) $subject->department_id !== (int) ($payload['department_id'] ?? 0)) {
+                    throw ValidationException::withMessages([
+                        'irreg_subject_ids' => 'Irregular subjects must belong to the selected department.',
+                    ]);
+                }
+
+                if (! empty($payload['program_id']) && (int) ($subject->program_id ?? 0) !== (int) $payload['program_id']) {
+                    throw ValidationException::withMessages([
+                        'irreg_subject_ids' => 'Irregular subjects must belong to the selected program.',
+                    ]);
+                }
+
+                if (! empty($payload['strand_id']) && (int) ($subject->strand_id ?? 0) !== (int) $payload['strand_id']) {
+                    throw ValidationException::withMessages([
+                        'irreg_subject_ids' => 'Irregular subjects must belong to the selected strand.',
+                    ]);
+                }
+
+                $teacherId = data_get($payload['irreg_subject_teacher_ids'] ?? [], (string) $subjectId);
+                $teacherId = $teacherId ? (int) $teacherId : null;
+                $availableTeacherIds = collect($subject->teacher_id ?? [])
+                    ->filter()
+                    ->map(fn ($id) => (int) $id)
+                    ->values();
+
+                if ($teacherId !== null && ! $availableTeacherIds->contains($teacherId)) {
+                    throw ValidationException::withMessages([
+                        'irreg_subject_teacher_ids' => 'Irregular subject teachers must come from the teachers assigned to each subject.',
+                    ]);
+                }
+
+                $payload['irreg_subject_map'][(string) $subjectId] = $teacherId;
+            }
+        }
+
+        return $payload;
     }
 }

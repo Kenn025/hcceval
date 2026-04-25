@@ -11,15 +11,22 @@ class Student extends Model
 
     protected $fillable = [
         'code', 'branch_id', 'department_id', 'program_id',
-        'strand_id', 'education_level_id', 'subject_id',
-        'is_irreg', 'irreg_subject_id',
+        'strand_id', 'education_level_id', 'subject_id', 'removed_subject_map',
+        'is_irreg', 'irreg_subject_id', 'irreg_subject_map',
         'firstname', 'middlename', 'lastname',
         'email', 'password', 'is_activated', 'is_deleted',
     ];
 
     protected $hidden = ['password'];
 
-    protected $casts = ['subject_id' => 'array', 'is_irreg' => 'boolean', 'is_activated' => 'boolean', 'is_deleted' => 'boolean'];
+    protected $casts = [
+        'subject_id' => 'array',
+        'removed_subject_map' => 'array',
+        'irreg_subject_map' => 'array',
+        'is_irreg' => 'boolean',
+        'is_activated' => 'boolean',
+        'is_deleted' => 'boolean',
+    ];
 
     public function branch(): BelongsTo
     {
@@ -72,8 +79,10 @@ class Student extends Model
         $attributes['suffix_name'] = null;
         $attributes['year_level_id'] = $attributes['education_level_id'] ?? null;
         $attributes['subject_id'] = $attributes['subject_id'] ?? [];
+        $attributes['removed_subject_map'] = $attributes['removed_subject_map'] ?? [];
         $attributes['is_irreg'] = (bool) ($attributes['is_irreg'] ?? false);
         $attributes['irreg_subject_id'] = $attributes['irreg_subject_id'] ?? null;
+        $attributes['irreg_subject_map'] = $attributes['irreg_subject_map'] ?? [];
         $attributes['is_active'] = (bool) ($attributes['is_activated'] ?? false);
         $attributes['status'] = ($attributes['is_activated'] ?? false) ? 'Active' : 'Inactive';
 
