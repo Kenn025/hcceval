@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\Department;
 use App\Models\Employee;
+use App\Models\EmployeeDepartment;
 use App\Models\Program;
 use App\Models\Strand;
 use Illuminate\Http\Request;
@@ -27,7 +28,7 @@ class EmployeeController extends Controller
             ->get();
 
         $employees = Employee::query()
-            ->with(['branch:id,name', 'department:id,name', 'program:id,name'])
+            ->with(['branch:id,name', 'department:id,name', 'employeeDepartment:id,name', 'program:id,name'])
             ->where('is_deleted', 0)
             ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
             ->when($search, fn ($q) => $q->where(function ($sub) use ($search) {
@@ -46,6 +47,15 @@ class EmployeeController extends Controller
             'filters'       => ['search' => $search, 'branch_id' => $branchId],
             'branches'      => $branches,
             'departments'   => Department::select('id', 'name')->orderBy('name')->get(),
+            'employeeDepartments' => EmployeeDepartment::query()
+                ->select('id', 'branch_id', 'code', 'name')
+                ->where('is_deleted', 0)
+                ->where('is_activated', 1)
+                ->when($scopedId, fn ($query) => $query->where(fn ($sub) => $sub
+                    ->whereNull('branch_id')
+                    ->orWhere('branch_id', $scopedId)))
+                ->orderBy('name')
+                ->get(),
             'programs'      => Program::select('id', 'name')->orderBy('name')->get(),
             'strands'       => Strand::select('id', 'name')->orderBy('name')->get(),
             'nextEmployeeCodes' => array_merge(
@@ -91,6 +101,7 @@ class EmployeeController extends Controller
             'code' => $validated['employee_no'] ?: $this->generateEmployeeCode($branchId ? (int) $branchId : null),
             'branch_id' => $branchId,
             'department_id' => $validated['department_id'] ?: null,
+            'employee_department_id' => $validated['employee_department_id'] ?: null,
             'program_id' => $validated['program_id'] ?: null,
             'strand_id' => $validated['strand_id'] ?: null,
             'firstname' => $validated['first_name'],
@@ -119,6 +130,7 @@ class EmployeeController extends Controller
             'employee_no' => $request->input('employee_no'),
             'branch_id' => $scopedBranchId ?? $request->input('branch_id'),
             'department_id' => $request->input('department_id'),
+            'employee_department_id' => $request->input('employee_department_id'),
             'program_id' => $request->input('program_id'),
             'strand_id' => $request->input('strand_id'),
             'first_name' => $request->input('first_name'),
