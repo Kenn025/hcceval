@@ -39,15 +39,46 @@ const getDepartmentKind = (department) => {
     return 'other';
 };
 
-const formatYearLevelOption = (yearLevel) => {
+const formatGradeLevelOption = (yearLevel) => {
     const yearName = String(yearLevel?.year_level ?? '').trim();
-    const sectionName = String(yearLevel?.section ?? '').trim();
 
-    if (yearName && sectionName) {
-        return `${yearName} - ${sectionName}`;
+    if (!yearName) {
+        return 'Unnamed grade level';
     }
 
-    return yearName || sectionName || 'Unnamed level';
+    return yearName.toLowerCase().startsWith('grade ') ? yearName : `Grade ${yearName}`;
+};
+
+const getUniqueGradeLevelScopes = (yearLevels, departmentId) => {
+    const scopes = new Map();
+
+    yearLevels
+        .filter((yearLevel) => String(yearLevel.department_id ?? '') === String(departmentId))
+        .forEach((yearLevel) => {
+            const levelKey = String(yearLevel.year_level ?? '').trim();
+
+            if (!levelKey) {
+                return;
+            }
+
+            if (!scopes.has(levelKey)) {
+                scopes.set(levelKey, {
+                    ...yearLevel,
+                    primary: formatGradeLevelOption(yearLevel),
+                    levelIds: [],
+                    subjectIds: [],
+                });
+            }
+
+            const scope = scopes.get(levelKey);
+            scope.levelIds.push(yearLevel.id);
+            scope.subjectIds = Array.from(new Set([
+                ...scope.subjectIds,
+                ...parseIdList(yearLevel.subject_id),
+            ]));
+        });
+
+    return Array.from(scopes.values());
 };
 
 const getScopeListHeading = (layer) => {
@@ -70,7 +101,254 @@ const getTableHeading = (assignmentType, layer) => {
     return getScopeListHeading(layer);
 };
 
-function QuestionnaireListModal({ open, scopeItem, questionnaires, onClose }) {
+const getPeerScopeLabel = (departmentKind) => {
+    if (departmentKind === 'college') {
+        return 'Programs';
+    }
+
+    if (departmentKind === 'senior-high') {
+        return 'Strands';
+    }
+
+    return 'Grade Levels';
+};
+
+const hasSelectedQuestionnaire = (selectedQuestionnaire) => Boolean(selectedQuestionnaire?.questionnaire_id);
+
+const parseIdList = (value) => {
+    try {
+        const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+        return Array.isArray(parsed) ? parsed.map((id) => String(id)) : [];
+    } catch {
+        return [];
+    }
+};
+
+const getSubjectTeacherStatusCards = ({
+    departments,
+    programs,
+    strands,
+    yearLevels,
+    subjects,
+    selectedQuestionnaires,
+    customSubjectGroups,
+}) => {
+    const count = (items, isLoaded, getSubjectIds = () => [], getLoadedSubjectIds = () => []) => {
+        const subjectIds = new Set();
+        const loadedSubjectIds = new Set();
+        let loaded = 0;
+
+        items.forEach((item) => {
+            const currentSubjectIds = getSubjectIds(item).map((id) => String(id));
+            currentSubjectIds.forEach((id) => subjectIds.add(id));
+
+            if (isLoaded(item, currentSubjectIds)) {
+                loaded += 1;
+                currentSubjectIds.forEach((id) => loadedSubjectIds.add(id));
+                return;
+            }
+
+            const currentSubjectIdSet = new Set(currentSubjectIds);
+            getLoadedSubjectIds(item, currentSubjectIds)
+                .map((id) => String(id))
+                .filter((id) => currentSubjectIdSet.has(id))
+                .forEach((id) => loadedSubjectIds.add(id));
+        });
+
+        return {
+            total: items.length,
+            loaded,
+            subjectTotal: subjectIds.size,
+            subjectLoaded: loadedSubjectIds.size,
+        };
+    };
+
+    const collegePrograms = programs.filter((program) => {
+        const department = departments.find((item) => String(item.id) === String(program.department_id));
+        return department && getDepartmentKind(department) === 'college';
+    });
+    const seniorHighStrands = strands.filter((strand) => {
+        const department = departments.find((item) => String(item.id) === String(strand.department_id));
+        return department && getDepartmentKind(department) === 'senior-high';
+    });
+    const juniorHighLevels = departments
+        .filter((department) => getDepartmentKind(department) === 'junior-high')
+        .flatMap((department) => getUniqueGradeLevelScopes(yearLevels, department.id));
+    const elementaryLevels = departments
+        .filter((department) => getDepartmentKind(department) === 'elementary')
+        .flatMap((department) => getUniqueGradeLevelScopes(yearLevels, department.id));
+
+    const collegeStatus = count(
+        collegePrograms,
+        (program, subjectIds) => {
+            const selected = selectedQuestionnaires[`program-${program.id}`];
+            const groups = customSubjectGroups[String(program.id)] ?? [];
+            const selectedCustomSubjectIds = (selected?.custom_subject_ids ?? []).map((id) => String(id));
+
+            if (groups.length > 0) {
+                const coveredSubjectIds = new Set(groups.flatMap((group) => group.subject_ids ?? []).map((id) => String(id)));
+                return groups.every((group) => group.questionnaire_id) && subjectIds.every((id) => coveredSubjectIds.has(id));
+            }
+
+            if (selectedCustomSubjectIds.length > 0) {
+                const coveredSubjectIds = new Set(selectedCustomSubjectIds);
+                return subjectIds.every((id) => coveredSubjectIds.has(id));
+            }
+
+            return hasSelectedQuestionnaire(selected);
+        },
+        (program) => subjects
+            .filter((subject) => String(subject.program_id ?? '') === String(program.id))
+            .map((subject) => subject.id),
+        (program) => {
+            const selected = selectedQuestionnaires[`program-${program.id}`];
+            const groups = customSubjectGroups[String(program.id)] ?? [];
+
+            if (groups.length > 0) {
+                return groups
+                    .filter((group) => group.questionnaire_id)
+                    .flatMap((group) => group.subject_ids ?? []);
+            }
+
+            return selected?.custom_subject_ids ?? [];
+        },
+    );
+
+    const seniorHighStatus = count(
+        seniorHighStrands,
+        (strand) => hasSelectedQuestionnaire(selectedQuestionnaires[`strand-${strand.id}`]),
+        (strand) => subjects
+            .filter((subject) => String(subject.strand_id ?? '') === String(strand.id))
+            .map((subject) => subject.id),
+    );
+
+    const levelSubjectIds = (level) => level.subjectIds ?? parseIdList(level.subject_id);
+    const levelHasQuestionnaire = (level) => (level.levelIds ?? [level.id])
+        .some((levelId) => hasSelectedQuestionnaire(selectedQuestionnaires[`level-${levelId}`]));
+    const juniorHighStatus = count(
+        juniorHighLevels,
+        levelHasQuestionnaire,
+        levelSubjectIds,
+    );
+    const elementaryStatus = count(
+        elementaryLevels,
+        levelHasQuestionnaire,
+        levelSubjectIds,
+    );
+
+    return DEPARTMENT_LAYER_TABS.map((tab) => {
+        const status = {
+            college: collegeStatus,
+            'senior-high': seniorHighStatus,
+            'junior-high': juniorHighStatus,
+            elementary: elementaryStatus,
+        }[tab.key];
+        const scopePercent = status.total > 0 ? Math.round((status.loaded / status.total) * 100) : 0;
+        const subjectPercent = status.subjectTotal > 0 ? Math.round((status.subjectLoaded / status.subjectTotal) * 100) : 0;
+        const percent = status.subjectTotal > 0 ? subjectPercent : scopePercent;
+        const isComplete = status.total > 0 && status.loaded === status.total && status.subjectLoaded === status.subjectTotal;
+
+        return {
+            ...tab,
+            ...status,
+            percent,
+            subjectPercent,
+            isComplete,
+            statusLabel: isComplete ? 'Complete' : (status.loaded > 0 || status.subjectLoaded > 0) ? 'In Progress' : 'Not Started',
+        };
+    });
+};
+
+const getPeerDepartmentStatusCards = ({
+    departments,
+    branches,
+    programs,
+    strands,
+    yearLevels,
+    selectedQuestionnaires,
+}) => departments.map((department) => {
+    const departmentKind = getDepartmentKind(department);
+    const branch = branches.find((item) => String(item.id) === String(department.branch_id));
+    const selectedQuestionnaire = selectedQuestionnaires[`department-${department.id}`] ?? null;
+    const customGroups = selectedQuestionnaire?.custom_scope_groups ?? [];
+    const scopeItems = (() => {
+        if (departmentKind === 'college') {
+            return programs.filter((program) => String(program.department_id ?? '') === String(department.id));
+        }
+
+        if (departmentKind === 'senior-high') {
+            return strands.filter((strand) => String(strand.department_id ?? '') === String(department.id));
+        }
+
+        return getUniqueGradeLevelScopes(yearLevels, department.id);
+    })();
+    const total = scopeItems.length;
+    const coveredScopeIds = new Set(
+        customGroups
+            .filter((group) => group.questionnaire_id)
+            .flatMap((group) => group.subject_ids ?? [])
+            .map((id) => String(id)),
+    );
+    const loaded = customGroups.length > 0
+        ? scopeItems.filter((item) => coveredScopeIds.has(String(item.id))).length
+        : hasSelectedQuestionnaire(selectedQuestionnaire)
+            ? total
+            : 0;
+    const percent = total > 0 ? Math.round((loaded / total) * 100) : 0;
+    const isComplete = total > 0 && loaded === total;
+
+    return {
+        id: `department-${department.id}`,
+        entityId: department.id,
+        scopeType: 'department',
+        branchId: department.branch_id ?? null,
+        departmentId: department.id ?? null,
+        departmentKind,
+        primary: department.name,
+        secondary: department.code,
+        branchName: branch?.name ?? '-',
+        scopeLabel: getPeerScopeLabel(departmentKind),
+        selectedQuestionnaire,
+        customGroups,
+        total,
+        loaded,
+        percent,
+        isComplete,
+        statusLabel: isComplete ? 'Complete' : loaded > 0 ? 'In Progress' : 'Not Started',
+    };
+});
+
+const getHeadDepartmentStatusCards = ({
+    departments,
+    branches,
+    faculty,
+    selectedQuestionnaires,
+}) => departments.map((department) => {
+    const branch = branches.find((item) => String(item.id) === String(department.branch_id));
+    const programChairs = faculty.filter((teacher) => (
+        String(teacher.department_id ?? '') === String(department.id)
+        && String(teacher.role ?? '').toLowerCase().includes('program chair')
+    ));
+    const loaded = programChairs.filter((teacher) => hasSelectedQuestionnaire(selectedQuestionnaires[`teacher-${teacher.id}`])).length;
+    const total = programChairs.length;
+    const percent = total > 0 ? Math.round((loaded / total) * 100) : 0;
+    const isComplete = total > 0 && loaded === total;
+
+    return {
+        id: `head-department-${department.id}`,
+        entityId: department.id,
+        primary: department.name,
+        secondary: department.code,
+        branchName: branch?.name ?? '-',
+        total,
+        loaded,
+        percent,
+        isComplete,
+        statusLabel: isComplete ? 'Complete' : loaded > 0 ? 'In Progress' : 'Not Started',
+    };
+});
+
+function QuestionnaireListModal({ open, scopeItem, questionnaires, assignmentType, onClose }) {
     const [viewTarget, setViewTarget] = useState(null);
 
     if (!open || !scopeItem) {
@@ -133,7 +411,7 @@ function QuestionnaireListModal({ open, scopeItem, questionnaires, onClose }) {
                                                             type="button"
                                                             onClick={() => {
                                                                 router.post(route('admin.assignments.select-questionnaire'), {
-                                                                    assignment_type: 'student-teacher',
+                                                                    assignment_type: assignmentType,
                                                                     questionnaire_id: questionnaire.questionnaire_id,
                                                                     scope_type: scopeItem.scopeType,
                                                                     scope_id: scopeItem.entityId,
@@ -276,13 +554,14 @@ function QuestionnaireListModal({ open, scopeItem, questionnaires, onClose }) {
     );
 }
 
-function AssignedQuestionnairesModal({ open, scopeItem, questionnaires, onClose }) {
+function AssignedQuestionnairesModal({ open, scopeItem, questionnaires, assignmentType, onClose }) {
     const [viewTarget, setViewTarget] = useState(null);
 
     if (!open || !scopeItem) {
         return null;
     }
 
+    const itemLabel = assignmentType === 'peer' ? getPeerScopeLabel(scopeItem.departmentKind) : 'Subjects';
     const assignedQuestionnaires = Array.isArray(scopeItem.customGroups) && scopeItem.customGroups.length > 0
         ? scopeItem.customGroups
             .map((group) => ({
@@ -333,7 +612,7 @@ function AssignedQuestionnairesModal({ open, scopeItem, questionnaires, onClose 
                                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Code</th>
                                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Title</th>
                                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Type</th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Selected Subjects</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Selected {itemLabel}</th>
                                         <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Action</th>
                                     </tr>
                                 </thead>
@@ -416,7 +695,18 @@ function AssignedQuestionnairesModal({ open, scopeItem, questionnaires, onClose 
     );
 }
 
-function CustomSubjectsModal({ open, scopeItem, subjects, questionnaires, onClose }) {
+function CustomSubjectsModal({
+    open,
+    scopeItem,
+    subjects,
+    faculty,
+    programs = [],
+    strands = [],
+    yearLevels = [],
+    questionnaires,
+    assignmentType,
+    onClose,
+}) {
     const [groups, setGroups] = useState([]);
     const [questionnairePickerGroupId, setQuestionnairePickerGroupId] = useState(null);
     const [questionnaireViewTarget, setQuestionnaireViewTarget] = useState(null);
@@ -431,7 +721,9 @@ function CustomSubjectsModal({ open, scopeItem, subjects, questionnaires, onClos
 
         const existingGroups = Array.isArray(scopeItem.customGroups) ? scopeItem.customGroups : [];
 
-        if (scopeItem.scopeType === 'program' && existingGroups.length > 0) {
+        const canUseCustomGroups = assignmentType === 'peer' || scopeItem.scopeType === 'program';
+
+        if (canUseCustomGroups && existingGroups.length > 0) {
             setGroups(existingGroups.map((group, index) => ({
                 localId: `${group.id ?? 'existing'}-${index}`,
                 questionnaire_id: String(group.questionnaire_id ?? ''),
@@ -447,37 +739,82 @@ function CustomSubjectsModal({ open, scopeItem, subjects, questionnaires, onClos
                 subject_ids: (scopeItem?.selectedQuestionnaire?.custom_subject_ids ?? []).map((id) => String(id)),
             },
         ]);
-    }, [scopeItem]);
+    }, [assignmentType, scopeItem]);
 
     if (!open || !scopeItem) {
         return null;
     }
 
-    const availableSubjects = subjects.filter((subject) => {
+    const isPeer = assignmentType === 'peer';
+    const canUseCustomGroups = isPeer || scopeItem.scopeType === 'program';
+    const peerScopeLabel = getPeerScopeLabel(scopeItem.departmentKind);
+    const itemNoun = isPeer ? peerScopeLabel.toLowerCase() : 'subjects';
+    const itemLabel = isPeer ? peerScopeLabel : 'Subjects';
+    const selectedQuestionnaireId = groups[0]?.questionnaire_id || scopeItem.selectedQuestionnaire?.questionnaire_id || null;
+    const peerScopeItems = (() => {
+        if (!isPeer) {
+            return [];
+        }
+
+        if (scopeItem.departmentKind === 'college') {
+            return programs
+                .filter((program) => String(program.department_id ?? '') === String(scopeItem.entityId))
+                .map((program) => ({
+                    id: program.id,
+                    name: program.name,
+                    code: program.code,
+                    role: null,
+                }));
+        }
+
+        if (scopeItem.departmentKind === 'senior-high') {
+            return strands
+                .filter((strand) => String(strand.department_id ?? '') === String(scopeItem.entityId))
+                .map((strand) => ({
+                    id: strand.id,
+                    name: strand.name,
+                    code: strand.code,
+                    role: null,
+                }));
+        }
+
+        return getUniqueGradeLevelScopes(yearLevels, scopeItem.entityId)
+            .map((yearLevel) => ({
+                id: yearLevel.id,
+                name: yearLevel.primary,
+                code: null,
+                role: null,
+            }));
+    })();
+    const availableItems = (isPeer ? peerScopeItems : subjects).filter((item) => {
+        if (isPeer) {
+            return true;
+        }
+
         if (scopeItem.scopeType === 'program') {
-            return String(subject.program_id ?? '') === String(scopeItem.entityId);
+            return String(item.program_id ?? '') === String(scopeItem.entityId);
         }
 
         if (scopeItem.scopeType === 'strand') {
-            return String(subject.strand_id ?? '') === String(scopeItem.entityId);
+            return String(item.strand_id ?? '') === String(scopeItem.entityId);
         }
 
         if (scopeItem.scopeType === 'level') {
-            return (scopeItem.subjectIds ?? []).includes(String(subject.id));
+            return (scopeItem.subjectIds ?? []).includes(String(item.id));
         }
 
         return false;
     });
-    const renderSubjectItem = (subject, group) => (
+    const renderSelectableItem = (item, group) => (
         <label
-            key={subject.id}
+            key={item.id}
             className="flex items-start gap-3 rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-700 transition hover:bg-slate-50"
         >
             <input
                 type="checkbox"
-                checked={group.subject_ids.includes(String(subject.id))}
+                checked={group.subject_ids.includes(String(item.id))}
                 onChange={() => {
-                    const subjectKey = String(subject.id);
+                    const subjectKey = String(item.id);
                     setGroups((currentGroups) => {
                         const isAlreadySelected = group.subject_ids.includes(subjectKey);
 
@@ -507,8 +844,8 @@ function CustomSubjectsModal({ open, scopeItem, subjects, questionnaires, onClos
                 className="mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
             />
             <span className="min-w-0">
-                <span className="block font-medium text-slate-900">{subject.name}</span>
-                <span className="block text-xs text-slate-500">{subject.code}</span>
+                <span className="block font-medium text-slate-900">{item.name}</span>
+                <span className="block text-xs text-slate-500">{[item.code, item.role].filter(Boolean).join(' - ')}</span>
             </span>
         </label>
     );
@@ -525,9 +862,9 @@ function CustomSubjectsModal({ open, scopeItem, subjects, questionnaires, onClos
                 <div className="relative max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
                     <div className="flex items-start justify-between gap-4">
                         <div>
-                            <h3 className="text-lg font-semibold text-slate-900">Custom Subjects</h3>
+                            <h3 className="text-lg font-semibold text-slate-900">Custom {itemLabel}</h3>
                             <p className="mt-1 text-sm text-slate-500">
-                                Choose subjects for <span className="font-medium text-slate-700">{scopeItem.primary}</span>.
+                                Choose {itemNoun} for <span className="font-medium text-slate-700">{scopeItem.primary}</span>.
                             </p>
                         </div>
                         <button
@@ -540,7 +877,7 @@ function CustomSubjectsModal({ open, scopeItem, subjects, questionnaires, onClos
                     </div>
 
                     <div className="mt-6 space-y-4">
-                        {scopeItem.scopeType === 'program' ? (
+                        {canUseCustomGroups ? (
                             <div className="flex justify-end">
                                 <button
                                     type="button"
@@ -567,9 +904,9 @@ function CustomSubjectsModal({ open, scopeItem, subjects, questionnaires, onClos
                                     .filter((currentGroup) => currentGroup.localId !== group.localId)
                                     .flatMap((currentGroup) => currentGroup.subject_ids),
                             );
-                            const groupedSelectedSubjects = availableSubjects.filter((subject) => group.subject_ids.includes(String(subject.id)));
-                            const groupedAvailableSubjects = availableSubjects.filter((subject) => {
-                                const subjectKey = String(subject.id);
+                            const groupedSelectedItems = availableItems.filter((item) => group.subject_ids.includes(String(item.id)));
+                            const groupedAvailableItems = availableItems.filter((item) => {
+                                const subjectKey = String(item.id);
 
                                 return !group.subject_ids.includes(subjectKey) && !subjectIdsUsedByOtherGroups.has(subjectKey);
                             });
@@ -582,9 +919,9 @@ function CustomSubjectsModal({ open, scopeItem, subjects, questionnaires, onClos
                                     <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
                                         <div>
                                             <p className="text-sm font-semibold text-slate-900">Custom Group {groupIndex + 1}</p>
-                                            <p className="text-xs text-slate-500">Assign a questionnaire and subject set.</p>
+                                            <p className="text-xs text-slate-500">Assign a questionnaire and {itemNoun} set.</p>
                                         </div>
-                                        {scopeItem.scopeType === 'program' && groups.length > 1 ? (
+                                        {canUseCustomGroups && groups.length > 1 ? (
                                             <button
                                                 type="button"
                                                 onClick={() => setGroups((current) => current.filter((item) => item.localId !== group.localId))}
@@ -620,49 +957,49 @@ function CustomSubjectsModal({ open, scopeItem, subjects, questionnaires, onClos
                                         </div>
 
                                         <div className="rounded-2xl border border-slate-200">
-                                            {availableSubjects.length > 0 ? (
+                                            {availableItems.length > 0 ? (
                                                 <div className="max-h-96 space-y-5 overflow-y-auto p-3">
                                                     <div>
                                                         <div className="mb-2 flex items-center justify-between gap-3">
-                                                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Selected Subjects</p>
+                                                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Selected {itemLabel}</p>
                                                             <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
-                                                                {groupedSelectedSubjects.length}
+                                                                {groupedSelectedItems.length}
                                                             </span>
                                                         </div>
 
-                                                        {groupedSelectedSubjects.length > 0 ? (
+                                                        {groupedSelectedItems.length > 0 ? (
                                                             <div className="space-y-2">
-                                                                {groupedSelectedSubjects.map((subject) => renderSubjectItem(subject, group))}
+                                                                {groupedSelectedItems.map((item) => renderSelectableItem(item, group))}
                                                             </div>
                                                         ) : (
                                                             <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-sm text-slate-500">
-                                                                No selected subjects yet.
+                                                                No selected {itemNoun} yet.
                                                             </div>
                                                         )}
                                                     </div>
 
                                                     <div>
                                                         <div className="mb-2 flex items-center justify-between gap-3">
-                                                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Available Subjects</p>
+                                                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Available {itemLabel}</p>
                                                             <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-                                                                {groupedAvailableSubjects.length}
+                                                                {groupedAvailableItems.length}
                                                             </span>
                                                         </div>
 
-                                                        {groupedAvailableSubjects.length > 0 ? (
+                                                        {groupedAvailableItems.length > 0 ? (
                                                             <div className="space-y-2">
-                                                                {groupedAvailableSubjects.map((subject) => renderSubjectItem(subject, group))}
+                                                                {groupedAvailableItems.map((item) => renderSelectableItem(item, group))}
                                                             </div>
                                                         ) : (
                                                             <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-sm text-slate-500">
-                                                                All subjects in this scope are already grouped above.
+                                                                All {itemNoun} in this scope are already grouped above.
                                                             </div>
                                                         )}
                                                     </div>
                                                 </div>
                                             ) : (
                                                 <div className="px-4 py-8 text-center text-sm text-slate-500">
-                                                    No subjects found for this scope.
+                                                    No {itemNoun} found for this scope.
                                                 </div>
                                             )}
                                         </div>
@@ -684,10 +1021,12 @@ function CustomSubjectsModal({ open, scopeItem, subjects, questionnaires, onClos
                             type="button"
                             onClick={() => {
                                 router.post(route('admin.assignments.custom-subjects'), {
-                                    assignment_type: 'student-teacher',
+                                    assignment_type: assignmentType,
                                     scope_type: scopeItem.scopeType,
                                     scope_id: scopeItem.entityId,
-                                    questionnaire_id: scopeItem.selectedQuestionnaire?.questionnaire_id ?? null,
+                                    branch_id: scopeItem.branchId,
+                                    department_id: scopeItem.departmentId,
+                                    questionnaire_id: selectedQuestionnaireId,
                                     subject_ids: groups[0]?.subject_ids ?? [],
                                     groups: groups.map((group) => ({
                                         questionnaire_id: group.questionnaire_id || null,
@@ -838,14 +1177,17 @@ export default function Assignments({
     questionnaires = [],
     branches = [],
     departments = [],
+    employeeDepartments = [],
     programs = [],
     strands = [],
     yearLevels = [],
     subjects = [],
+    faculty = [],
     selectedQuestionnaires = {},
     customSubjectGroups = {},
 }) {
     const [activeDepartmentLayer, setActiveDepartmentLayer] = useState('college');
+    const [activeHeadDepartmentId, setActiveHeadDepartmentId] = useState(null);
     const [distributeTarget, setDistributeTarget] = useState(null);
     const [customTarget, setCustomTarget] = useState(null);
     const [assignedQuestionnaireTarget, setAssignedQuestionnaireTarget] = useState(null);
@@ -855,20 +1197,108 @@ export default function Assignments({
         { key: 'head', label: 'School Heads', routeName: 'admin.head-assignments' },
         { key: 'employee', label: 'Employee Feedback', routeName: 'admin.employee-assignments' },
     ];
+    const activeTab = tabs.find((tab) => tab.key === assignmentType) ?? tabs[0];
+    const activeBranchId = String(filters.branch_id ?? '');
+    const branchOptions = branches.filter((branch) => String(branch.code ?? '').toUpperCase() !== 'OVERALL');
+    const changeBranchFilter = (branchId) => {
+        router.get(route(activeTab.routeName), {
+            ...filters,
+            branch_id: branchId || '',
+        }, {
+            preserveScroll: true,
+            preserveState: true,
+            replace: true,
+        });
+    };
+    const subjectTeacherStatusCards = useMemo(() => getSubjectTeacherStatusCards({
+        departments,
+        programs,
+        strands,
+        yearLevels,
+        subjects,
+        selectedQuestionnaires,
+        customSubjectGroups,
+    }), [customSubjectGroups, departments, programs, selectedQuestionnaires, strands, subjects, yearLevels]);
+    const peerDepartmentStatusCards = useMemo(() => getPeerDepartmentStatusCards({
+        departments,
+        branches,
+        programs,
+        strands,
+        yearLevels,
+        selectedQuestionnaires,
+    }), [branches, departments, programs, selectedQuestionnaires, strands, yearLevels]);
+    const headDepartmentStatusCards = useMemo(() => getHeadDepartmentStatusCards({
+        departments,
+        branches,
+        faculty,
+        selectedQuestionnaires,
+    }), [branches, departments, faculty, selectedQuestionnaires]);
+    const peerDepartmentStatusGroups = useMemo(() => {
+        const groups = new Map();
+
+        peerDepartmentStatusCards.forEach((card) => {
+            const groupKey = String(card.branchId ?? card.branchName ?? 'all');
+
+            if (!groups.has(groupKey)) {
+                groups.set(groupKey, {
+                    id: groupKey,
+                    label: card.branchName ?? 'All Branches',
+                    cards: [],
+                });
+            }
+
+            groups.get(groupKey).cards.push(card);
+        });
+
+        return Array.from(groups.values());
+    }, [peerDepartmentStatusCards]);
     const filteredScopeItems = useMemo(() => {
         if (assignmentType === 'peer') {
-            return departments.map((department) => ({
-                id: `department-${department.id}`,
-                entityId: department.id,
-                scopeType: 'department',
-                branchId: department.branch_id ?? null,
-                departmentId: department.id ?? null,
-                branchName: branches.find((branch) => String(branch.id) === String(department.branch_id))?.name ?? '-',
-                primary: department.name,
-                secondary: department.code,
-                selectedQuestionnaire: selectedQuestionnaires[`department-${department.id}`] ?? null,
-                customGroups: [],
-            }));
+            return peerDepartmentStatusCards;
+        }
+
+        if (assignmentType === 'head') {
+            return faculty
+                .filter((teacher) => String(teacher.role ?? '').toLowerCase().includes('program chair'))
+                .filter((teacher) => !activeHeadDepartmentId || String(teacher.department_id ?? '') === String(activeHeadDepartmentId))
+                .map((teacher) => {
+                    const program = programs.find((item) => String(item.id) === String(teacher.program_id));
+                    const department = departments.find((item) => String(item.id) === String(teacher.department_id));
+                    const branch = branches.find((item) => String(item.id) === String(teacher.branch_id));
+
+                    return {
+                        id: `teacher-${teacher.id}`,
+                        entityId: teacher.id,
+                        scopeType: 'teacher',
+                        branchId: teacher.branch_id ?? null,
+                        departmentId: teacher.department_id ?? null,
+                        primary: teacher.name,
+                        secondary: teacher.code,
+                        role: teacher.role,
+                        programName: program?.name ?? '-',
+                        departmentName: department?.name ?? '-',
+                        branchName: branch?.name ?? '-',
+                        selectedQuestionnaire: selectedQuestionnaires[`teacher-${teacher.id}`] ?? null,
+                    };
+                });
+        }
+
+        if (assignmentType === 'employee') {
+            return employeeDepartments.map((department) => {
+                const branch = branches.find((item) => String(item.id) === String(department.branch_id));
+
+                return {
+                    id: `employee-department-${department.id}`,
+                    entityId: department.id,
+                    scopeType: 'employee-department',
+                    branchId: department.branch_id ?? null,
+                    departmentId: null,
+                    primary: department.name,
+                    secondary: department.code,
+                    branchName: branch?.name ?? 'All Branches',
+                    selectedQuestionnaire: selectedQuestionnaires[`employee-department-${department.id}`] ?? null,
+                };
+            });
         }
 
         if (activeDepartmentLayer === 'college') {
@@ -918,13 +1348,12 @@ export default function Assignments({
                 .filter(Boolean);
         }
 
-        return yearLevels
-            .map((yearLevel) => {
-                const department = departments.find((item) => String(item.id) === String(yearLevel.department_id));
-
-                if (!department || getDepartmentKind(department) !== activeDepartmentLayer) {
-                    return null;
-                }
+        return departments
+            .filter((department) => getDepartmentKind(department) === activeDepartmentLayer)
+            .flatMap((department) => getUniqueGradeLevelScopes(yearLevels, department.id).map((yearLevel) => {
+                const selectedQuestionnaire = (yearLevel.levelIds ?? [])
+                    .map((levelId) => selectedQuestionnaires[`level-${levelId}`])
+                    .find((questionnaire) => hasSelectedQuestionnaire(questionnaire)) ?? null;
 
                 return {
                     id: `level-${yearLevel.id}`,
@@ -932,29 +1361,37 @@ export default function Assignments({
                     scopeType: 'level',
                     branchId: department.branch_id ?? null,
                     departmentId: department.id ?? null,
-                    primary: formatYearLevelOption(yearLevel),
+                    primary: yearLevel.primary,
                     secondary: '',
-                    subjectIds: (() => {
-                        try {
-                            const parsed = typeof yearLevel.subject_id === 'string'
-                                ? JSON.parse(yearLevel.subject_id)
-                                : yearLevel.subject_id;
-                            return Array.isArray(parsed) ? parsed.map((id) => String(id)) : [];
-                        } catch {
-                            return [];
-                        }
-                    })(),
-                    selectedQuestionnaire: selectedQuestionnaires[`level-${yearLevel.id}`] ?? null,
+                    levelIds: yearLevel.levelIds ?? [yearLevel.id],
+                    subjectIds: yearLevel.subjectIds ?? [],
+                    selectedQuestionnaire,
                 };
-            })
-            .filter(Boolean);
-    }, [activeDepartmentLayer, assignmentType, branches, departments, programs, selectedQuestionnaires, strands, yearLevels]);
+            }));
+    }, [activeDepartmentLayer, activeHeadDepartmentId, assignmentType, branches, departments, employeeDepartments, faculty, peerDepartmentStatusCards, programs, selectedQuestionnaires, strands, yearLevels]);
 
     return (
         <AdminLayout title={TITLE_MAP[assignmentType]} activeRoute="admin.questionnaire-distribution" breadcrumbs={['Question Bank']}>
-            <div className="mb-6">
-                <h2 className="text-base font-semibold text-slate-900">Questionnaire Distribution</h2>
-                <p className="text-sm text-slate-500">Manage which questionnaire set is used for each evaluation flow.</p>
+            <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+                <div>
+                    <h2 className="text-base font-semibold text-slate-900">Questionnaire Distribution</h2>
+                    <p className="text-sm text-slate-500">Manage which questionnaire set is used for each evaluation flow.</p>
+                </div>
+                <label className="min-w-64">
+                    <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Active Branch</span>
+                    <select
+                        value={activeBranchId}
+                        onChange={(event) => changeBranchFilter(event.target.value)}
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    >
+                        <option value="">All Branches</option>
+                        {branchOptions.map((branch) => (
+                            <option key={branch.id} value={branch.id}>
+                                {branch.name}
+                            </option>
+                        ))}
+                    </select>
+                </label>
             </div>
 
             <div className="mb-5 flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
@@ -981,6 +1418,59 @@ export default function Assignments({
 
             {assignmentType === 'student-teacher' ? (
                 <>
+                    <div className="mb-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                        {subjectTeacherStatusCards.map((card) => {
+                            const isActive = card.key === activeDepartmentLayer;
+
+                            return (
+                                <button
+                                    key={`status-${card.key}`}
+                                    type="button"
+                                    onClick={() => setActiveDepartmentLayer(card.key)}
+                                    className={[
+                                        'rounded-2xl border bg-white p-4 text-left shadow-sm transition hover:border-blue-200 hover:shadow-md',
+                                        isActive ? 'border-blue-300 ring-2 ring-blue-100' : 'border-slate-200',
+                                    ].join(' ')}
+                                >
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-semibold text-slate-900">{card.label}</p>
+                                            <p className="mt-1 text-xs text-slate-500">
+                                                {card.loaded}/{card.total} {getScopeListHeading(card.key).toLowerCase()} loaded
+                                            </p>
+                                        </div>
+                                        <span className={[
+                                            'shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold',
+                                            card.isComplete
+                                                ? 'bg-emerald-50 text-emerald-700'
+                                                : card.loaded > 0
+                                                ? 'bg-amber-50 text-amber-700'
+                                                : 'bg-slate-100 text-slate-600',
+                                        ].join(' ')}>
+                                            {card.statusLabel}
+                                        </span>
+                                    </div>
+
+                                    <div className="mt-4">
+                                        <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                                            <div
+                                                className={[
+                                                    'h-full rounded-full transition-all',
+                                                    card.isComplete ? 'bg-emerald-500' : 'bg-blue-600',
+                                                ].join(' ')}
+                                                style={{ width: `${card.percent}%` }}
+                                            />
+                                        </div>
+                                        <div className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-500">
+                                            <span>{card.percent}% assigned</span>
+                                            <span>{card.subjectLoaded}/{card.subjectTotal} subjects</span>
+                                        </div>
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </div>
+
                     <div className="mb-5 flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
                         {DEPARTMENT_LAYER_TABS.map((tab) => {
                             const isActive = tab.key === activeDepartmentLayer;
@@ -1006,13 +1496,135 @@ export default function Assignments({
                 </>
             ) : null}
 
-            {assignmentType === 'student-teacher' || assignmentType === 'peer' ? (
+            {assignmentType === 'peer' ? (
+                <div className="mb-5 space-y-5">
+                    {peerDepartmentStatusGroups.map((group) => (
+                        <section key={`peer-branch-${group.id}`}>
+                            <div className="mb-3 flex items-center gap-3">
+                                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{group.label}</span>
+                                <div className="h-px flex-1 bg-slate-200" />
+                            </div>
+
+                            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                                {group.cards.map((card) => (
+                                    <button
+                                        key={`peer-status-${card.id}`}
+                                        type="button"
+                                        onClick={() => setCustomTarget(card)}
+                                        className="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-blue-200 hover:shadow-md"
+                                    >
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <p className="truncate text-sm font-semibold text-slate-900">{card.primary}</p>
+                                                <p className="mt-1 truncate text-xs text-slate-500">{card.branchName}</p>
+                                            </div>
+                                            <span className={[
+                                                'shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold',
+                                                card.isComplete
+                                                    ? 'bg-emerald-50 text-emerald-700'
+                                                    : card.loaded > 0
+                                                    ? 'bg-amber-50 text-amber-700'
+                                                    : 'bg-slate-100 text-slate-600',
+                                            ].join(' ')}>
+                                                {card.statusLabel}
+                                            </span>
+                                        </div>
+
+                                        <div className="mt-4">
+                                            <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                                                <div
+                                                    className={[
+                                                        'h-full rounded-full transition-all',
+                                                        card.isComplete ? 'bg-emerald-500' : 'bg-blue-600',
+                                                    ].join(' ')}
+                                                    style={{ width: `${card.percent}%` }}
+                                                />
+                                            </div>
+                                            <div className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-500">
+                                                <span>{card.percent}% assigned</span>
+                                                <span>{card.loaded}/{card.total} {card.scopeLabel.toLowerCase()}</span>
+                                            </div>
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        </section>
+                    ))}
+                                </div>
+            ) : null}
+
+            {assignmentType === 'head' ? (
+                <div className="mb-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    {headDepartmentStatusCards.map((card) => {
+                        const isActive = String(activeHeadDepartmentId ?? '') === String(card.entityId);
+
+                        return (
+                            <button
+                                key={`head-status-${card.id}`}
+                                type="button"
+                                onClick={() => setActiveHeadDepartmentId(isActive ? null : card.entityId)}
+                                className={[
+                                    'rounded-2xl border bg-white p-4 text-left shadow-sm transition hover:border-blue-200 hover:shadow-md',
+                                    isActive ? 'border-blue-300 ring-2 ring-blue-100' : 'border-slate-200',
+                                ].join(' ')}
+                            >
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <p className="truncate text-sm font-semibold text-slate-900">{card.primary}</p>
+                                        <p className="mt-1 truncate text-xs text-slate-500">{card.branchName}</p>
+                                    </div>
+                                    <span className={[
+                                        'shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold',
+                                        card.isComplete
+                                            ? 'bg-emerald-50 text-emerald-700'
+                                            : card.loaded > 0
+                                            ? 'bg-amber-50 text-amber-700'
+                                            : 'bg-slate-100 text-slate-600',
+                                    ].join(' ')}>
+                                        {card.statusLabel}
+                                    </span>
+                                </div>
+
+                                <div className="mt-4">
+                                    <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                                        <div
+                                            className={[
+                                                'h-full rounded-full transition-all',
+                                                card.isComplete ? 'bg-emerald-500' : 'bg-blue-600',
+                                            ].join(' ')}
+                                            style={{ width: `${card.percent}%` }}
+                                        />
+                                    </div>
+                                    <div className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-500">
+                                        <span>{card.percent}% assigned</span>
+                                        <span>{card.loaded}/{card.total} program chairs</span>
+                                    </div>
+                                </div>
+                            </button>
+                        );
+                    })}
+                </div>
+            ) : null}
+
+            {assignmentType === 'student-teacher' || assignmentType === 'peer' || assignmentType === 'head' || assignmentType === 'employee' ? (
                 <div className="mb-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                     <div className="mb-4 flex items-center justify-between gap-3">
                         <div>
-                            <h3 className="text-sm font-semibold text-slate-900">{getTableHeading(assignmentType, activeDepartmentLayer)}</h3>
+                            <h3 className="text-sm font-semibold text-slate-900">
+                                {assignmentType === 'employee'
+                                    ? 'Employee Departments'
+                                    : assignmentType === 'head'
+                                    ? 'Program Chairs'
+                                    : getTableHeading(assignmentType, activeDepartmentLayer)}
+                            </h3>
                             <p className="text-sm text-slate-500">
-                                {assignmentType === 'peer'
+                                {assignmentType === 'employee'
+                                    ? 'Showing all active employee departments for employee-feedback questionnaire distribution.'
+                                    : assignmentType === 'head'
+                                    ? activeHeadDepartmentId
+                                        ? 'Showing active program chairs for the selected department.'
+                                        : 'Showing all active program chairs for school-head questionnaire distribution.'
+                                    : assignmentType === 'peer'
                                     ? 'Showing all active departments for peer-to-peer questionnaire distribution.'
                                     : `Showing all available ${getScopeListHeading(activeDepartmentLayer).toLowerCase()} for this department layer.`}
                             </p>
@@ -1033,6 +1645,15 @@ export default function Assignments({
                                             {assignmentType === 'peer' ? (
                                                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Branch</th>
                                             ) : null}
+                                            {assignmentType === 'employee' ? (
+                                                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Branch</th>
+                                            ) : null}
+                                            {assignmentType === 'head' ? (
+                                                <>
+                                                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Program</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Branch</th>
+                                                </>
+                                            ) : null}
                                             <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Code</th>
                                             <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Selected Questionnaire</th>
                                             <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Actions</th>
@@ -1045,6 +1666,15 @@ export default function Assignments({
                                                 <td className="px-4 py-3 text-sm font-medium text-slate-900">{item.primary}</td>
                                                 {assignmentType === 'peer' ? (
                                                     <td className="px-4 py-3 text-sm text-slate-600">{item.branchName ?? '-'}</td>
+                                                ) : null}
+                                                {assignmentType === 'employee' ? (
+                                                    <td className="px-4 py-3 text-sm text-slate-600">{item.branchName ?? '-'}</td>
+                                                ) : null}
+                                                {assignmentType === 'head' ? (
+                                                    <>
+                                                        <td className="px-4 py-3 text-sm text-slate-600">{item.programName ?? '-'}</td>
+                                                        <td className="px-4 py-3 text-sm text-slate-600">{item.branchName ?? '-'}</td>
+                                                    </>
                                                 ) : null}
                                                 <td className="px-4 py-3 text-sm text-slate-600">{item.secondary || '-'}</td>
                                                 <td className="px-4 py-3 text-sm text-slate-700">
@@ -1097,27 +1727,24 @@ export default function Assignments({
                                                                 }}
                                                                 className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                                                             >
-                                                                Distribute
+                                                                {assignmentType === 'head' ? 'Assign' : 'Distribute'}
                                                             </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => {
-                                                                if (assignmentType === 'peer') {
-                                                                    if (item.selectedQuestionnaire) {
-                                                                        setAssignedQuestionnaireTarget(item);
-                                                                        return;
-                                                                    }
+                                                            {assignmentType !== 'head' && assignmentType !== 'employee' ? (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        if (assignmentType === 'peer') {
+                                                                            setCustomTarget(item);
+                                                                            return;
+                                                                        }
 
-                                                                    setDistributeTarget(item);
-                                                                    return;
-                                                                }
-
-                                                                setCustomTarget(item);
-                                                            }}
-                                                            className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-slate-800"
-                                                        >
-                                                            Custom
-                                                        </button>
+                                                                        setCustomTarget(item);
+                                                                    }}
+                                                                    className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-slate-800"
+                                                                >
+                                                                    Custom
+                                                                </button>
+                                                            ) : null}
                                                     </div>
                                                 </td>
                                             </tr>
@@ -1130,6 +1757,10 @@ export default function Assignments({
                         <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
                             {assignmentType === 'peer'
                                 ? 'No departments found yet.'
+                                : assignmentType === 'employee'
+                                ? 'No employee departments found yet.'
+                                : assignmentType === 'head'
+                                ? 'No program chairs found yet.'
                                 : 'No items found for this department layer yet.'}
                         </div>
                     )}
@@ -1140,6 +1771,7 @@ export default function Assignments({
                 open={Boolean(distributeTarget)}
                 scopeItem={distributeTarget}
                 questionnaires={questionnaires}
+                assignmentType={assignmentType}
                 onClose={() => setDistributeTarget(null)}
             />
 
@@ -1147,7 +1779,12 @@ export default function Assignments({
                 open={Boolean(customTarget)}
                 scopeItem={customTarget}
                 subjects={subjects}
+                faculty={faculty}
+                programs={programs}
+                strands={strands}
+                yearLevels={yearLevels}
                 questionnaires={questionnaires}
+                assignmentType={assignmentType}
                 onClose={() => setCustomTarget(null)}
             />
 
@@ -1155,6 +1792,7 @@ export default function Assignments({
                 open={Boolean(assignedQuestionnaireTarget)}
                 scopeItem={assignedQuestionnaireTarget}
                 questionnaires={questionnaires}
+                assignmentType={assignmentType}
                 onClose={() => setAssignedQuestionnaireTarget(null)}
             />
         </AdminLayout>

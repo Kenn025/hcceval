@@ -22,6 +22,7 @@ export default function Employees({
     filters,
     branches,
     departments,
+    employeeDepartments = [],
     programs,
     strands,
     nextEmployeeCodes,
@@ -42,6 +43,7 @@ export default function Employees({
         employee_no: '',
         branch_id: activeBranchId,
         department_id: '',
+        employee_department_id: '',
         program_id: '',
         strand_id: '',
         first_name: '',
@@ -86,6 +88,7 @@ export default function Employees({
             employee_no: row.employee_no,
             branch_id: String(row.branch_id ?? ''),
             department_id: row.department_id ?? '',
+            employee_department_id: row.employee_department_id ?? '',
             program_id: row.program_id ?? '',
             strand_id: row.strand_id ?? '',
             first_name: row.first_name,
@@ -141,7 +144,7 @@ export default function Employees({
         { key: 'employee_no', label: 'Employee No.' },
         { key: 'full_name', label: 'Full Name', render: (row) => `${row.last_name}, ${row.first_name} ${row.middle_name ?? ''}`.trim() },
         { key: 'branch', label: 'Branch', render: (row) => row.branch?.name ?? '-' },
-        { key: 'department', label: 'Department', render: (row) => row.department?.name ?? '-' },
+        { key: 'employee_department', label: 'Department', render: (row) => row.employee_department?.name ?? row.department?.name ?? '-' },
         { key: 'role', label: 'Role' },
         { key: 'is_active', label: 'Status', render: (row) => <StatusBadge active={row.is_active} activeLabel={row.status ?? 'Active'} inactiveLabel="Inactive" /> },
     ];
@@ -224,7 +227,7 @@ export default function Employees({
                             </div>
                             <div>
                                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Department</p>
-                                <p className="mt-1 text-sm text-slate-900">{viewing.department?.name ?? '-'}</p>
+                                <p className="mt-1 text-sm text-slate-900">{viewing.employee_department?.name ?? viewing.department?.name ?? '-'}</p>
                             </div>
                             <div>
                                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Program</p>
@@ -281,9 +284,9 @@ export default function Employees({
                         )}
                     </FormField>
                     <FormField label="Department" error={errors.department_id}>
-                        <SelectInput value={data.department_id} onChange={(e) => setData('department_id', e.target.value)}>
+                        <SelectInput value={data.employee_department_id} onChange={(e) => setData('employee_department_id', e.target.value)}>
                             <option value="">Not assigned</option>
-                            {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
+                            {employeeDepartments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
                         </SelectInput>
                     </FormField>
                     <FormField label="Role" error={errors.role}>
