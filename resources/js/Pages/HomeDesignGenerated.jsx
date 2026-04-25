@@ -498,10 +498,11 @@ function App({ loginUrl = "/login" }) {
                     children: [
                         /* @__PURE__ */ jsxs("div", {
                             className:
-                                "grid lg:grid-cols-2 gap-12 items-center",
+                                "flex justify-center",
                             children: [
                                 /* @__PURE__ */ jsxs("div", {
-                                    className: "animate-slide-up",
+                                    className:
+                                        "animate-slide-up max-w-4xl mx-auto text-center flex flex-col items-center",
                                     children: [
                                         /* @__PURE__ */ jsxs("div", {
                                             className:
@@ -548,7 +549,8 @@ function App({ loginUrl = "/login" }) {
                                             ],
                                         }),
                                         /* @__PURE__ */ jsx("p", {
-                                            className: "text-lg mb-8 max-w-xl",
+                                            className:
+                                                "text-lg mb-8 max-w-3xl mx-auto",
                                             style: {
                                                 color: "var(--text-secondary)",
                                             },
@@ -557,7 +559,7 @@ function App({ loginUrl = "/login" }) {
                                         }),
                                         /* @__PURE__ */ jsxs("div", {
                                             className:
-                                                "flex flex-wrap gap-4 mb-12",
+                                                "flex flex-wrap gap-4 mb-12 justify-center",
                                             children: [
                                                 /* @__PURE__ */ jsxs("button", {
                                                     onClick: goToLogin,
@@ -617,7 +619,7 @@ function App({ loginUrl = "/login" }) {
                                     ],
                                 }),
                                 /* @__PURE__ */ jsx("div", {
-                                    className: "flex justify-center",
+                                    className: "hidden",
                                     children: /* @__PURE__ */ jsxs("div", {
                                         className: "relative animate-float",
                                         children: [
@@ -1152,7 +1154,7 @@ function App({ loginUrl = "/login" }) {
                 id: "roles",
                 className: "py-20 px-4",
                 children: /* @__PURE__ */ jsxs("div", {
-                    className: "max-w-7xl mx-auto",
+                    className: "max-w-6xl mx-auto",
                     children: [
                         /* @__PURE__ */ jsxs("div", {
                             className: "text-center mb-16",
@@ -1198,18 +1200,19 @@ function App({ loginUrl = "/login" }) {
                             ),
                         }),
                         /* @__PURE__ */ jsxs("div", {
-                            className: "grid lg:grid-cols-2 gap-8",
+                            className:
+                                "grid gap-8 items-stretch lg:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]",
                             children: [
                                 /* @__PURE__ */ jsxs(NeuCard, {
-                                    className: "animate-slide-up",
+                                    className: "animate-slide-up flex flex-col",
                                     children: [
                                         /* @__PURE__ */ jsxs("div", {
                                             className:
-                                                "flex items-center gap-4 mb-6",
+                                                "flex items-center gap-4 mb-4",
                                             children: [
                                                 /* @__PURE__ */ jsx("div", {
                                                     className:
-                                                        "w-20 h-20 neumorphic-circle flex items-center justify-center",
+                                                        "w-16 h-16 neumorphic-circle flex items-center justify-center",
                                                     style: {
                                                         color: "var(--accent)",
                                                     },
@@ -1250,17 +1253,17 @@ function App({ loginUrl = "/login" }) {
                                         }),
                                         /* @__PURE__ */ jsxs("div", {
                                             className:
-                                                "neumorphic-inset p-6 rounded-2xl mb-6",
+                                                "neumorphic-inset p-5 rounded-2xl mb-4",
                                             children: [
                                                 /* @__PURE__ */ jsx("h4", {
-                                                    className: "font-bold mb-4",
+                                                    className: "font-bold mb-3",
                                                     style: {
                                                         color: "var(--text-primary)",
                                                     },
                                                     children: "Features",
                                                 }),
                                                 /* @__PURE__ */ jsx("ul", {
-                                                    className: "space-y-3",
+                                                    className: "space-y-2.5",
                                                     children: roles[
                                                         activeRole
                                                     ].features.map(
@@ -1278,7 +1281,7 @@ function App({ loginUrl = "/login" }) {
                                                                             "div",
                                                                             {
                                                                                 className:
-                                                                                    "w-6 h-6 neumorphic-circle flex items-center justify-center text-xs",
+                                                                                    "w-5 h-5 neumorphic-circle flex items-center justify-center text-[10px]",
                                                                                 style: {
                                                                                     color: "var(--accent)",
                                                                                 },
@@ -1297,7 +1300,7 @@ function App({ loginUrl = "/login" }) {
                                         }),
                                         /* @__PURE__ */ jsxs("button", {
                                             className:
-                                                "w-full neumorphic-btn py-4 font-bold",
+                                                "mt-2 w-full neumorphic-btn py-3 font-bold",
                                             style: { color: "var(--accent)" },
                                             children: [
                                                 "Access ",
@@ -1307,54 +1310,147 @@ function App({ loginUrl = "/login" }) {
                                         }),
                                     ],
                                 }),
-                                /* @__PURE__ */ jsx("div", {
-                                    className:
-                                        "flex items-center justify-center",
-                                    children: /* @__PURE__ */ jsxs("div", {
-                                        className: "relative",
-                                        children: [
-                                            /* @__PURE__ */ jsx(ProgressRing, {
-                                                progress:
-                                                    roles[activeRole].progress,
-                                                size: 180,
-                                                strokeWidth: 12,
-                                            }),
-                                            /* @__PURE__ */ jsxs("div", {
-                                                className:
-                                                    "absolute inset-0 flex flex-col items-center justify-center",
-                                                children: [
-                                                    /* @__PURE__ */ jsxs(
-                                                        "span",
-                                                        {
-                                                            className:
-                                                                "text-4xl font-bold",
-                                                            style: {
-                                                                color: "var(--accent)",
+                                /* @__PURE__ */ jsxs(NeuCard, {
+                                    className: "animate-slide-up h-full flex flex-col",
+                                    children: [
+                                        /* @__PURE__ */ jsx("h3", {
+                                            className:
+                                                "text-lg font-bold mb-3",
+                                            style: {
+                                                color: "var(--text-primary)",
+                                            },
+                                            children: "Role Insights",
+                                        }),
+                                        /* @__PURE__ */ jsx("div", {
+                                            className:
+                                                "mb-4 flex items-center justify-center",
+                                            children: /* @__PURE__ */ jsxs(
+                                                "div",
+                                                {
+                                                    className: "relative",
+                                                    children: [
+                                                        /* @__PURE__ */ jsx(
+                                                            ProgressRing,
+                                                            {
+                                                                progress:
+                                                                    roles[
+                                                                        activeRole
+                                                                    ].progress,
+                                                                size: 160,
+                                                                strokeWidth: 10,
                                                             },
-                                                            children: [
-                                                                roles[
-                                                                    activeRole
-                                                                ].progress,
-                                                                "%",
-                                                            ],
-                                                        },
-                                                    ),
-                                                    /* @__PURE__ */ jsx(
-                                                        "span",
-                                                        {
-                                                            className:
-                                                                "text-sm",
-                                                            style: {
-                                                                color: "var(--text-secondary)",
+                                                        ),
+                                                        /* @__PURE__ */ jsxs(
+                                                            "div",
+                                                            {
+                                                                className:
+                                                                    "absolute inset-0 flex flex-col items-center justify-center",
+                                                                children: [
+                                                                    /* @__PURE__ */ jsxs(
+                                                                        "span",
+                                                                        {
+                                                                            className:
+                                                                                "text-2xl font-bold",
+                                                                            style: {
+                                                                                color: "var(--accent)",
+                                                                            },
+                                                                            children:
+                                                                                [
+                                                                                    roles[
+                                                                                        activeRole
+                                                                                    ]
+                                                                                        .progress,
+                                                                                    "%",
+                                                                                ],
+                                                                        },
+                                                                    ),
+                                                                    /* @__PURE__ */ jsx(
+                                                                        "span",
+                                                                        {
+                                                                            className:
+                                                                                "text-[11px] tracking-wide uppercase",
+                                                                            style: {
+                                                                                color: "var(--text-secondary)",
+                                                                            },
+                                                                            children:
+                                                                                "Completion",
+                                                                        },
+                                                                    ),
+                                                                ],
                                                             },
-                                                            children:
-                                                                "Completion",
-                                                        },
-                                                    ),
-                                                ],
-                                            }),
-                                        ],
-                                    }),
+                                                        ),
+                                                    ],
+                                                },
+                                            ),
+                                        }),
+                                        /* @__PURE__ */ jsx("div", {
+                                            className: "space-y-2",
+                                            children: [
+                                                {
+                                                    label: "Active Role",
+                                                    value: roles[activeRole]
+                                                        .title,
+                                                },
+                                                {
+                                                    label: "Key Capabilities",
+                                                    value: `${roles[activeRole].features.length} modules`,
+                                                },
+                                            ].map((item, i) =>
+                                                /* @__PURE__ */ jsxs(
+                                                    "div",
+                                                    {
+                                                        className:
+                                                            "neumorphic-inset rounded-lg px-3 py-2.5",
+                                                        children: [
+                                                            /* @__PURE__ */ jsx(
+                                                                "p",
+                                                                {
+                                                                    className:
+                                                                        "text-[11px] font-bold uppercase tracking-wider",
+                                                                    style: {
+                                                                        color: "var(--text-secondary)",
+                                                                    },
+                                                                    children:
+                                                                        item.label,
+                                                                },
+                                                            ),
+                                                            /* @__PURE__ */ jsx(
+                                                                "p",
+                                                                {
+                                                                    className:
+                                                                        "mt-0.5 text-sm font-bold",
+                                                                    style: {
+                                                                        color: "var(--text-primary)",
+                                                                    },
+                                                                    children:
+                                                                        item.value,
+                                                                },
+                                                            ),
+                                                        ],
+                                                    },
+                                                    i,
+                                                ),
+                                            ),
+                                        }),
+                                        /* @__PURE__ */ jsx("div", {
+                                            className: "mt-auto pt-3",
+                                            children: /* @__PURE__ */ jsxs(
+                                                "button",
+                                                {
+                                                    className:
+                                                        "w-full neumorphic-btn py-3 font-bold",
+                                                    style: {
+                                                        color: "var(--accent)",
+                                                    },
+                                                    children: [
+                                                        "View ",
+                                                        roles[activeRole].title,
+                                                        " Overview",
+                                                    ],
+                                                },
+                                            ),
+                                        }),
+                                    ],
                                 }),
                             ],
                         }),
@@ -1440,7 +1536,7 @@ function App({ loginUrl = "/login" }) {
                                             }),
                                             /* @__PURE__ */ jsx("div", {
                                                 className:
-                                                    "text-4xl font-bold mb-2 opacity-30",
+                                                    "text-4xl font-bold mb-2 opacity-80",
                                                 style: {
                                                     color: "var(--accent)",
                                                 },
@@ -1492,22 +1588,22 @@ function App({ loginUrl = "/login" }) {
                             ],
                         }),
                         /* @__PURE__ */ jsxs("div", {
-                            className: "neumorphic p-8 md:p-12",
+                            className: "neumorphic p-6 md:p-8",
                             children: [
                                 /* @__PURE__ */ jsx("div", {
-                                    className: "text-6xl mb-6 opacity-20",
+                                    className: "text-4xl mb-3 opacity-20",
                                     style: { color: "var(--accent)" },
                                     children: '"',
                                 }),
                                 /* @__PURE__ */ jsx("p", {
                                     className:
-                                        "text-xl md:text-2xl mb-8 leading-relaxed",
+                                        "text-lg md:text-xl mb-5 leading-relaxed",
                                     style: { color: "var(--text-primary)" },
                                     children:
                                         testimonials[currentTestimonial].text,
                                 }),
                                 /* @__PURE__ */ jsxs("div", {
-                                    className: "flex items-center gap-4",
+                                    className: "flex items-center gap-3",
                                     children: [
                                         /* @__PURE__ */ jsx("div", {
                                             className:
@@ -1554,7 +1650,7 @@ function App({ loginUrl = "/login" }) {
                                     ],
                                 }),
                                 /* @__PURE__ */ jsx("div", {
-                                    className: "flex justify-center gap-3 mt-8",
+                                    className: "flex justify-center gap-2.5 mt-4",
                                     children: testimonials.map((_, i) =>
                                         /* @__PURE__ */ jsx(
                                             "button",
