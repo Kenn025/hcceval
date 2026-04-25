@@ -246,7 +246,7 @@ export default function AdminLayout({
     activeRoute,
     breadcrumbs = [],
 }) {
-    const { auth, portal } = usePage().props;
+    const { auth, portal, activeAcademicYear } = usePage().props;
     const role = auth?.role ?? "admin";
     const [collapsed, setCollapsed] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
@@ -388,19 +388,44 @@ export default function AdminLayout({
 
             {/* User card */}
             {!sidebarCollapsed && (
-                <div className="mx-3 mb-4 flex items-center gap-3 rounded-2xl bg-white/10 px-3 py-3 ring-1 ring-white/10 shadow-sm">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-300 to-blue-500 text-xs font-bold text-white shadow">
-                        {userInitials}
+                <>
+                    <div className="mx-3 mb-3 flex items-center gap-3 rounded-2xl bg-white/10 px-3 py-3 ring-1 ring-white/10 shadow-sm">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-300 to-blue-500 text-xs font-bold text-white shadow">
+                            {userInitials}
+                        </div>
+                        <div className="min-w-0">
+                            <p className="truncate text-sm font-bold text-white">
+                                {auth?.user?.name ?? "Admin"}
+                            </p>
+                            <p className="truncate text-[10px] text-blue-300 uppercase tracking-wider">
+                                {ROLE_LABELS[role] ?? "Admin"}
+                            </p>
+                        </div>
                     </div>
-                    <div className="min-w-0">
-                        <p className="truncate text-sm font-bold text-white">
-                            {auth?.user?.name ?? "Admin"}
-                        </p>
-                        <p className="truncate text-[10px] text-blue-300 uppercase tracking-wider">
-                            {ROLE_LABELS[role] ?? "Admin"}
-                        </p>
+
+                    <div className="mx-3 mb-4 rounded-2xl bg-blue-950/45 px-3 py-3 ring-1 ring-white/10">
+                        <div className="flex items-center gap-2 text-blue-200">
+                            <AppIcon name="calendar" className="h-4 w-4 shrink-0" />
+                            <span className="text-[10px] font-semibold uppercase tracking-widest">
+                                Active Academic Year
+                            </span>
+                        </div>
+                        {activeAcademicYear ? (
+                            <>
+                                <p className="mt-2 truncate text-sm font-bold text-white">
+                                    {activeAcademicYear.school_year}
+                                </p>
+                                <p className="truncate text-xs text-blue-300">
+                                    {activeAcademicYear.term}
+                                </p>
+                            </>
+                        ) : (
+                            <p className="mt-2 text-xs font-medium text-blue-200">
+                                No active term set
+                            </p>
+                        )}
                     </div>
-                </div>
+                </>
             )}
 
             {/* Nav */}

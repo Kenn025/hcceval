@@ -19,6 +19,23 @@ const buildStudentCode = (branch, nextStudentCodes = {}) => {
 
 const stripCampusSuffix = (value) => String(value ?? '').replace(/\s*-\s*(Santa Rosa|Concepcion)\s*$/i, '').trim();
 
+const parseSubjectIds = (value) => {
+    if (Array.isArray(value)) {
+        return value;
+    }
+
+    if (typeof value !== 'string' || !value.trim()) {
+        return [];
+    }
+
+    try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch {
+        return [];
+    }
+};
+
 const getProgramStrandLabel = (row) => {
     if (row.program?.name) {
         return stripCampusSuffix(row.program.name);
@@ -45,6 +62,7 @@ export default function Students({
     programs,
     strands,
     yearLevels,
+    subjects,
     nextStudentCodes,
     isBranchAdmin,
     selectedBranchId,
@@ -57,6 +75,9 @@ export default function Students({
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [showPassword, setShowPassword] = useState(false);
     const [submitError, setSubmitError] = useState('');
+    const [subjectListOpen, setSubjectListOpen] = useState(false);
+    const [subjectListMode, setSubjectListMode] = useState('year-level');
+    const [registeredSubjectIds, setRegisteredSubjectIds] = useState([]);
     const activeBranchId = String(selectedBranchId ?? scopedBranchId ?? '');
     const selectedFilterBranchId = String(filters.branch_id ?? activeBranchId ?? '');
     const selectedFilterDepartmentId = String(filters.department_id ?? '');
@@ -69,6 +90,9 @@ export default function Students({
         program_id: '',
         strand_id: '',
         year_level_id: '',
+        subject_ids: [],
+        is_irreg: false,
+        irreg_subject_id: '',
         first_name: '',
         middle_name: '',
         last_name: '',
@@ -119,6 +143,36 @@ export default function Students({
         )),
         [yearLevels, data.department_id, data.program_id],
     );
+    const selectedYearLevel = useMemo(
+        () => yearLevels.find((yearLevel) => String(yearLevel.id) === String(data.year_level_id)),
+        [data.year_level_id, yearLevels],
+    );
+    const selectedYearLevelSubjectIds = useMemo(() => {
+        if (!selectedYearLevel) {
+            return [];
+        }
+
+        const raw = selectedYearLevel.subject_id;
+        const values = Array.isArray(raw)
+            ? raw
+            : typeof raw === 'string'
+                ? parseSubjectIds(raw)
+                : [];
+
+        return values.map((id) => String(id));
+    }, [selectedYearLevel]);
+    const selectedYearLevelSubjects = useMemo(
+        () => subjects.filter((subject) => selectedYearLevelSubjectIds.includes(String(subject.id))),
+        [selectedYearLevelSubjectIds, subjects],
+    );
+    const availableYearLevelSubjects = useMemo(
+        () => selectedYearLevelSubjects.filter((subject) => !registeredSubjectIds.includes(String(subject.id))),
+        [registeredSubjectIds, selectedYearLevelSubjects],
+    );
+    const selectedProgramSubjects = useMemo(
+        () => subjects.filter((subject) => !data.program_id || String(subject.program_id ?? '') === String(data.program_id)),
+        [data.program_id, subjects],
+    );
     const selectedDepartmentName = String(selectedDepartment?.name ?? '').toLowerCase();
     const selectedDepartmentCode = String(selectedDepartment?.code ?? '').toLowerCase();
     const isCollegeDepartment = selectedDepartmentName.includes('college') || selectedDepartmentCode.includes('col');
@@ -129,6 +183,21 @@ export default function Students({
     const supportsStrand = isSeniorHighDepartment;
     const showYearLevelOnly = isJuniorHighDepartment || isElementaryDepartment;
     const generatedStudentCode = editing ? data.student_no : buildStudentCode(selectedBranch, nextStudentCodes);
+    const canShowIrregularControls = supportsProgram && Boolean(data.department_id);
+    const activeSubjectScopeLabel = subjectListMode === 'irregular-pick'
+        ? 'Irregular Subject'
+        : data.is_irreg
+            ? 'Program Subjects'
+            : 'Year Level Subjects';
+    const availableSubjects = data.is_irreg ? selectedProgramSubjects : availableYearLevelSubjects;
+    const availableSubjectIds = useMemo(
+        () => availableSubjects.map((subject) => String(subject.id)),
+        [availableSubjects],
+    );
+    const selectedSubjectIds = useMemo(
+        () => (Array.isArray(data.subject_ids) ? data.subject_ids.map((id) => String(id)) : []),
+        [data.subject_ids],
+    );
 
     useEffect(() => {
         if (!data.branch_id && activeBranchId) {
@@ -142,6 +211,8 @@ export default function Students({
             setData('program_id', '');
             setData('strand_id', '');
             setData('year_level_id', '');
+            setData('subject_ids', []);
+            setData('irreg_subject_id', '');
         }
     }, [data.department_id, filteredDepartments, setData]);
 
@@ -149,6 +220,8 @@ export default function Students({
         if (data.program_id && !filteredPrograms.some((program) => String(program.id) === String(data.program_id))) {
             setData('program_id', '');
             setData('year_level_id', '');
+            setData('subject_ids', []);
+            setData('irreg_subject_id', '');
         }
     }, [data.program_id, filteredPrograms, setData]);
 
@@ -161,6 +234,7 @@ export default function Students({
     useEffect(() => {
         if (!supportsProgram && data.program_id) {
             setData('program_id', '');
+            setData('subject_ids', []);
         }
     }, [data.program_id, setData, supportsProgram]);
 
@@ -173,8 +247,34 @@ export default function Students({
     useEffect(() => {
         if (data.year_level_id && !filteredYearLevels.some((yearLevel) => String(yearLevel.id) === String(data.year_level_id))) {
             setData('year_level_id', '');
+            setData('subject_ids', []);
+            setData('irreg_subject_id', '');
         }
     }, [data.year_level_id, filteredYearLevels, setData]);
+
+    useEffect(() => {
+        if (!canShowIrregularControls && data.is_irreg) {
+            setData('is_irreg', false);
+        }
+    }, [canShowIrregularControls, data.is_irreg, setData]);
+
+    useEffect(() => {
+        if (!data.is_irreg && data.irreg_subject_id) {
+            setData('irreg_subject_id', '');
+        }
+    }, [data.irreg_subject_id, data.is_irreg, setData]);
+
+    useEffect(() => {
+        if (data.irreg_subject_id && !availableSubjectIds.includes(String(data.irreg_subject_id))) {
+            setData('irreg_subject_id', '');
+        }
+    }, [availableSubjectIds, data.irreg_subject_id, setData]);
+
+    useEffect(() => {
+        if (selectedSubjectIds.some((id) => !availableSubjectIds.includes(id))) {
+            setData('subject_ids', selectedSubjectIds.filter((id) => availableSubjectIds.includes(id)));
+        }
+    }, [availableSubjectIds, selectedSubjectIds, setData]);
 
     const handleBranchChange = (branchId) => {
         setData('branch_id', branchId);
@@ -182,6 +282,8 @@ export default function Students({
         setData('program_id', '');
         setData('strand_id', '');
         setData('year_level_id', '');
+        setData('subject_ids', []);
+        setData('irreg_subject_id', '');
     };
 
     const handleDepartmentChange = (departmentId) => {
@@ -189,17 +291,49 @@ export default function Students({
         setData('program_id', '');
         setData('strand_id', '');
         setData('year_level_id', '');
+        setData('subject_ids', []);
+        setData('irreg_subject_id', '');
     };
 
     const handleProgramChange = (programId) => {
         setData('program_id', programId);
         setData('year_level_id', '');
+        setData('subject_ids', data.is_irreg
+            ? subjects
+                .filter((subject) => String(subject.program_id ?? '') === String(programId))
+                .map((subject) => String(subject.id))
+            : []);
+        setData('irreg_subject_id', '');
+    };
+
+    const toggleSubject = (subjectId) => {
+        const subjectKey = String(subjectId);
+        const isSelected = selectedSubjectIds.includes(subjectKey);
+
+        setData('subject_ids', isSelected
+            ? selectedSubjectIds.filter((id) => id !== subjectKey)
+            : [...selectedSubjectIds, subjectKey]);
+
+        if (String(data.irreg_subject_id) === subjectKey && isSelected) {
+            setData('irreg_subject_id', '');
+        }
+    };
+
+    const openSubjectViewer = (mode) => {
+        setSubjectListMode(mode);
+        setSubjectListOpen(true);
+    };
+
+    const pickIrregularSubject = (subjectId) => {
+        setData('irreg_subject_id', String(subjectId));
+        setSubjectListOpen(false);
     };
 
     const openCreate = () => {
         reset();
         setDetailOpen(false);
         setViewing(null);
+        setRegisteredSubjectIds([]);
         setData({
             student_no: '',
             branch_id: activeBranchId,
@@ -207,6 +341,9 @@ export default function Students({
             program_id: '',
             strand_id: '',
             year_level_id: '',
+            subject_ids: [],
+            is_irreg: false,
+            irreg_subject_id: '',
             first_name: '',
             middle_name: '',
             last_name: '',
@@ -216,6 +353,7 @@ export default function Students({
             status: 'active',
         });
         setShowPassword(false);
+        setSubjectListOpen(false);
         clearErrors();
         setEditing(null);
         setSlideOpen(true);
@@ -229,6 +367,7 @@ export default function Students({
     const openEdit = (row) => {
         setDetailOpen(false);
         setViewing(null);
+        setRegisteredSubjectIds(Array.isArray(row.subject_id) ? row.subject_id.map((id) => String(id)) : []);
         setData({
             student_no: row.student_no,
             branch_id: String(row.branch_id ?? ''),
@@ -236,6 +375,9 @@ export default function Students({
             program_id: String(row.program_id ?? ''),
             strand_id: String(row.strand_id ?? ''),
             year_level_id: String(row.year_level_id ?? ''),
+            subject_ids: Array.isArray(row.subject_id) ? row.subject_id.map((id) => String(id)) : [],
+            is_irreg: Boolean(row.is_irreg),
+            irreg_subject_id: String(row.irreg_subject_id ?? ''),
             first_name: row.first_name,
             middle_name: row.middle_name ?? '',
             last_name: row.last_name,
@@ -245,6 +387,7 @@ export default function Students({
             status: row.is_active ? 'active' : 'inactive',
         });
         setShowPassword(false);
+        setSubjectListOpen(false);
         clearErrors();
         setEditing(row);
         setSlideOpen(true);
@@ -434,6 +577,14 @@ export default function Students({
                                     {viewing.yearLevel ? `${viewing.yearLevel.year_level} - ${viewing.yearLevel.section}` : '-'}
                                 </p>
                             </div>
+                            <div>
+                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Irregular</p>
+                                <p className="mt-1 text-sm text-slate-900">{viewing.is_irreg ? 'Yes' : 'No'}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Irregular Subject</p>
+                                <p className="mt-1 text-sm text-slate-900">{viewing.irregSubject?.name ?? '-'}</p>
+                            </div>
                         </div>
 
                         <div className="flex gap-3 pt-2">
@@ -524,13 +675,130 @@ export default function Students({
                     <FormField label="Year Level" error={errors.year_level_id}>
                         <SelectInput
                             value={data.year_level_id}
-                            onChange={(e) => setData('year_level_id', e.target.value)}
+                            onChange={(e) => {
+                                const nextYearLevelId = e.target.value;
+                                const nextYearLevel = yearLevels.find((yearLevel) => String(yearLevel.id) === String(nextYearLevelId));
+                                const nextYearLevelSubjectIds = parseSubjectIds(nextYearLevel?.subject_id)
+                                    .map((id) => String(id))
+                                    .filter((id) => !registeredSubjectIds.includes(id));
+
+                                setData('year_level_id', nextYearLevelId);
+                                setData('subject_ids', [
+                                    ...selectedSubjectIds,
+                                    ...nextYearLevelSubjectIds.filter((id) => !selectedSubjectIds.includes(id)),
+                                ]);
+                                setData('irreg_subject_id', '');
+                            }}
                             disabled={!data.department_id || (supportsProgram && !data.program_id) || (!supportsProgram && !supportsStrand && !showYearLevelOnly && !data.department_id)}
                         >
                             <option value="">Not assigned</option>
                             {filteredYearLevels.map((yearLevel) => <option key={yearLevel.id} value={yearLevel.id}>{yearLevel.name}</option>)}
                         </SelectInput>
                     </FormField>
+
+                    {data.year_level_id && !data.is_irreg && (
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-slate-900">Selected year level subjects</p>
+                                    <p className="text-xs text-slate-500">
+                                        {availableYearLevelSubjects.length > 0
+                                            ? `${availableYearLevelSubjects.length} subject(s) available from this year level.`
+                                            : 'No subjects are assigned to this year level yet.'}
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => openSubjectViewer('year-level')}
+                                    className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                                >
+                                    View All Subjects
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {canShowIrregularControls && (
+                        <div className="space-y-4">
+                            <div className="rounded-xl border border-slate-200 bg-white p-4">
+                                <div className="flex items-center justify-between gap-4">
+                                    <div>
+                                        <p className="text-sm font-medium text-slate-900">Irregular Student</p>
+                                        <p className="text-xs text-slate-500">Turn this on if the student should be treated as irregular.</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const nextValue = !data.is_irreg;
+                                            const nextSubjectIds = nextValue
+                                                ? selectedProgramSubjects.map((subject) => String(subject.id))
+                                                : selectedYearLevelSubjects.map((subject) => String(subject.id));
+
+                                            setData('is_irreg', nextValue);
+                                            setData('subject_ids', nextSubjectIds);
+                                            setData('irreg_subject_id', '');
+                                        }}
+                                        className={`relative inline-flex h-7 w-12 items-center rounded-full transition ${data.is_irreg ? 'bg-slate-900' : 'bg-slate-300'}`}
+                                        aria-pressed={data.is_irreg}
+                                    >
+                                        <span
+                                            className={`inline-block h-5 w-5 transform rounded-full bg-white transition ${data.is_irreg ? 'translate-x-6' : 'translate-x-1'}`}
+                                        />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {data.is_irreg && (
+                                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                        <div>
+                                            <p className="text-sm font-medium text-slate-900">Selected program subjects</p>
+                                            <p className="text-xs text-slate-500">
+                                                {selectedSubjectIds.length > 0
+                                                    ? `${selectedSubjectIds.length} subject(s) selected for this irregular student.`
+                                                    : 'No program subjects are selected yet.'}
+                                            </p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => openSubjectViewer('irregular')}
+                                            disabled={!data.program_id}
+                                            className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                            View Program Subjects
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {data.is_irreg && canShowIrregularControls && (
+                        <FormField label="Irregular Subject" error={errors.irreg_subject_id}>
+                            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <div>
+                                        <p className="text-sm font-medium text-slate-900">
+                                            {availableSubjects.find((subject) => String(subject.id) === String(data.irreg_subject_id))?.name ?? 'No irregular subject selected'}
+                                        </p>
+                                        <p className="text-xs text-slate-500">
+                                            {data.irreg_subject_id
+                                                ? (availableSubjects.find((subject) => String(subject.id) === String(data.irreg_subject_id))?.code || 'Selected from current program subjects')
+                                                : 'Choose one subject from the selected program subjects.'}
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => openSubjectViewer('irregular-pick')}
+                                        disabled={!data.program_id || selectedSubjectIds.length === 0}
+                                        className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                        Choose Irregular Subject
+                                    </button>
+                                </div>
+                            </div>
+                        </FormField>
+                    )}
 
                     <FormField label="Email" error={errors.email} required>
                         <TextInput type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} />
@@ -563,6 +831,85 @@ export default function Students({
                         </SubmitButton>
                     </div>
                 </form>
+            </SlideOver>
+
+            <SlideOver open={subjectListOpen} onClose={() => setSubjectListOpen(false)} title={activeSubjectScopeLabel} width="max-w-lg">
+                <div className="space-y-4">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            {subjectListMode === 'irregular' || subjectListMode === 'irregular-pick' ? 'Program' : 'Year Level'}
+                        </p>
+                        <p className="mt-1 text-sm font-medium text-slate-900">
+                            {subjectListMode === 'irregular' || subjectListMode === 'irregular-pick'
+                                ? (filteredPrograms.find((program) => String(program.id) === String(data.program_id))?.name ?? 'Not assigned')
+                                : (selectedYearLevel?.name ?? 'Not assigned')}
+                        </p>
+                    </div>
+
+                    {(subjectListMode === 'irregular-pick'
+                        ? availableSubjects.filter((subject) => selectedSubjectIds.includes(String(subject.id)))
+                        : availableSubjects
+                    ).length > 0 ? (
+                        <div className="space-y-2">
+                            {(subjectListMode === 'irregular-pick'
+                                ? availableSubjects.filter((subject) => selectedSubjectIds.includes(String(subject.id)))
+                                : availableSubjects
+                            ).map((subject) => (
+                                subjectListMode === 'irregular-pick' ? (
+                                    <button
+                                        key={subject.id}
+                                        type="button"
+                                        onClick={() => pickIrregularSubject(subject.id)}
+                                        className={`flex w-full items-start gap-3 rounded-lg border px-4 py-3 text-left transition ${
+                                            String(data.irreg_subject_id) === String(subject.id)
+                                                ? 'border-slate-900 bg-slate-100'
+                                                : 'border-slate-200 bg-white hover:bg-slate-50'
+                                        }`}
+                                    >
+                                        <span className={`mt-0.5 inline-flex h-4 w-4 rounded-full border ${
+                                            String(data.irreg_subject_id) === String(subject.id)
+                                                ? 'border-slate-900 bg-slate-900'
+                                                : 'border-slate-300 bg-white'
+                                        }`}>
+                                            <span className="m-auto h-1.5 w-1.5 rounded-full bg-white" />
+                                        </span>
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-medium text-slate-900">{subject.name}</p>
+                                            <p className="text-xs text-slate-500">{subject.code || 'No subject code'}</p>
+                                        </div>
+                                    </button>
+                                ) : (
+                                    <label key={subject.id} className="flex items-start gap-3 rounded-lg border border-slate-200 px-4 py-3">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedSubjectIds.includes(String(subject.id))}
+                                            onChange={() => toggleSubject(subject.id)}
+                                            className="mt-1 rounded border-slate-300"
+                                        />
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-medium text-slate-900">{subject.name}</p>
+                                            <p className="text-xs text-slate-500">{subject.code || 'No subject code'}</p>
+                                        </div>
+                                    </label>
+                                )
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="rounded-lg border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-500">
+                            {subjectListMode === 'irregular' || subjectListMode === 'irregular-pick'
+                                ? 'No subjects are available for the selected program yet.'
+                                : 'No subjects are assigned to this year level yet.'}
+                        </div>
+                    )}
+
+                    <button
+                        type="button"
+                        onClick={() => setSubjectListOpen(false)}
+                        className="w-full rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700"
+                    >
+                        Close
+                    </button>
+                </div>
             </SlideOver>
 
             <ConfirmDialog open={Boolean(deleteTarget)} onConfirm={() => { router.delete(route('admin.students') + '/' + deleteTarget.id, { onSuccess: () => setDeleteTarget(null) }); }} onCancel={() => setDeleteTarget(null)} title="Delete Student" message={`Delete student "${deleteTarget?.first_name} ${deleteTarget?.last_name}"?`} />

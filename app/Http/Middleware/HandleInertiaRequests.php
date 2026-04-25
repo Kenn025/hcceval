@@ -3,6 +3,8 @@
 namespace App\Http\Middleware;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -43,10 +45,39 @@ class HandleInertiaRequests extends Middleware
                 'navigation' => $portal['sections'],
                 'migration'  => $portal['migration'],
             ],
+            'activeAcademicYear' => fn () => $this->activeAcademicYear(),
             'flash' => [
                 'success' => session('success'),
                 'error'   => session('error'),
             ],
+        ];
+    }
+
+    private function activeAcademicYear(): ?array
+    {
+        if (! Schema::hasTable('academic_year')) {
+            return null;
+        }
+
+        $cycle = DB::table('academic_year')
+            ->select('id', 'from_year', 'to_year', 'term')
+            ->where('is_deleted', 0)
+            ->where('is_activated', 1)
+            ->orderByDesc('from_year')
+            ->orderByDesc('id')
+            ->first();
+
+        if (! $cycle) {
+            return null;
+        }
+
+        $schoolYear = "{$cycle->from_year}-{$cycle->to_year}";
+
+        return [
+            'id' => $cycle->id,
+            'school_year' => $schoolYear,
+            'term' => $cycle->term,
+            'label' => trim("{$schoolYear} {$cycle->term}"),
         ];
     }
 }

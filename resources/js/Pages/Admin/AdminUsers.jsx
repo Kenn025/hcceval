@@ -10,8 +10,16 @@ import { router, useForm } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
 const buildAdminCodePreview = (role, branchId, branches) => {
+    if (!role) {
+        return 'Select role to generate code';
+    }
+
     if (role === 'overalladmin') {
         return 'OVERALLADMIN01';
+    }
+
+    if (!branchId) {
+        return 'Select branch to generate code';
     }
 
     const selectedBranch = branches.find((branch) => String(branch.id) === String(branchId));
@@ -31,7 +39,7 @@ export default function AdminUsers({ admins, filters, branches }) {
     const [showPassword, setShowPassword] = useState(false);
 
     const { data, setData, errors, processing, reset, clearErrors } = useForm({
-        name: '', email: '', password: '', role: 'admin', branch_id: '', is_activated: true,
+        name: '', email: '', password: '', role: '', branch_id: '', is_activated: true,
     });
     const generatedCode = useMemo(
         () => buildAdminCodePreview(data.role, data.branch_id, branches),
@@ -48,7 +56,7 @@ export default function AdminUsers({ admins, filters, branches }) {
         setData('name', '');
         setData('email', '');
         setData('password', '');
-        setData('role', 'admin');
+        setData('role', '');
         setData('branch_id', '');
         setData('is_activated', true);
         setSlideOpen(true);
@@ -159,7 +167,7 @@ export default function AdminUsers({ admins, filters, branches }) {
                             </button>
                         </div>
                     </FormField>
-                    <FormField label="Role" error={errors.role}>
+                    <FormField label="Role" error={errors.role} required>
                         <SelectInput
                             value={data.role}
                             onChange={(e) => {
@@ -170,6 +178,7 @@ export default function AdminUsers({ admins, filters, branches }) {
                                 }
                             }}
                         >
+                            <option value="">Select role...</option>
                             <option value="overalladmin">Overall Admin</option>
                             <option value="admin">Admin</option>
                         </SelectInput>
