@@ -63,6 +63,7 @@ const NAV_ITEMS = {
     ],
     employee: [
         { key: 'ratings', label: 'My Ratings', icon: 'ratings' },
+        { key: 'evaluate', label: 'Evaluate',  icon: 'peer' },
         { key: 'archive', label: 'Archive',    icon: 'archive' },
     ],
 };
