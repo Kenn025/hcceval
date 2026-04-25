@@ -142,19 +142,19 @@ class RatingsController extends Controller
         $branchId   = $this->scopedBranchId();
 
         return DB::table('ratings_head as rh')
-            ->leftJoin('teacher as t', 'rh.teacher_id', '=', 't.id')
+            ->leftJoin('employee as e', 'rh.employee_id', '=', 'e.id')
             ->leftJoin('academic_year as ay', 'rh.academic_year_id', '=', 'ay.id')
             ->select(
                 'rh.id as rating_id',
-                DB::raw("CONCAT(t.firstname, ' ', t.lastname) as teacher_name"),
+                DB::raw("CONCAT(e.firstname, ' ', e.lastname) as teacher_name"),
                 DB::raw("JSON_UNQUOTE(JSON_EXTRACT(rh.overall_ratings, '$.average')) as overall_rating"),
                 'rh.submission_count',
                 DB::raw("CONCAT(ay.from_year, '-', ay.to_year) as school_year")
             )
-            ->when($branchId, fn ($q) => $q->where('t.branch_id', $branchId))
+            ->when($branchId, fn ($q) => $q->where('e.branch_id', $branchId))
             ->when($search, fn ($q) => $q->where(function ($sub) use ($search) {
-                $sub->where('t.firstname', 'like', "%{$search}%")
-                    ->orWhere('t.lastname', 'like', "%{$search}%");
+                $sub->where('e.firstname', 'like', "%{$search}%")
+                    ->orWhere('e.lastname', 'like', "%{$search}%");
             }))
             ->when($schoolYear, fn ($q) => $q->whereRaw("CONCAT(ay.from_year, '-', ay.to_year) = ?", [$schoolYear]));
     }

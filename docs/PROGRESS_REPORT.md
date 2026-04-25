@@ -24,7 +24,7 @@
 | 2 | Performance Efficiency  | 60%   | Needs evidence |
 | 3 | Compatibility           | 70%   | Demonstrable |
 | 4 | Usability               | 85%   | ConfirmDialog wired across destructive actions (Export, Print, Recompute, Submit Evaluation, Mark-all-read, Clear) |
-| 5 | Reliability             | 50%   | Tests required |
+| 5 | Reliability             | 60%   | Core portal/auth coverage added; 2 high-value tests still missing |
 | 6 | Security                | 80%   | MD5 migration done — bcrypt with on-login rehash |
 | 7 | Maintainability         | 80%   | Pass-ready |
 | 8 | Portability             | 50%   | Deploy doc required |
@@ -134,7 +134,7 @@ Build a 1-page `/help` route with a static manual + screenshots, and wire `Confi
 
 ## 5. Reliability — *does it stay up; does it recover from failure?*
 
-**Score: 50% — second weakest.**
+**Score: 60% — improved, but still one of the weaker categories.**
 
 ### Done
 - Soft deletes (`is_deleted`) prevent accidental data loss
@@ -142,25 +142,24 @@ Build a 1-page `/help` route with a static manual + screenshots, and wire `Confi
 - Audit log captures every admin action
 - 2FA + login throttling (5 attempts) protects accounts
 - Notifications wrapped in `try/catch` — broken SMTP will not 500 the request
+- Feature tests now cover employee peer/head submissions, duplicate-submit blocking, login lockout, and admin 2FA challenge
 
 ### Partial
 - Some controllers use raw `DB::table()` updates without a transaction — concurrent submissions to `ratings_*` tables could miscount.
+- Full PHPUnit suite is green (`php artisan test`: 31 passing tests / 123 assertions), but ratings/reporting coverage is still thin outside the employee portal path.
 
 ### Missing
-- **Test coverage is ~3%** — only Breeze auth scaffolding + 1 `BranchManagementTest`. No coverage for Ratings, Evaluate flows, Outstanding Awards, Notifications, 2FA.
+- Still missing 2 of the 5 high-value defense tests: student submits subject evaluation, and admin opens cycle notifications/emails.
 - No backup/restore strategy documented.
 - No error monitoring (Sentry, Bugsnag, Flare).
 - No `php artisan health:check` or status endpoint.
 
 ### Recommendation
-Write **5 feature tests** before defense:
+Finish the remaining **2 feature tests** before defense:
 1. Student submits evaluation -> `ratings_subject` row created/updated
-2. Employee submits peer evaluation -> `ratings_employee` updated
-3. Admin opens cycle -> notifications written to `app_notifications` + emails attempted
-4. Login lockout triggers after 5 failed attempts
-5. 2FA challenge required when `two_factor_enabled=1`
+2. Admin opens cycle -> notifications written to `app_notifications` + emails attempted
 
-Five passing tests is enough evidence for the rubric.
+The employee evaluation flow, duplicate-submit guard, login lockout, and admin 2FA challenge are now covered.
 
 ---
 
@@ -257,7 +256,7 @@ Ranked by **impact divided by effort**.
 | # | Fix                                                          | Categories Improved          | Effort   |
 |---|--------------------------------------------------------------|------------------------------|----------|
 | 1 | ~~Migrate passwords from MD5 -> bcrypt (with on-login rehash)~~ **DONE** | Security                     | shipped  |
-| 2 | Write 5 feature tests for evaluation flows                   | Reliability                  | 3 hrs    |
+| 2 | Write 5 feature tests for evaluation flows *(3/5 shipped)*   | Reliability                  | 1-2 hrs  |
 | 3 | ~~Add missing sidebar nav entries + wire `ConfirmDialog`~~ **DONE** | Functional + Usability       | shipped  |
 | 4 | Write README + DEPLOY.md + minimal docker-compose            | Maintainability + Portability| 2 hrs    |
 | 5 | Set `APP_DEBUG=false` for demo + configure real SMTP         | Security + Functional        | 30 min   |
@@ -321,3 +320,4 @@ If a request implies any of these, the AI must stop and ask the user to confirm:
 | 2026-04-26 | Claude (review)  | Initial report against ISO 25010 — overall 68%          |
 | 2026-04-26 | Claude           | Priority #1 shipped: MD5 -> bcrypt with on-login rehash + `auth:rehash` command. Security 65% -> 80%. Overall 68% -> 70%. |
 | 2026-04-26 | Claude           | Priority #3 shipped: sidebar nav entries (Audit Logs, Outstanding Awards, Head/Branch Ratings, Employee Archives) + `ConfirmDialog` wired into Export, Print Summary, Recompute Awards, Submit Evaluation (Student/Teacher/Employee), Mark-all-read, Clear notifications. Functional 90% -> 95%, Usability 75% -> 85%. Overall 70% -> 74%. |
+| 2026-04-26 | Codex            | Added employee portal evaluation tests, admin login lockout + 2FA tests, fixed `ratings_head` to aggregate department-head evaluations against `employee` records, and confirmed the full PHPUnit suite is green (31 tests / 123 assertions). |

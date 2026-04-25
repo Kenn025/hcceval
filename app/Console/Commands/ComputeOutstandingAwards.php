@@ -84,15 +84,15 @@ class ComputeOutstandingAwards extends Command
     private function topChairs(int $academicYearId, int $branchId, int $limit): array
     {
         return DB::table('ratings_head as rh')
-            ->join('teacher as t', 'rh.teacher_id', '=', 't.id')
+            ->join('employee as e', 'rh.employee_id', '=', 'e.id')
             ->where('rh.academic_year_id', $academicYearId)
-            ->where('t.branch_id', $branchId)
+            ->where('e.branch_id', $branchId)
             ->select(
-                't.id',
-                DB::raw("CONCAT(t.firstname, ' ', t.lastname) as name"),
+                'e.id',
+                DB::raw("CONCAT(e.firstname, ' ', e.lastname) as name"),
                 DB::raw("AVG(JSON_UNQUOTE(JSON_EXTRACT(rh.overall_ratings, '$.average'))) as score")
             )
-            ->groupBy('t.id', 't.firstname', 't.lastname')
+            ->groupBy('e.id', 'e.firstname', 'e.lastname')
             ->orderByDesc('score')
             ->limit($limit)
             ->get()
