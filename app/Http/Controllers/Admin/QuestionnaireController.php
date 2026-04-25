@@ -40,7 +40,7 @@ class QuestionnaireController extends Controller
                     ->orWhere('qc.code', 'like', "%{$search}%");
             }))
             ->orderBy('q.code')
-            ->paginate(15)
+            ->paginate($request->input('per_page', 15))
             ->through(function ($row) {
                 $payload = json_decode($row->items ?? '{}', true) ?: [];
                 $legacyComments = json_decode($row->comments ?? '[]', true) ?: [];

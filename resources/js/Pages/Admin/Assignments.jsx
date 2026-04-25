@@ -377,7 +377,8 @@ function QuestionnaireListModal({ open, scopeItem, questionnaires, assignmentTyp
                     </div>
 
                     <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
-                        <div className="overflow-x-auto">
+                        {/* Desktop Table View */}
+                        <div className="hidden md:block overflow-x-auto">
                             <table className="min-w-full divide-y divide-slate-200">
                                 <thead className="bg-slate-50">
                                     <tr>
@@ -439,6 +440,61 @@ function QuestionnaireListModal({ open, scopeItem, questionnaires, assignmentTyp
                                     )}
                                 </tbody>
                             </table>
+                        </div>
+
+                        {/* Mobile Card View */}
+                        <div className="md:hidden divide-y divide-slate-100">
+                            {questionnaires.length > 0 ? (
+                                questionnaires.map((questionnaire, index) => (
+                                    <div key={`mobile-q-${questionnaire.questionnaire_id}`} className="p-4 active:bg-slate-50 transition-colors">
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div className="flex-1 space-y-3">
+                                                <div>
+                                                    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400"># {index + 1}</div>
+                                                    <div className="mt-0.5 text-sm font-semibold text-slate-900">{questionnaire.title ?? '-'}</div>
+                                                    <div className="text-xs text-slate-500">{questionnaire.questionnaire_code ?? '-'}</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Type</div>
+                                                    <div className="mt-0.5 text-xs text-slate-600">{questionnaire.questionnaire_type_name ?? '-'}</div>
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col gap-2 shrink-0">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setViewTarget(questionnaire)}
+                                                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm"
+                                                >
+                                                    View
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        router.post(route('admin.assignments.select-questionnaire'), {
+                                                            assignment_type: assignmentType,
+                                                            questionnaire_id: questionnaire.questionnaire_id,
+                                                            scope_type: scopeItem.scopeType,
+                                                            scope_id: scopeItem.entityId,
+                                                            branch_id: scopeItem.branchId,
+                                                            department_id: scopeItem.departmentId,
+                                                        }, {
+                                                            preserveScroll: true,
+                                                            onSuccess: () => onClose(),
+                                                        });
+                                                    }}
+                                                    className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm"
+                                                >
+                                                    Select
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="px-4 py-8 text-center text-sm text-slate-500">
+                                    No questionnaires found.
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -604,7 +660,8 @@ function AssignedQuestionnairesModal({ open, scopeItem, questionnaires, assignme
                     </div>
 
                     <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
-                        <div className="overflow-x-auto">
+                        {/* Desktop Table View */}
+                        <div className="hidden md:block overflow-x-auto">
                             <table className="min-w-full divide-y divide-slate-200">
                                 <thead className="bg-slate-50">
                                     <tr>
@@ -647,6 +704,48 @@ function AssignedQuestionnairesModal({ open, scopeItem, questionnaires, assignme
                                     )}
                                 </tbody>
                             </table>
+                        </div>
+
+                        {/* Mobile Card View */}
+                        <div className="md:hidden divide-y divide-slate-100">
+                            {assignedQuestionnaires.length > 0 ? (
+                                assignedQuestionnaires.map((group, index) => (
+                                    <div key={`mobile-assigned-${group.id ?? group.questionnaire_id}-${index}`} className="p-4 active:bg-slate-50 transition-colors">
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div className="flex-1 space-y-3">
+                                                <div>
+                                                    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400"># {index + 1}</div>
+                                                    <div className="mt-0.5 text-sm font-semibold text-slate-900">{group.questionnaire?.title ?? group.questionnaire_title ?? '-'}</div>
+                                                    <div className="text-xs text-slate-500">{group.questionnaire?.questionnaire_code ?? group.questionnaire_code ?? '-'}</div>
+                                                </div>
+                                                <div className="flex gap-4">
+                                                    <div>
+                                                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Type</div>
+                                                        <div className="mt-0.5 text-xs text-slate-600">{group.questionnaire?.questionnaire_type_name ?? '-'}</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{itemLabel}</div>
+                                                        <div className="mt-0.5 text-xs text-slate-600 font-bold">{Array.isArray(group.subject_ids) ? group.subject_ids.length : 0}</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col gap-2 shrink-0">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setViewTarget(group.questionnaire)}
+                                                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm"
+                                                >
+                                                    View
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="px-4 py-8 text-center text-sm text-slate-500">
+                                    No assigned questionnaires found.
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -1066,7 +1165,8 @@ function CustomSubjectsModal({
                         </div>
 
                         <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
-                            <div className="overflow-x-auto">
+                            {/* Desktop Table View */}
+                            <div className="hidden md:block overflow-x-auto">
                                 <table className="min-w-full divide-y divide-slate-200">
                                     <thead className="bg-slate-50">
                                         <tr>
@@ -1123,6 +1223,56 @@ function CustomSubjectsModal({
                                         )}
                                     </tbody>
                                 </table>
+                            </div>
+
+                            {/* Mobile Card View */}
+                            <div className="md:hidden divide-y divide-slate-100">
+                                {questionnaires.length > 0 ? (
+                                    questionnaires.map((questionnaire, index) => (
+                                        <div key={`mobile-picker-${questionnaire.questionnaire_id}`} className="p-4 active:bg-slate-50 transition-colors">
+                                            <div className="flex items-start justify-between gap-4">
+                                                <div className="flex-1 space-y-3">
+                                                    <div>
+                                                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400"># {index + 1}</div>
+                                                        <div className="mt-0.5 text-sm font-semibold text-slate-900">{questionnaire.title ?? '-'}</div>
+                                                        <div className="text-xs text-slate-500">{questionnaire.questionnaire_code ?? '-'}</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Type</div>
+                                                        <div className="mt-0.5 text-xs text-slate-600">{questionnaire.questionnaire_type_name ?? '-'}</div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-col gap-2 shrink-0">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setQuestionnaireViewTarget(questionnaire)}
+                                                        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm"
+                                                    >
+                                                        View
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setGroups((current) => current.map((group) => (
+                                                                group.localId === questionnairePickerGroupId
+                                                                    ? { ...group, questionnaire_id: String(questionnaire.questionnaire_id) }
+                                                                    : group
+                                                            )));
+                                                            setQuestionnairePickerGroupId(null);
+                                                        }}
+                                                        className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm"
+                                                    >
+                                                        Select
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="px-4 py-8 text-center text-sm text-slate-500">
+                                        No questionnaires found.
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -1636,7 +1786,8 @@ export default function Assignments({
 
                     {filteredScopeItems.length > 0 ? (
                         <div className="overflow-hidden rounded-2xl border border-slate-200">
-                            <div className="overflow-x-auto">
+                            {/* Desktop Table View */}
+                            <div className="hidden md:block overflow-x-auto">
                                 <table className="min-w-full divide-y divide-slate-200">
                                     <thead className="bg-slate-50">
                                         <tr>
@@ -1703,54 +1854,157 @@ export default function Assignments({
                                                         '-'
                                                     )}
                                                 </td>
-                                                    <td className="px-4 py-3">
-                                                        <div className="flex justify-end gap-2">
+                                                <td className="px-4 py-3">
+                                                    <div className="flex justify-end gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                const hasCustomDistribution = assignmentType === 'student-teacher'
+                                                                    && item.scopeType === 'program'
+                                                                    && Array.isArray(item.customGroups)
+                                                                    && item.customGroups.length > 0;
+
+                                                                if (hasCustomDistribution) {
+                                                                    const shouldContinue = window.confirm(
+                                                                        'This program is currently using custom questionnaire distribution. Continuing will reset all custom distributions for this program. Do you want to continue?',
+                                                                    );
+
+                                                                    if (!shouldContinue) {
+                                                                        return;
+                                                                    }
+                                                                }
+
+                                                                setDistributeTarget(item);
+                                                            }}
+                                                            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                                                        >
+                                                            {assignmentType === 'head' ? 'Assign' : 'Distribute'}
+                                                        </button>
+                                                        {assignmentType !== 'head' && assignmentType !== 'employee' ? (
                                                             <button
                                                                 type="button"
                                                                 onClick={() => {
-                                                                    const hasCustomDistribution = assignmentType === 'student-teacher'
-                                                                        && item.scopeType === 'program'
-                                                                        && Array.isArray(item.customGroups)
-                                                                        && item.customGroups.length > 0;
-
-                                                                    if (hasCustomDistribution) {
-                                                                        const shouldContinue = window.confirm(
-                                                                            'This program is currently using custom questionnaire distribution. Continuing will reset all custom distributions for this program. Do you want to continue?',
-                                                                        );
-
-                                                                        if (!shouldContinue) {
-                                                                            return;
-                                                                        }
+                                                                    if (assignmentType === 'peer') {
+                                                                        setCustomTarget(item);
+                                                                        return;
                                                                     }
 
-                                                                    setDistributeTarget(item);
+                                                                    setCustomTarget(item);
                                                                 }}
-                                                                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                                                                className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-slate-800"
                                                             >
-                                                                {assignmentType === 'head' ? 'Assign' : 'Distribute'}
+                                                                Custom
                                                             </button>
-                                                            {assignmentType !== 'head' && assignmentType !== 'employee' ? (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => {
-                                                                        if (assignmentType === 'peer') {
-                                                                            setCustomTarget(item);
-                                                                            return;
-                                                                        }
-
-                                                                        setCustomTarget(item);
-                                                                    }}
-                                                                    className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-slate-800"
-                                                                >
-                                                                    Custom
-                                                                </button>
-                                                            ) : null}
+                                                        ) : null}
                                                     </div>
                                                 </td>
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
+                            </div>
+
+                            {/* Mobile Card View */}
+                            <div className="md:hidden divide-y divide-slate-100">
+                                {filteredScopeItems.map((item, index) => (
+                                    <div key={`mobile-dist-${item.id}`} className="p-4 active:bg-slate-50 transition-colors">
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div className="flex-1 space-y-3">
+                                                <div>
+                                                    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400"># {index + 1}</div>
+                                                    <div className="mt-0.5 text-sm font-semibold text-slate-900">{item.primary}</div>
+                                                    <div className="text-xs text-slate-500">{item.secondary || '-'}</div>
+                                                </div>
+
+                                                {item.branchName && (
+                                                    <div>
+                                                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Branch</div>
+                                                        <div className="mt-0.5 text-xs text-slate-600">{item.branchName}</div>
+                                                    </div>
+                                                )}
+
+                                                {assignmentType === 'head' && item.programName && (
+                                                    <div>
+                                                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Program</div>
+                                                        <div className="mt-0.5 text-xs text-slate-600">{item.programName}</div>
+                                                    </div>
+                                                )}
+
+                                                <div>
+                                                    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Questionnaire</div>
+                                                    <div className="mt-1">
+                                                        {(Array.isArray(item.customGroups) && item.customGroups.length > 0) || item.selectedQuestionnaire ? (
+                                                            <div className="space-y-1">
+                                                                {Array.isArray(item.customGroups) && item.customGroups.length > 0 ? (
+                                                                    <div>
+                                                                        <div className="text-xs font-semibold text-blue-600">Custom ({item.customGroups.length})</div>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setAssignedQuestionnaireTarget(item)}
+                                                                            className="text-[10px] font-medium text-slate-500 underline"
+                                                                        >
+                                                                            Open list
+                                                                        </button>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div>
+                                                                        <div className="text-xs font-medium text-slate-900 truncate max-w-[150px]">{item.selectedQuestionnaire.questionnaire_title}</div>
+                                                                        <div className="text-[10px] text-slate-500">{item.selectedQuestionnaire.questionnaire_code}</div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-xs italic text-slate-400">None assigned</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex flex-col gap-2 shrink-0">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const hasCustomDistribution = assignmentType === 'student-teacher'
+                                                            && item.scopeType === 'program'
+                                                            && Array.isArray(item.customGroups)
+                                                            && item.customGroups.length > 0;
+
+                                                        if (hasCustomDistribution) {
+                                                            const shouldContinue = window.confirm(
+                                                                'This program is currently using custom questionnaire distribution. Continuing will reset all custom distributions for this program. Do you want to continue?',
+                                                            );
+
+                                                            if (!shouldContinue) {
+                                                                return;
+                                                            }
+                                                        }
+
+                                                        setDistributeTarget(item);
+                                                    }}
+                                                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm"
+                                                >
+                                                    {assignmentType === 'head' ? 'Assign' : 'Distribute'}
+                                                </button>
+                                                {assignmentType !== 'head' && assignmentType !== 'employee' ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            if (assignmentType === 'peer') {
+                                                                setCustomTarget(item);
+                                                                return;
+                                                            }
+
+                                                            setCustomTarget(item);
+                                                        }}
+                                                        className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white shadow-sm"
+                                                    >
+                                                        Custom
+                                                    </button>
+                                                ) : null}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     ) : (

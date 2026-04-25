@@ -1,3 +1,4 @@
+import ConfirmDialog from '@/Components/ConfirmDialog';
 import ResourceTable from '@/Components/Admin/ResourceTable';
 import SlideOver from '@/Components/Admin/SlideOver';
 import AdminLayout from '@/Layouts/AdminLayout';
@@ -80,6 +81,7 @@ export default function Ratings({ ratings, ratingType, filters, schoolYears }) {
     const [selectedYear, setSelectedYear] = useState(filters.school_year ?? '');
     const [detailOpen, setDetailOpen] = useState(false);
     const [viewing, setViewing] = useState(null);
+    const [confirmAction, setConfirmAction] = useState(null);
     const activeRoute = ROUTE_MAP[ratingType] ?? 'admin.subject-ratings';
     const columns = COLUMNS_MAP[ratingType] ?? SUBJECT_COLUMNS;
 
@@ -91,6 +93,32 @@ export default function Ratings({ ratings, ratingType, filters, schoolYears }) {
     const openView = (row) => {
         setViewing(row);
         setDetailOpen(true);
+    };
+
+    const exportUrl  = route(EXPORT_ROUTE_MAP[ratingType] ?? EXPORT_ROUTE_MAP.subject, { search: filters.search ?? '', school_year: selectedYear });
+    const summaryUrl = route('admin.reports.summary', { school_year: selectedYear });
+
+    const askExport = () => setConfirmAction({
+        kind:    'export',
+        title:   'Export ratings as CSV?',
+        message: `This will download a CSV of ${TITLE_MAP[ratingType]?.toLowerCase()} for ${selectedYear || 'all school years'}. Continue?`,
+        confirm: 'Download CSV',
+        tone:    'primary',
+        run: () => { window.location.href = exportUrl; },
+    });
+
+    const askPrint = () => setConfirmAction({
+        kind:    'print',
+        title:   'Open printable summary?',
+        message: `This opens a new tab with a printable HTML summary for ${selectedYear || 'all school years'} that you can save as PDF.`,
+        confirm: 'Open Summary',
+        tone:    'primary',
+        run: () => { window.open(summaryUrl, '_blank', 'noopener,noreferrer'); },
+    });
+
+    const handleConfirm = () => {
+        confirmAction?.run?.();
+        setConfirmAction(null);
     };
 
     return (
@@ -111,22 +139,22 @@ export default function Ratings({ ratings, ratingType, filters, schoolYears }) {
                             {schoolYears.map((y) => <option key={y} value={y}>{y}</option>)}
                         </select>
                     )}
-                    <a
-                        href={route(EXPORT_ROUTE_MAP[ratingType] ?? EXPORT_ROUTE_MAP.subject, { search: filters.search ?? '', school_year: selectedYear })}
+                    <button
+                        type="button"
+                        onClick={askExport}
                         className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
                     >
                         <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12l7 7 7-7" /></svg>
                         Export CSV
-                    </a>
-                    <a
-                        href={route('admin.reports.summary', { school_year: selectedYear })}
-                        target="_blank"
-                        rel="noreferrer"
+                    </button>
+                    <button
+                        type="button"
+                        onClick={askPrint}
                         className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
                     >
                         <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9V4h12v5M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z" /></svg>
                         Print Summary
-                    </a>
+                    </button>
                 </div>
             </div>
 
@@ -170,6 +198,16 @@ export default function Ratings({ ratings, ratingType, filters, schoolYears }) {
                     </div>
                 )}
             </SlideOver>
+
+            <ConfirmDialog
+                open={Boolean(confirmAction)}
+                title={confirmAction?.title}
+                message={confirmAction?.message}
+                confirmLabel={confirmAction?.confirm}
+                tone={confirmAction?.tone ?? 'primary'}
+                onConfirm={handleConfirm}
+                onCancel={() => setConfirmAction(null)}
+            />
         </AdminLayout>
     );
 }

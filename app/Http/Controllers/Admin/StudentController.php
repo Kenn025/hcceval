@@ -31,6 +31,9 @@ class StudentController extends Controller
             ->orderBy('name')
             ->get();
 
+        $perPage = $request->integer('per_page', 20);
+        $perPage = in_array($perPage, [10, 20, 50, 100, 250]) ? $perPage : 20;
+
         $students = Student::query()
             ->with(['branch:id,name', 'department:id,name', 'program:id,name', 'strand:id,name', 'yearLevel:id,year_level,section,strand_id', 'irregSubject:id,code,name'])
             ->where('is_deleted', 0)
@@ -45,7 +48,7 @@ class StudentController extends Controller
             }))
             ->orderBy('lastname')
             ->orderBy('firstname')
-            ->paginate(20)
+            ->paginate($perPage)
             ->withQueryString();
 
         return Inertia::render('Admin/Students', [
@@ -55,6 +58,7 @@ class StudentController extends Controller
                 'branch_id' => $branchId,
                 'department_id' => $departmentId,
                 'program_id' => $programId,
+                'per_page' => $perPage,
             ],
             'branches'    => $branches,
             'departments' => Department::query()

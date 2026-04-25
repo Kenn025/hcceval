@@ -1,3 +1,4 @@
+import ConfirmDialog from '@/Components/ConfirmDialog';
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
 
@@ -38,6 +39,7 @@ export default function EmployeeEvaluateForm({ category, evaluatee, questions, c
     const [comment, setComment] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [errors, setErrors] = useState({});
+    const [confirmOpen, setConfirmOpen] = useState(false);
 
     const allAnswered = questions.length > 0 && questions.every((q) => answers[q.question_id]);
 
@@ -61,6 +63,10 @@ export default function EmployeeEvaluateForm({ category, evaluatee, questions, c
             setErrors(errs);
             return;
         }
+        setConfirmOpen(true);
+    };
+
+    const doSubmit = () => {
         setSubmitting(true);
         router.post(route('portal.employee.evaluate.submit'), {
             category,
@@ -75,8 +81,8 @@ export default function EmployeeEvaluateForm({ category, evaluatee, questions, c
             comments: comment || null,
         }, {
             onSuccess: () => router.visit(route('portal.employee.dashboard')),
-            onError:   (errs) => { setErrors(errs); setSubmitting(false); },
-            onFinish:  () => setSubmitting(false),
+            onError:   (errs) => { setErrors(errs); setSubmitting(false); setConfirmOpen(false); },
+            onFinish:  () => { setSubmitting(false); setConfirmOpen(false); },
         });
     };
 
@@ -173,6 +179,17 @@ export default function EmployeeEvaluateForm({ category, evaluatee, questions, c
                     )}
                 </div>
             </div>
+
+            <ConfirmDialog
+                open={confirmOpen}
+                title="Submit this evaluation?"
+                message={`Once submitted, your responses for ${evaluatee?.name?.trim() || 'this person'} cannot be edited. Make sure your ratings are final.`}
+                confirmLabel="Submit"
+                tone="primary"
+                loading={submitting}
+                onConfirm={doSubmit}
+                onCancel={() => setConfirmOpen(false)}
+            />
         </>
     );
 }

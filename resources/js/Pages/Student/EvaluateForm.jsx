@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { router } from '@inertiajs/react';
 import ClientLayout from '@/Layouts/ClientLayout';
+import ConfirmDialog from '@/Components/ConfirmDialog';
 
 const CATEGORY_LABELS = {
   teacher_subject: 'Subject Teacher Evaluation',
@@ -14,6 +15,7 @@ export default function EvaluateForm({ category, evaluatee, subjectSectionId, su
   const [comment,    setComment]    = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errors,     setErrors]     = useState({});
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const allAnswered = questions.every(q => answers[q.question_id]);
 

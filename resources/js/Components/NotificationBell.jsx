@@ -89,7 +89,7 @@ export default function NotificationBell({ routePrefix = '' }) {
                 type="button"
                 onClick={toggle}
                 className={[
-                    'group relative flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition-all duration-200 hover:scale-105 hover:bg-slate-50 hover:text-blue-600 active:scale-95',
+                    'group relative flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition-all duration-200 hover:scale-105 hover:bg-slate-50 hover:text-blue-600 active:scale-95 sm:h-10 sm:w-10',
                     open ? 'border-blue-200 bg-blue-50 text-blue-600 ring-4 ring-blue-50' : '',
                 ].join(' ')}
                 aria-label="Notifications"

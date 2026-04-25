@@ -128,7 +128,8 @@ export default function EvaluationCycle({ cycles = [], activeCycle = null }) {
             </div>
 
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div className="overflow-x-auto">
+                {/* Desktop Table View */}
+                <div className="hidden md:block overflow-x-auto">
                     <table className="min-w-full divide-y divide-slate-200">
                         <thead className="bg-slate-50">
                             <tr>
@@ -172,6 +173,50 @@ export default function EvaluationCycle({ cycles = [], activeCycle = null }) {
                             )}
                         </tbody>
                     </table>
+                </div>
+
+                {/* Mobile Card View */}
+                <div className="md:hidden divide-y divide-slate-100">
+                    {cycles.length > 0 ? cycles.map((cycle) => (
+                        <div key={`card-${cycle.year_id}`} className="p-4 active:bg-slate-50 transition-colors">
+                            <div className="flex items-start justify-between gap-4">
+                                <div className="flex-1 space-y-3">
+                                    <div>
+                                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">School Year</div>
+                                        <div className="mt-0.5 text-sm font-semibold text-slate-900">{cycle.school_year}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Term</div>
+                                        <div className="mt-0.5 text-sm font-medium text-slate-600">{cycle.semester}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Status</div>
+                                        <div className="mt-1"><StatusPill status={cycle.status} /></div>
+                                    </div>
+                                </div>
+                                <div className="flex flex-col gap-2 shrink-0">
+                                    <button
+                                        type="button"
+                                        onClick={() => openEdit(cycle)}
+                                        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm"
+                                    >
+                                        Edit
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setDeleteTarget(cycle)}
+                                        className="rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-medium text-rose-600 shadow-sm"
+                                    >
+                                        Close
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )) : (
+                        <div className="px-4 py-8 text-center text-sm text-slate-500">
+                            No academic years found yet.
+                        </div>
+                    )}
                 </div>
             </div>
 

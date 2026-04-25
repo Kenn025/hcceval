@@ -26,6 +26,9 @@ class DepartmentController extends Controller
             ? $requestedBranchId
             : $branches->first()?->id;
 
+        $perPage = $request->integer('per_page', 15);
+        $perPage = in_array($perPage, [10, 15, 25, 50, 100]) ? $perPage : 15;
+
         $departments = Department::query()
             ->with(['branch:id,name'])
             ->where('is_deleted', 0)
@@ -38,12 +41,12 @@ class DepartmentController extends Controller
                 });
             })
             ->orderBy('name')
-            ->paginate(15)
+            ->paginate($perPage)
             ->withQueryString();
 
         return Inertia::render('Admin/Departments', [
             'departments' => $departments,
-            'filters' => ['search' => $search, 'branch_id' => $selectedBranchId],
+            'filters' => ['search' => $search, 'branch_id' => $selectedBranchId, 'per_page' => $perPage],
             'branches' => $branches,
             'selectedBranchId' => $selectedBranchId,
         ]);

@@ -18,6 +18,8 @@ class BranchController extends Controller
     public function index(Request $request)
     {
         $search = $request->input('search', '');
+        $perPage = $request->integer('per_page', 15);
+        $perPage = in_array($perPage, [10, 15, 25, 50, 100]) ? $perPage : 15;
 
         $branches = Branch::query()
             ->where('is_deleted', 0)
@@ -38,12 +40,12 @@ class BranchController extends Controller
                 ->where('is_deleted', 0)
                 ->orderBy('name')])
             ->orderBy('name')
-            ->paginate(15)
+            ->paginate($perPage)
             ->withQueryString();
 
         return Inertia::render('Admin/Branches', [
             'branches' => $branches,
-            'filters' => ['search' => $search],
+            'filters' => ['search' => $search, 'per_page' => $perPage],
         ]);
     }
 
