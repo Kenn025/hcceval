@@ -6,11 +6,16 @@ use App\Models\Employee;
 use App\Models\Student;
 use App\Models\Teacher;
 use App\Models\User;
+use App\Notifications\TwoFactorCode;
+use App\Services\AuditLogger;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -46,6 +51,35 @@ class LoginRequest extends FormRequest
             ->first();
 
         if ($admin && $admin->password === md5($password)) {
+            $twoFactor = Schema::hasColumn('admin', 'two_factor_enabled') && (int) ($admin->two_factor_enabled ?? 0) === 1;
+
+            if ($twoFactor && ! empty($admin->email)) {
+                $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+
+                DB::table('two_factor_tokens')->insert([
+                    'subject_type' => 'admin',
+                    'subject_id'   => $admin->id,
+                    'code_hash'    => Hash::make($code),
+                    'expires_at'   => now()->addMinutes(10),
+                    'created_at'   => now(),
+                ]);
+
+                Notification::route('mail', $admin->email)->notify(new TwoFactorCode($code));
+
+                session(['2fa_pending' => [
+                    'admin_id'  => $admin->id,
+                    'email'     => $admin->email,
+                    'name'      => $admin->name,
+                    'role'      => $admin->role ?? 'admin',
+                    'branch_id' => $admin->branch_id,
+                    'remember'  => $this->boolean('remember'),
+                ]]);
+
+                RateLimiter::clear($this->throttleKey());
+                $this->merge(['login_destination' => '2fa']);
+                return;
+            }
+
             $user = User::firstOrCreate(
                 ['email' => $admin->email],
                 ['name' => $admin->name, 'password' => bcrypt($password)]
@@ -60,6 +94,8 @@ class LoginRequest extends FormRequest
             ]);
 
             RateLimiter::clear($this->throttleKey());
+
+            AuditLogger::record('auth.login', 'admin', $admin->id);
 
             $this->merge(['login_destination' => 'admin']);
 
@@ -149,6 +185,8 @@ class LoginRequest extends FormRequest
         }
 
         RateLimiter::hit($this->throttleKey());
+
+        AuditLogger::record('auth.failed', null, null, ['identifier' => $identifier]);
 
         throw ValidationException::withMessages([
             'identifier' => trans('auth.failed'),

@@ -60,7 +60,7 @@ class EmployeeController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(\App\Http\Requests\Admin\StoreEmployeeRequest $request)
     {
         $payload = $this->employeePayloadFromRequest($request);
         Employee::create($this->mapEmployeePayload($payload));
@@ -68,7 +68,7 @@ class EmployeeController extends Controller
         return back()->with('success', 'Employee created successfully.');
     }
 
-    public function update(Request $request, Employee $employee)
+    public function update(\App\Http\Requests\Admin\UpdateEmployeeRequest $request, Employee $employee)
     {
         $payload = $this->employeePayloadFromRequest($request);
         $employee->update($this->mapEmployeePayload($payload, false));

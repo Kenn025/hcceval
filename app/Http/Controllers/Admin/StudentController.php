@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\StoreStudentRequest;
+use App\Http\Requests\Admin\UpdateStudentRequest;
 use App\Models\Branch;
 use App\Models\Department;
 use App\Models\EducationLevel;
@@ -94,7 +96,7 @@ class StudentController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(StoreStudentRequest $request)
     {
         $payload = $this->studentPayloadFromRequest($request);
         Student::create($this->mapStudentPayload($payload));
@@ -102,7 +104,7 @@ class StudentController extends Controller
         return back()->with('success', 'Student created successfully.');
     }
 
-    public function update(Request $request, Student $student)
+    public function update(UpdateStudentRequest $request, Student $student)
     {
         $payload = $this->studentPayloadFromRequest($request);
         $student->update($this->mapStudentPayload($payload, false));

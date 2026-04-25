@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
+use App\Http\Requests\Admin\EvaluationCycleRequest;
+use App\Services\AuditLogger;
+use App\Services\EvaluationNotifier;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
@@ -31,15 +33,9 @@ class EvaluationCycleController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(EvaluationCycleRequest $request, EvaluationNotifier $notifier)
     {
-        $validated = $request->validate([
-            'school_year' => 'nullable|string|max:20',
-            'semester'    => 'required|string|max:50',
-            'year_start'  => 'required|integer|min:2000',
-            'year_end'    => 'required|integer|min:2000',
-            'status'      => 'required|in:active,inactive,closed',
-        ]);
+        $validated = $request->validated();
 
         if ($validated['status'] === 'active') {
             DB::table('academic_year')->update(['is_activated' => 0]);
@@ -55,18 +51,24 @@ class EvaluationCycleController extends Controller
             'updated_at'   => now(),
         ]);
 
+        if ($validated['status'] === 'active') {
+            $notifier->windowOpened(
+                "{$validated['year_start']}-{$validated['year_end']}",
+                $validated['semester'],
+                $this->scopedBranchId(),
+            );
+        }
+
+        AuditLogger::record('evaluation_cycle.created', 'academic_year', null, $validated);
+
         return back()->with('success', 'Evaluation cycle created.');
     }
 
-    public function update(Request $request, int $id)
+    public function update(EvaluationCycleRequest $request, int $id, EvaluationNotifier $notifier)
     {
-        $validated = $request->validate([
-            'school_year' => 'nullable|string|max:20',
-            'semester'    => 'required|string|max:50',
-            'year_start'  => 'required|integer|min:2000',
-            'year_end'    => 'required|integer|min:2000',
-            'status'      => 'required|in:active,inactive,closed',
-        ]);
+        $validated = $request->validated();
+
+        $previous = DB::table('academic_year')->where('id', $id)->first();
 
         if ($validated['status'] === 'active') {
             DB::table('academic_year')->where('id', '!=', $id)->update(['is_activated' => 0]);
@@ -81,16 +83,40 @@ class EvaluationCycleController extends Controller
             'updated_at'   => now(),
         ]);
 
+        $yearLabel = "{$validated['year_start']}-{$validated['year_end']}";
+        $branch    = $this->scopedBranchId();
+
+        if ($previous && ! $previous->is_activated && $validated['status'] === 'active') {
+            $notifier->windowOpened($yearLabel, $validated['semester'], $branch);
+        } elseif ($previous && $previous->is_activated && $validated['status'] !== 'active') {
+            $notifier->windowClosed($yearLabel, $validated['semester'], $branch);
+        }
+
+        AuditLogger::record('evaluation_cycle.updated', 'academic_year', $id, $validated);
+
         return back()->with('success', 'Evaluation cycle updated.');
     }
 
-    public function destroy(int $id)
+    public function destroy(int $id, EvaluationNotifier $notifier)
     {
+        $cycle = DB::table('academic_year')->where('id', $id)->first();
+
         DB::table('academic_year')->where('id', $id)->update([
             'is_deleted' => 1,
             'is_activated' => 0,
             'updated_at' => now(),
         ]);
+
+        if ($cycle && $cycle->is_activated) {
+            $notifier->windowClosed(
+                "{$cycle->from_year}-{$cycle->to_year}",
+                $cycle->term,
+                $this->scopedBranchId(),
+            );
+        }
+
+        AuditLogger::record('evaluation_cycle.deleted', 'academic_year', $id);
+
         return back()->with('success', 'Evaluation cycle deleted.');
     }
 }

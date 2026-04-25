@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\StoreTeacherRequest;
+use App\Http\Requests\Admin\UpdateTeacherRequest;
 use App\Models\Branch;
 use App\Models\Department;
 use App\Models\Program;
@@ -86,7 +88,7 @@ class TeacherController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(StoreTeacherRequest $request)
     {
         $payload = $this->teacherPayloadFromRequest($request);
         Teacher::create($this->mapTeacherPayload($payload));
@@ -94,7 +96,7 @@ class TeacherController extends Controller
         return back()->with('success', 'Teacher created successfully.');
     }
 
-    public function update(Request $request, Teacher $teacher)
+    public function update(UpdateTeacherRequest $request, Teacher $teacher)
     {
         $payload = $this->teacherPayloadFromRequest($request);
         $teacher->update($this->mapTeacherPayload($payload, false));

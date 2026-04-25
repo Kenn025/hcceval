@@ -1,5 +1,6 @@
 import AppIcon from '@/Components/AppIcon';
 import FlashNotification from '@/Components/FlashNotification';
+import NotificationBell from '@/Components/NotificationBell';
 import { Head, router, useForm } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -293,7 +294,10 @@ export default function PortalLayout({
                                 </div>
                             </div>
 
-                            <div className="relative" ref={userMenuRef}>
+                            <div className="flex items-center gap-2">
+                                <NotificationBell routePrefix="/portal" />
+
+                                <div className="relative" ref={userMenuRef}>
                                 <button
                                     type="button"
                                     onClick={() => setShowUserMenu((v) => !v)}
@@ -334,6 +338,7 @@ export default function PortalLayout({
                                         </button>
                                     </div>
                                 )}
+                                </div>
                             </div>
                         </div>
                     </header>
