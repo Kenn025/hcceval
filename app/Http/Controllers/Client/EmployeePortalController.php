@@ -223,7 +223,7 @@ class EmployeePortalController extends Controller
             'school_year'       => $data['school_year'],
             'term'              => $data['term'],
             'answers'           => json_encode($data['answers']),
-            'comments'          => $data['comments'] ?? null,
+            'comments'          => json_encode(($data['comments'] ?? null) ? ['text' => $data['comments']] : []),
             'overall_average'   => $avg,
             'submitted_at'      => now(),
             'created_at'        => now(),
@@ -283,14 +283,12 @@ class EmployeePortalController extends Controller
         $cycle          = $this->activeCycle();
         $currentRatings = [];
         $archiveFolders = [];
-        $pendingTargets = [];
 
         if ($cycle) {
             [$termA, $termB] = $this->termOptions($cycle->term ?? null);
             $schoolYear      = trim("{$cycle->from_year}-{$cycle->to_year}");
 
             $currentRatings = $this->ratingsForCycle($employeeId, $schoolYear, [$termA, $termB]);
-            $pendingTargets = $this->pendingTargets($employeeId, $schoolYear, [$termA, $termB]);
 
             $pastCycles = DB::table('academic_year')
                 ->where('is_activated', 0)
@@ -331,7 +329,6 @@ class EmployeePortalController extends Controller
             ] : null,
             'currentRatings' => $currentRatings,
             'archiveFolders' => $archiveFolders,
-            'pendingTargets' => $pendingTargets,
         ]);
     }
 }

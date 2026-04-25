@@ -1,6 +1,5 @@
 import AppIcon from '@/Components/AppIcon';
 import PortalLayout from '@/Layouts/PortalLayout';
-import { router } from '@inertiajs/react';
 import { useState } from 'react';
 
 function EmptyState({ icon = 'ratings', message }) {
@@ -155,70 +154,11 @@ function ArchiveTab({ archiveFolders = [] }) {
     );
 }
 
-function EvaluateTab({ targets = [] }) {
-    if (!targets.length) {
-        return <EmptyState icon="evaluate" message="No evaluations to complete right now." />;
-    }
 
-    const pending = targets.filter((t) => !t.done);
-    const done    = targets.filter((t) => t.done);
-
-    const startEval = (t) => router.visit(route('portal.employee.evaluate', { evaluatee_id: t.id, category: t.category }));
-
-    return (
-        <div className="space-y-4">
-            {pending.length > 0 && (
-                <div>
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Pending ({pending.length})</p>
-                    <div className="space-y-2">
-                        {pending.map((t) => (
-                            <div key={t.id} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
-                                    <AppIcon name="user" className="h-5 w-5" />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm font-semibold text-slate-800">{t.name}</p>
-                                    <p className="text-xs text-slate-400 capitalize">{t.role} · {t.category === 'head' ? 'Head evaluation' : 'Peer evaluation'}</p>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => startEval(t)}
-                                    className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
-                                >
-                                    Evaluate
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {done.length > 0 && (
-                <div>
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Submitted ({done.length})</p>
-                    <div className="space-y-2">
-                        {done.map((t) => (
-                            <div key={t.id} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
-                                    <AppIcon name="check" className="h-5 w-5" />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm font-semibold text-slate-700">{t.name}</p>
-                                    <p className="text-xs text-slate-400">Already submitted</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-}
-
-export default function EmployeeDashboard({ employee, cycle, currentRatings = [], archiveFolders = [], pendingTargets = [] }) {
+export default function EmployeeDashboard({ employee, cycle, currentRatings = [], archiveFolders = [] }) {
     const [activeNav, setActiveNav] = useState('ratings');
 
-    const titles = { ratings: 'My Ratings', evaluate: 'Evaluate', archive: 'Archive' };
+    const titles = { ratings: 'My Ratings', archive: 'Archive' };
 
     return (
         <PortalLayout
@@ -236,16 +176,6 @@ export default function EmployeeDashboard({ employee, cycle, currentRatings = []
                         <p className="text-xs text-slate-400">Current evaluation cycle</p>
                     </div>
                     <RatingsCard ratings={currentRatings} />
-                </>
-            )}
-
-            {activeNav === 'evaluate' && (
-                <>
-                    <div className="mb-5">
-                        <h2 className="text-base font-semibold text-slate-800">Evaluate Colleagues</h2>
-                        <p className="text-xs text-slate-400">Peer & department head evaluations for {cycle?.school_year}</p>
-                    </div>
-                    <EvaluateTab targets={pendingTargets} />
                 </>
             )}
 

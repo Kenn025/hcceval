@@ -66,11 +66,18 @@ class SendEvaluationReminders extends Command
                 ->where('ss.is_active', 1)
                 ->count();
 
-            $submitted = DB::table('evaluation_submissions')
-                ->where('evaluator_id', $student->id)
-                ->where('evaluator_type', 'student')
-                ->where('school_year', $schoolYear)
-                ->count();
+            $submissionIds = collect($student->evaluation_submission_ids ?? [])
+                ->map(fn ($id) => (int) $id)
+                ->filter()
+                ->unique()
+                ->values();
+
+            $submitted = $submissionIds->isEmpty()
+                ? 0
+                : DB::table('evaluation_submissions')
+                    ->whereIn('id', $submissionIds->all())
+                    ->where('school_year', $schoolYear)
+                    ->count();
 
             $pending = max(0, $expected - $submitted);
 
