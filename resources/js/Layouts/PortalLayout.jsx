@@ -3,6 +3,7 @@ import FlashNotification from "@/Components/FlashNotification";
 import NotificationBell from "@/Components/NotificationBell";
 import useSystemTooltip from "@/Components/useSystemTooltip";
 import { Head, router, useForm } from "@inertiajs/react";
+import { Moon, Sun } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 const THEMES = {
@@ -91,6 +92,52 @@ function SignOutButton({ collapsed, onClick }) {
     );
 }
 
+function ThemeToggle({ isDarkMode, onToggle }) {
+    const tooltipRef = useSystemTooltip(
+        isDarkMode ? "Switch to light mode" : "Switch to dark mode",
+        true,
+        "bottom",
+    );
+
+    return (
+        <button
+            ref={tooltipRef}
+            type="button"
+            onClick={onToggle}
+            aria-label={
+                isDarkMode ? "Switch to light mode" : "Switch to dark mode"
+            }
+            className={[
+                "group relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border transition-all duration-300 ease-in-out",
+                isDarkMode
+                    ? "border-slate-700 bg-slate-900 text-blue-200 shadow-inner shadow-black/30 hover:bg-slate-800"
+                    : "border-slate-200 bg-white text-amber-500 shadow-sm hover:bg-amber-50",
+            ].join(" ")}
+        >
+            <span
+                className={[
+                    "absolute left-1/2 top-1/2 block h-3.5 w-3.5 origin-center -translate-x-1/2 -translate-y-1/2 transform-gpu transition-all duration-300 ease-in-out",
+                    isDarkMode
+                        ? "scale-75 -rotate-90 opacity-0"
+                        : "scale-100 rotate-0 opacity-100",
+                ].join(" ")}
+            >
+                <Sun className="h-full w-full" strokeWidth={2} />
+            </span>
+            <span
+                className={[
+                    "absolute left-1/2 top-1/2 block h-3.5 w-3.5 origin-center -translate-x-1/2 -translate-y-1/2 transform-gpu transition-all duration-300 ease-in-out",
+                    isDarkMode
+                        ? "scale-100 rotate-0 opacity-100"
+                        : "scale-75 rotate-90 opacity-0",
+                ].join(" ")}
+            >
+                <Moon className="h-full w-full" strokeWidth={2} />
+            </span>
+        </button>
+    );
+}
+
 function PortalNavItem({ item, isActive, collapsed, onClick }) {
     const tooltipRef = useSystemTooltip(item.label, collapsed);
 
@@ -140,6 +187,10 @@ export default function PortalLayout({
 
     const [collapsed, setCollapsed] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
+    const [isDarkMode, setIsDarkMode] = useState(() => {
+        if (typeof window === "undefined") return false;
+        return localStorage.getItem("hcceval-theme-mode") === "dark";
+    });
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
     const [showUserMenu, setShowUserMenu] = useState(false);
     const [showBugReport, setShowBugReport] = useState(false);
@@ -155,6 +206,17 @@ export default function PortalLayout({
         reporter_id: user?.id ?? 0,
         reporter_name: user?.name ?? "",
     });
+
+    useEffect(() => {
+        document.body.classList.toggle("dark-mode", isDarkMode);
+        document.body.classList.toggle("light-mode", !isDarkMode);
+        if (typeof window !== "undefined") {
+            localStorage.setItem(
+                "hcceval-theme-mode",
+                isDarkMode ? "dark" : "light",
+            );
+        }
+    }, [isDarkMode]);
 
     useEffect(() => {
         if (!showUserMenu) return;
@@ -297,7 +359,12 @@ export default function PortalLayout({
             <Head title={title} />
             <FlashNotification />
             <div
-                className={`min-h-screen text-slate-900 ${theme.mainBg ?? "bg-slate-50"}`}
+                className={[
+                    "portal-shell min-h-screen transition-colors duration-300",
+                    isDarkMode
+                        ? "bg-[#172033] text-slate-100"
+                        : `text-slate-900 ${theme.mainBg ?? "bg-slate-50"}`,
+                ].join(" ")}
             >
                 {/* Mobile backdrop */}
                 <div
@@ -336,7 +403,12 @@ export default function PortalLayout({
                         ref={collapseTooltipRef}
                         type="button"
                         onClick={() => setCollapsed((v) => !v)}
-                        className="absolute -right-3.5 top-5 hidden h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-md transition hover:bg-slate-50 hover:text-slate-900 lg:flex"
+                        className={[
+                            "absolute -right-3.5 top-5 hidden h-7 w-7 items-center justify-center rounded-full border shadow-md transition lg:flex",
+                            isDarkMode
+                                ? "border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-white"
+                                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900",
+                        ].join(" ")}
                     >
                         <svg
                             viewBox="0 0 24 24"
@@ -364,32 +436,58 @@ export default function PortalLayout({
                 >
                     {/* Top bar */}
                     <header
-                        className={`sticky top-0 z-20 border-b shadow-sm ${theme.headerBg ?? "bg-white"} ${theme.headerBorder ?? "border-slate-200"}`}
+                        className={[
+                            "sticky top-0 z-20 border-b shadow-sm transition-colors duration-300",
+                            isDarkMode
+                                ? "border-slate-700/70 bg-[#1f293d]"
+                                : `${theme.headerBg ?? "bg-white"} ${theme.headerBorder ?? "border-slate-200"}`,
+                        ].join(" ")}
                     >
                         <div className="flex items-center justify-between gap-4 px-4 py-3 sm:px-6">
                             <div className="flex min-w-0 items-center gap-3">
                                 <button
                                     type="button"
                                     onClick={() => setMobileOpen(true)}
-                                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 lg:hidden"
+                                    className={[
+                                        "flex h-9 w-9 items-center justify-center rounded-lg border transition-colors lg:hidden",
+                                        isDarkMode
+                                            ? "border-slate-700 text-slate-300"
+                                            : "border-slate-200 text-slate-600",
+                                    ].join(" ")}
                                 >
                                     <AppIcon name="menu" className="h-4 w-4" />
                                 </button>
                                 <div className="min-w-0">
                                     <p
-                                        className={`text-[11px] font-semibold uppercase tracking-wider ${theme.headerLabel ?? "text-slate-400"}`}
+                                        className={[
+                                            "text-[11px] font-semibold uppercase tracking-wider transition-colors",
+                                            isDarkMode
+                                                ? "text-slate-500"
+                                                : (theme.headerLabel ??
+                                                  "text-slate-400"),
+                                        ].join(" ")}
                                     >
                                         HCC Portal
                                     </p>
                                     <h1
-                                        className={`truncate text-lg font-bold ${theme.headerTitle ?? "text-slate-800"}`}
+                                        className={[
+                                            "truncate text-lg font-bold transition-colors",
+                                            isDarkMode
+                                                ? "text-slate-100"
+                                                : (theme.headerTitle ??
+                                                  "text-slate-800"),
+                                        ].join(" ")}
                                     >
                                         {title}
                                     </h1>
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-5">
+                                <ThemeToggle
+                                    isDarkMode={isDarkMode}
+                                    onToggle={() => setIsDarkMode((v) => !v)}
+                                />
                                 <NotificationBell routePrefix="/portal" />
 
                                 <div className="relative" ref={userMenuRef}>
@@ -398,16 +496,33 @@ export default function PortalLayout({
                                         onClick={() =>
                                             setShowUserMenu((v) => !v)
                                         }
-                                        className="flex items-center gap-3 rounded-xl px-2 py-1.5 transition hover:bg-black/5"
+                                        className={[
+                                            "flex items-center gap-4 rounded-xl py-1.5 transition",
+                                            isDarkMode
+                                                ? "hover:bg-white/5"
+                                                : "hover:bg-black/5",
+                                        ].join(" ")}
                                     >
                                         <div className="hidden text-right sm:block">
                                             <p
-                                                className={`text-sm font-semibold leading-none ${theme.headerTitle ?? "text-slate-800"}`}
+                                                className={[
+                                                    "text-sm font-semibold leading-none transition-colors",
+                                                    isDarkMode
+                                                        ? "text-slate-100"
+                                                        : (theme.headerTitle ??
+                                                          "text-slate-800"),
+                                                ].join(" ")}
                                             >
                                                 {user?.name ?? ""}
                                             </p>
                                             <p
-                                                className={`mt-0.5 text-xs ${theme.headerLabel ?? "text-slate-400"}`}
+                                                className={[
+                                                    "mt-0.5 text-xs transition-colors",
+                                                    isDarkMode
+                                                        ? "text-slate-500"
+                                                        : (theme.headerLabel ??
+                                                          "text-slate-400"),
+                                                ].join(" ")}
                                             >
                                                 {theme.portalLabel}
                                             </p>
@@ -419,17 +534,50 @@ export default function PortalLayout({
                                         </div>
                                         <AppIcon
                                             name="chevronDown"
-                                            className="h-3.5 w-3.5 text-slate-400 hidden sm:block"
+                                            className={[
+                                                "hidden h-3.5 w-3.5 transition-colors sm:block",
+                                                isDarkMode
+                                                    ? "text-slate-500"
+                                                    : "text-slate-400",
+                                            ].join(" ")}
                                         />
                                     </button>
 
                                     {showUserMenu && (
-                                        <div className="absolute right-0 top-full mt-2 w-56 rounded-xl border border-slate-200 bg-white py-1.5 shadow-xl z-50">
-                                            <div className="px-3 py-2 border-b border-slate-100 sm:hidden">
-                                                <p className="text-sm font-semibold text-slate-800">
+                                        <div
+                                            className={[
+                                                "absolute right-0 top-full z-50 mt-2 w-56 rounded-xl border py-1.5 shadow-xl transition-colors",
+                                                isDarkMode
+                                                    ? "border-slate-800 bg-slate-900"
+                                                    : "border-slate-200 bg-white",
+                                            ].join(" ")}
+                                        >
+                                            <div
+                                                className={[
+                                                    "border-b px-3 py-2 sm:hidden",
+                                                    isDarkMode
+                                                        ? "border-slate-800"
+                                                        : "border-slate-100",
+                                                ].join(" ")}
+                                            >
+                                                <p
+                                                    className={[
+                                                        "text-sm font-semibold",
+                                                        isDarkMode
+                                                            ? "text-slate-100"
+                                                            : "text-slate-800",
+                                                    ].join(" ")}
+                                                >
                                                     {user?.name ?? ""}
                                                 </p>
-                                                <p className="text-xs text-slate-400">
+                                                <p
+                                                    className={[
+                                                        "text-xs",
+                                                        isDarkMode
+                                                            ? "text-slate-500"
+                                                            : "text-slate-400",
+                                                    ].join(" ")}
+                                                >
                                                     {theme.portalLabel}
                                                 </p>
                                             </div>
@@ -439,7 +587,12 @@ export default function PortalLayout({
                                                     setShowUserMenu(false);
                                                     setShowBugReport(true);
                                                 }}
-                                                className="flex w-full items-center gap-2.5 px-3 py-2.5 text-sm text-slate-700 transition hover:bg-slate-50"
+                                                className={[
+                                                    "flex w-full items-center gap-2.5 px-3 py-2.5 text-sm transition",
+                                                    isDarkMode
+                                                        ? "text-slate-200 hover:bg-white/5"
+                                                        : "text-slate-700 hover:bg-slate-50",
+                                                ].join(" ")}
                                             >
                                                 <AppIcon
                                                     name="bug"
@@ -447,7 +600,14 @@ export default function PortalLayout({
                                                 />
                                                 Report a Bug
                                             </button>
-                                            <div className="border-t border-slate-100 my-1" />
+                                            <div
+                                                className={[
+                                                    "my-1 border-t",
+                                                    isDarkMode
+                                                        ? "border-slate-800"
+                                                        : "border-slate-100",
+                                                ].join(" ")}
+                                            />
                                             <button
                                                 type="button"
                                                 onClick={() => {
@@ -480,7 +640,7 @@ export default function PortalLayout({
                     onClick={() => setShowLogoutConfirm(false)}
                 >
                     <div
-                        className="mx-4 w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl"
+                        className="portal-modal mx-4 w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-rose-100 text-rose-600">
@@ -525,7 +685,7 @@ export default function PortalLayout({
                     }}
                 >
                     <div
-                        className="mx-4 w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+                        className="portal-modal mx-4 w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {bugSuccess ? (

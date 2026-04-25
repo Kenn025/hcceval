@@ -249,3 +249,140 @@ body.dark-mode .admin-shell .bg-rose-600 {
 body.dark-mode .admin-shell .hover\:bg-rose-700:hover {
     background-color: #be123c !important;
 }
+
+body.dark-mode .portal-shell .bg-white,
+body.dark-mode .portal-shell .bg-white\/95,
+body.dark-mode .portal-modal.bg-white {
+    background-color: #243044 !important;
+}
+
+body.dark-mode .portal-shell .bg-slate-50,
+body.dark-mode .portal-shell .bg-slate-50\/70,
+body.dark-mode .portal-shell .bg-slate-100 {
+    background-color: #2e3a50 !important;
+}
+
+body.dark-mode .portal-shell .bg-blue-50,
+body.dark-mode .portal-shell .bg-blue-50\/40,
+body.dark-mode .portal-shell .bg-blue-50\/50 {
+    background-color: rgba(37, 99, 235, 0.16) !important;
+}
+
+body.dark-mode .portal-shell .hover\:bg-slate-50:hover,
+body.dark-mode .portal-shell .hover\:bg-slate-50\/70:hover,
+body.dark-mode .portal-shell .hover\:bg-blue-50:hover {
+    background-color: #344258 !important;
+}
+
+body.dark-mode .portal-shell .border-slate-50,
+body.dark-mode .portal-shell .border-slate-100,
+body.dark-mode .portal-shell .border-slate-200,
+body.dark-mode .portal-shell .ring-slate-200,
+body.dark-mode .portal-modal .border-slate-200 {
+    border-color: rgba(148, 163, 184, 0.22) !important;
+    --tw-ring-color: rgba(148, 163, 184, 0.22) !important;
+}
+
+body.dark-mode .portal-shell .border-blue-200,
+body.dark-mode .portal-shell .ring-blue-100\/50,
+body.dark-mode .portal-shell .ring-blue-200 {
+    border-color: rgba(96, 165, 250, 0.32) !important;
+    --tw-ring-color: rgba(96, 165, 250, 0.32) !important;
+}
+
+body.dark-mode
+    .portal-shell
+    .divide-slate-100
+    > :not([hidden])
+    ~ :not([hidden]) {
+    border-color: rgba(148, 163, 184, 0.18) !important;
+}
+
+body.dark-mode .portal-shell .text-slate-900,
+body.dark-mode .portal-shell .text-slate-800,
+body.dark-mode .portal-shell .text-slate-700,
+body.dark-mode .portal-modal .text-slate-900,
+body.dark-mode .portal-modal .text-slate-800,
+body.dark-mode .portal-modal .text-slate-700 {
+    color: #e8eef8 !important;
+}
+
+body.dark-mode .portal-shell .text-slate-600,
+body.dark-mode .portal-shell .text-slate-500,
+body.dark-mode .portal-modal .text-slate-600,
+body.dark-mode .portal-modal .text-slate-500 {
+    color: #b8c4d6 !important;
+}
+
+body.dark-mode .portal-shell .text-slate-400,
+body.dark-mode .portal-shell .text-slate-300,
+body.dark-mode .portal-shell .placeholder\:text-slate-400::placeholder,
+body.dark-mode .portal-modal .text-slate-400,
+body.dark-mode .portal-modal .text-slate-300,
+body.dark-mode .portal-modal .placeholder\:text-slate-400::placeholder {
+    color: #8fa0b8 !important;
+}
+
+body.dark-mode .portal-shell .text-blue-700,
+body.dark-mode .portal-shell .text-blue-600,
+body.dark-mode .portal-shell .text-blue-600\/50 {
+    color: #93c5fd !important;
+}
+
+body.dark-mode .portal-shell input,
+body.dark-mode .portal-shell select,
+body.dark-mode .portal-shell textarea,
+body.dark-mode .portal-modal input,
+body.dark-mode .portal-modal select,
+body.dark-mode .portal-modal textarea {
+    border-color: rgba(148, 163, 184, 0.26) !important;
+    background-color: #1f293d !important;
+    color: #e8eef8 !important;
+}
+
+body.dark-mode .portal-shell option,
+body.dark-mode .portal-modal option {
+    background-color: #1f293d;
+    color: #e8eef8;
+}
+
+body.dark-mode .portal-shell .shadow-sm,
+body.dark-mode .portal-shell .shadow-lg,
+body.dark-mode .portal-shell .shadow-xl,
+body.dark-mode .portal-shell .shadow-2xl,
+body.dark-mode .portal-modal.shadow-2xl {
+    --tw-shadow-color: rgba(3, 7, 18, 0.32) !important;
+}
+
+body.dark-mode .portal-shell .bg-slate-900,
+body.dark-mode .portal-shell .bg-slate-950,
+body.dark-mode .portal-modal .bg-slate-900,
+body.dark-mode .portal-modal .bg-slate-950 {
+    background-color: #1f293d !important;
+}
+
+body.dark-mode .portal-shell .hover\:bg-slate-800:hover,
+body.dark-mode .portal-modal .hover\:bg-slate-800:hover {
+    background-color: #334155 !important;
+}
+
+body.dark-mode .portal-shell .text-rose-700,
+body.dark-mode .portal-shell .text-rose-600,
+body.dark-mode .portal-shell .text-rose-500,
+body.dark-mode .portal-modal .text-rose-700,
+body.dark-mode .portal-modal .text-rose-600,
+body.dark-mode .portal-modal .text-rose-500 {
+    color: #fb7185 !important;
+}
+
+body.dark-mode .portal-shell .bg-rose-50,
+body.dark-mode .portal-shell .bg-rose-100,
+body.dark-mode .portal-modal .bg-rose-50,
+body.dark-mode .portal-modal .bg-rose-100 {
+    background-color: rgba(244, 63, 94, 0.16) !important;
+}
+
+body.dark-mode .portal-shell .hover\:bg-rose-50:hover,
+body.dark-mode .portal-modal .hover\:bg-rose-50:hover {
+    background-color: rgba(244, 63, 94, 0.22) !important;
+}
