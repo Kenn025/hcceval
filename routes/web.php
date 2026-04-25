@@ -26,14 +26,12 @@ use App\Http\Controllers\Client\EmployeePortalController;
 use App\Http\Controllers\Client\StudentPortalController;
 use App\Http\Controllers\Client\TeacherPortalController;
 use App\Http\Controllers\BugReportController;
+use App\Http\Controllers\HomeController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
-Route::get('/', function () {
-    return Inertia::render('Home');
-});
+Route::get('/', HomeController::class)->name('home');
 
 Route::middleware('auth')->group(function () {
     Route::redirect('/admin', '/dashboard');
