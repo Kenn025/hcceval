@@ -125,6 +125,37 @@ function normalizeFaqSection(faqSection = {}) {
     };
 }
 
+function normalizeContactSection(contactSection = {}) {
+    return {
+        badge_text: String(contactSection.badge_text ?? "").trim(),
+        title_text: String(contactSection.title_text ?? "").trim(),
+        subtitle_text: String(contactSection.subtitle_text ?? "").trim(),
+        email_label: String(contactSection.email_label ?? "").trim(),
+        email_value: String(contactSection.email_value ?? "").trim(),
+        location_label: String(contactSection.location_label ?? "").trim(),
+        location_value: String(contactSection.location_value ?? "").trim(),
+        phone_label: String(contactSection.phone_label ?? "").trim(),
+        phone_value: String(contactSection.phone_value ?? "").trim(),
+        form_name_label: String(contactSection.form_name_label ?? "").trim(),
+        form_name_placeholder: String(
+            contactSection.form_name_placeholder ?? "",
+        ).trim(),
+        form_email_label: String(contactSection.form_email_label ?? "").trim(),
+        form_email_placeholder: String(
+            contactSection.form_email_placeholder ?? "",
+        ).trim(),
+        form_message_label: String(
+            contactSection.form_message_label ?? "",
+        ).trim(),
+        form_message_placeholder: String(
+            contactSection.form_message_placeholder ?? "",
+        ).trim(),
+        form_button_label: String(
+            contactSection.form_button_label ?? "",
+        ).trim(),
+    };
+}
+
 function normalizeStatKey(value) {
     return String(value ?? "")
         .trim()
@@ -206,6 +237,24 @@ export default function LandingPage({
         title_text: "",
         faqs: [],
     },
+    contactSection = {
+        badge_text: "",
+        title_text: "",
+        subtitle_text: "",
+        email_label: "",
+        email_value: "",
+        location_label: "",
+        location_value: "",
+        phone_label: "",
+        phone_value: "",
+        form_name_label: "",
+        form_name_placeholder: "",
+        form_email_label: "",
+        form_email_placeholder: "",
+        form_message_label: "",
+        form_message_placeholder: "",
+        form_button_label: "",
+    },
 }) {
     const canEditStats =
         (statsSection ?? []).length > 0 &&
@@ -230,6 +279,7 @@ export default function LandingPage({
         useState(null);
     const [testimonialsModalOpen, setTestimonialsModalOpen] = useState(false);
     const [faqModalOpen, setFaqModalOpen] = useState(false);
+    const [contactModalOpen, setContactModalOpen] = useState(false);
     const [pendingFaqScrollToIndex, setPendingFaqScrollToIndex] =
         useState(null);
     const [testimonialAction, setTestimonialAction] = useState({
@@ -250,6 +300,7 @@ export default function LandingPage({
     const initialHowItWorksSnapshotRef = useRef("{}");
     const initialTestimonialsSnapshotRef = useRef("{}");
     const initialFaqSnapshotRef = useRef("{}");
+    const initialContactSnapshotRef = useRef("{}");
 
     const { data, setData, errors, processing, reset, clearErrors } = useForm({
         headers: [],
@@ -350,6 +401,31 @@ export default function LandingPage({
         title_text: "",
         faqs: [],
         delete_ids: [],
+    });
+    const {
+        data: contactData,
+        setData: setContactData,
+        errors: contactErrors,
+        processing: contactProcessing,
+        reset: resetContact,
+        clearErrors: clearContactErrors,
+    } = useForm({
+        badge_text: "",
+        title_text: "",
+        subtitle_text: "",
+        email_label: "",
+        email_value: "",
+        location_label: "",
+        location_value: "",
+        phone_label: "",
+        phone_value: "",
+        form_name_label: "",
+        form_name_placeholder: "",
+        form_email_label: "",
+        form_email_placeholder: "",
+        form_message_label: "",
+        form_message_placeholder: "",
+        form_button_label: "",
     });
 
     const openEdit = () => {
@@ -556,6 +632,34 @@ export default function LandingPage({
         );
         setFaqModalOpen(true);
     };
+    const openContactEdit = () => {
+        clearContactErrors();
+        const nextContactData = {
+            badge_text: contactSection?.badge_text ?? "",
+            title_text: contactSection?.title_text ?? "",
+            subtitle_text: contactSection?.subtitle_text ?? "",
+            email_label: contactSection?.email_label ?? "",
+            email_value: contactSection?.email_value ?? "",
+            location_label: contactSection?.location_label ?? "",
+            location_value: contactSection?.location_value ?? "",
+            phone_label: contactSection?.phone_label ?? "",
+            phone_value: contactSection?.phone_value ?? "",
+            form_name_label: contactSection?.form_name_label ?? "",
+            form_name_placeholder: contactSection?.form_name_placeholder ?? "",
+            form_email_label: contactSection?.form_email_label ?? "",
+            form_email_placeholder:
+                contactSection?.form_email_placeholder ?? "",
+            form_message_label: contactSection?.form_message_label ?? "",
+            form_message_placeholder:
+                contactSection?.form_message_placeholder ?? "",
+            form_button_label: contactSection?.form_button_label ?? "",
+        };
+        setContactData(nextContactData);
+        initialContactSnapshotRef.current = JSON.stringify(
+            normalizeContactSection(nextContactData),
+        );
+        setContactModalOpen(true);
+    };
     const closeHowItWorksModal = () => {
         resetHowItWorks();
         setHowItWorksModalOpen(false);
@@ -574,6 +678,11 @@ export default function LandingPage({
         clearFaqErrors();
         setPendingFaqScrollToIndex(null);
         faqContainerRefs.current = [];
+    };
+    const closeContactModal = () => {
+        resetContact();
+        setContactModalOpen(false);
+        clearContactErrors();
     };
 
     const updateRow = (index, key, value) => {
@@ -1272,6 +1381,47 @@ export default function LandingPage({
             { onSuccess: closeFaqModal },
         );
     };
+    const hasEmptyContactRequiredFields = useMemo(() => {
+        const requiredFields = [
+            contactData.badge_text,
+            contactData.title_text,
+            contactData.subtitle_text,
+            contactData.email_label,
+            contactData.email_value,
+            contactData.location_label,
+            contactData.location_value,
+            contactData.phone_label,
+            contactData.phone_value,
+            contactData.form_name_label,
+            contactData.form_name_placeholder,
+            contactData.form_email_label,
+            contactData.form_email_placeholder,
+            contactData.form_message_label,
+            contactData.form_message_placeholder,
+            contactData.form_button_label,
+        ];
+        return requiredFields.some(
+            (value) => String(value ?? "").trim() === "",
+        );
+    }, [contactData]);
+    const hasContactSectionChanges = useMemo(() => {
+        const currentSnapshot = JSON.stringify(
+            normalizeContactSection(contactData),
+        );
+        return currentSnapshot !== initialContactSnapshotRef.current;
+    }, [contactData]);
+    const submitContactSection = (event) => {
+        event.preventDefault();
+        if (hasEmptyContactRequiredFields || !hasContactSectionChanges) {
+            return;
+        }
+
+        router.put(
+            route("admin.landing-page.contact-section.update"),
+            contactData,
+            { onSuccess: closeContactModal },
+        );
+    };
     const updateTestimonialStatus = (testimonialId, status) => {
         if (!testimonialId) return;
         const current = (testimonialsSection?.testimonials ?? []).find(
@@ -1903,6 +2053,121 @@ export default function LandingPage({
                                             ),
                                         )}
                                     </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section className="mb-4 rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-5">
+                    <h2 className="text-base font-semibold text-slate-900">
+                        Contact
+                    </h2>
+                    <button
+                        type="button"
+                        onClick={openContactEdit}
+                        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                    >
+                        Edit
+                    </button>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="min-w-full">
+                        <thead>
+                            <tr className="border-b border-slate-100 bg-slate-50/70 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                <th className="px-4 py-3 sm:px-5">Field</th>
+                                <th className="px-4 py-3 sm:px-5">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody className="text-sm text-slate-700">
+                            <tr className="border-b border-slate-100">
+                                <td className="px-4 py-3 font-medium sm:px-5">
+                                    Badge
+                                </td>
+                                <td className="px-4 py-3 sm:px-5">
+                                    {contactSection?.badge_text || "-"}
+                                </td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                                <td className="px-4 py-3 font-medium sm:px-5">
+                                    Title
+                                </td>
+                                <td className="px-4 py-3 sm:px-5">
+                                    {contactSection?.title_text || "-"}
+                                </td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                                <td className="px-4 py-3 font-medium sm:px-5">
+                                    Subtitle
+                                </td>
+                                <td className="px-4 py-3 sm:px-5">
+                                    {contactSection?.subtitle_text || "-"}
+                                </td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                                <td className="px-4 py-3 font-medium sm:px-5">
+                                    Email
+                                </td>
+                                <td className="px-4 py-3 sm:px-5">
+                                    {contactSection?.email_label || "Email"}:{" "}
+                                    {contactSection?.email_value || "-"}
+                                </td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                                <td className="px-4 py-3 font-medium sm:px-5">
+                                    Location
+                                </td>
+                                <td className="px-4 py-3 sm:px-5">
+                                    {contactSection?.location_label ||
+                                        "Location"}
+                                    : {contactSection?.location_value || "-"}
+                                </td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                                <td className="px-4 py-3 font-medium sm:px-5">
+                                    Phone
+                                </td>
+                                <td className="px-4 py-3 sm:px-5">
+                                    {contactSection?.phone_label || "Phone"}:{" "}
+                                    {contactSection?.phone_value || "-"}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td className="px-4 py-3 align-top font-medium sm:px-5">
+                                    Form
+                                </td>
+                                <td className="space-y-1 px-4 py-3 sm:px-5">
+                                    <p>
+                                        {contactSection?.form_name_label ||
+                                            "Full Name"}{" "}
+                                        (
+                                        {contactSection?.form_name_placeholder ||
+                                            "Enter your name"}
+                                        )
+                                    </p>
+                                    <p>
+                                        {contactSection?.form_email_label ||
+                                            "Email"}{" "}
+                                        (
+                                        {contactSection?.form_email_placeholder ||
+                                            "Enter your email"}
+                                        )
+                                    </p>
+                                    <p>
+                                        {contactSection?.form_message_label ||
+                                            "Message"}{" "}
+                                        (
+                                        {contactSection?.form_message_placeholder ||
+                                            "How can we help?"}
+                                        )
+                                    </p>
+                                    <p>
+                                        Button:{" "}
+                                        {contactSection?.form_button_label ||
+                                            "Send Message"}
+                                    </p>
                                 </td>
                             </tr>
                         </tbody>
@@ -3644,7 +3909,8 @@ export default function LandingPage({
                                     <div
                                         key={row.id ?? `faq-edit-${index}`}
                                         ref={(el) => {
-                                            faqContainerRefs.current[index] = el;
+                                            faqContainerRefs.current[index] =
+                                                el;
                                         }}
                                         className="rounded-lg border border-slate-200 bg-slate-50 p-4"
                                     >
@@ -3777,6 +4043,373 @@ export default function LandingPage({
                 </div>
             )}
 
+            {contactModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div
+                        className="absolute inset-0 bg-slate-950/40"
+                        onClick={closeContactModal}
+                    />
+                    <div
+                        className="relative w-full max-w-4xl rounded-xl bg-white p-6 shadow-2xl"
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div className="mb-4 flex items-center justify-between">
+                            <h3 className="text-base font-semibold text-slate-900">
+                                Edit Contact Section
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={closeContactModal}
+                                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                                aria-label="Close modal"
+                            >
+                                <svg
+                                    className="h-5 w-5"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={2}
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M6 18L18 6M6 6l12 12"
+                                    />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <form
+                            onSubmit={submitContactSection}
+                            className="space-y-4"
+                        >
+                            <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
+                                <div className="grid gap-3 md:grid-cols-2">
+                                    <FormField
+                                        label="Badge"
+                                        error={contactErrors.badge_text}
+                                        required
+                                    >
+                                        <TextInput
+                                            value={contactData.badge_text}
+                                            onChange={(event) =>
+                                                setContactData(
+                                                    "badge_text",
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                    </FormField>
+                                    <FormField
+                                        label="Title"
+                                        error={contactErrors.title_text}
+                                        required
+                                    >
+                                        <TextInput
+                                            value={contactData.title_text}
+                                            onChange={(event) =>
+                                                setContactData(
+                                                    "title_text",
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                    </FormField>
+                                </div>
+
+                                <FormField
+                                    label="Subtitle"
+                                    error={contactErrors.subtitle_text}
+                                    required
+                                >
+                                    <TextareaInput
+                                        value={contactData.subtitle_text}
+                                        onChange={(event) =>
+                                            setContactData(
+                                                "subtitle_text",
+                                                event.target.value,
+                                            )
+                                        }
+                                        rows={2}
+                                    />
+                                </FormField>
+
+                                <div className="grid gap-3 md:grid-cols-2">
+                                    <FormField
+                                        label="Email Label"
+                                        error={contactErrors.email_label}
+                                        required
+                                    >
+                                        <TextInput
+                                            value={contactData.email_label}
+                                            onChange={(event) =>
+                                                setContactData(
+                                                    "email_label",
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                    </FormField>
+                                    <FormField
+                                        label="Email Value"
+                                        error={contactErrors.email_value}
+                                        required
+                                    >
+                                        <TextInput
+                                            value={contactData.email_value}
+                                            onChange={(event) =>
+                                                setContactData(
+                                                    "email_value",
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                    </FormField>
+                                </div>
+
+                                <div className="grid gap-3 md:grid-cols-2">
+                                    <FormField
+                                        label="Location Label"
+                                        error={contactErrors.location_label}
+                                        required
+                                    >
+                                        <TextInput
+                                            value={contactData.location_label}
+                                            onChange={(event) =>
+                                                setContactData(
+                                                    "location_label",
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                    </FormField>
+                                    <FormField
+                                        label="Location Value"
+                                        error={contactErrors.location_value}
+                                        required
+                                    >
+                                        <TextInput
+                                            value={contactData.location_value}
+                                            onChange={(event) =>
+                                                setContactData(
+                                                    "location_value",
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                    </FormField>
+                                </div>
+
+                                <div className="grid gap-3 md:grid-cols-2">
+                                    <FormField
+                                        label="Phone Label"
+                                        error={contactErrors.phone_label}
+                                        required
+                                    >
+                                        <TextInput
+                                            value={contactData.phone_label}
+                                            onChange={(event) =>
+                                                setContactData(
+                                                    "phone_label",
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                    </FormField>
+                                    <FormField
+                                        label="Phone Value"
+                                        error={contactErrors.phone_value}
+                                        required
+                                    >
+                                        <TextInput
+                                            value={contactData.phone_value}
+                                            onChange={(event) =>
+                                                setContactData(
+                                                    "phone_value",
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                    </FormField>
+                                </div>
+
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                                    <h4 className="mb-3 text-sm font-semibold text-slate-900">
+                                        Form Fields
+                                    </h4>
+                                    <div className="grid gap-3 md:grid-cols-2">
+                                        <FormField
+                                            label="Name Label"
+                                            error={
+                                                contactErrors.form_name_label
+                                            }
+                                            required
+                                        >
+                                            <TextInput
+                                                value={
+                                                    contactData.form_name_label
+                                                }
+                                                onChange={(event) =>
+                                                    setContactData(
+                                                        "form_name_label",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </FormField>
+                                        <FormField
+                                            label="Name Placeholder"
+                                            error={
+                                                contactErrors.form_name_placeholder
+                                            }
+                                            required
+                                        >
+                                            <TextInput
+                                                value={
+                                                    contactData.form_name_placeholder
+                                                }
+                                                onChange={(event) =>
+                                                    setContactData(
+                                                        "form_name_placeholder",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </FormField>
+                                    </div>
+
+                                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                                        <FormField
+                                            label="Email Label"
+                                            error={
+                                                contactErrors.form_email_label
+                                            }
+                                            required
+                                        >
+                                            <TextInput
+                                                value={
+                                                    contactData.form_email_label
+                                                }
+                                                onChange={(event) =>
+                                                    setContactData(
+                                                        "form_email_label",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </FormField>
+                                        <FormField
+                                            label="Email Placeholder"
+                                            error={
+                                                contactErrors.form_email_placeholder
+                                            }
+                                            required
+                                        >
+                                            <TextInput
+                                                value={
+                                                    contactData.form_email_placeholder
+                                                }
+                                                onChange={(event) =>
+                                                    setContactData(
+                                                        "form_email_placeholder",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </FormField>
+                                    </div>
+
+                                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                                        <FormField
+                                            label="Message Label"
+                                            error={
+                                                contactErrors.form_message_label
+                                            }
+                                            required
+                                        >
+                                            <TextInput
+                                                value={
+                                                    contactData.form_message_label
+                                                }
+                                                onChange={(event) =>
+                                                    setContactData(
+                                                        "form_message_label",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </FormField>
+                                        <FormField
+                                            label="Message Placeholder"
+                                            error={
+                                                contactErrors.form_message_placeholder
+                                            }
+                                            required
+                                        >
+                                            <TextInput
+                                                value={
+                                                    contactData.form_message_placeholder
+                                                }
+                                                onChange={(event) =>
+                                                    setContactData(
+                                                        "form_message_placeholder",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </FormField>
+                                    </div>
+
+                                    <div className="mt-3">
+                                        <FormField
+                                            label="Button Label"
+                                            error={
+                                                contactErrors.form_button_label
+                                            }
+                                            required
+                                        >
+                                            <TextInput
+                                                value={
+                                                    contactData.form_button_label
+                                                }
+                                                onChange={(event) =>
+                                                    setContactData(
+                                                        "form_button_label",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </FormField>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="pt-2">
+                                <div className="flex w-full flex-col gap-3 md:flex-row-reverse md:justify-start">
+                                    <SubmitButton
+                                        processing={contactProcessing}
+                                        disabled={
+                                            hasEmptyContactRequiredFields ||
+                                            !hasContactSectionChanges
+                                        }
+                                        className="w-full md:w-[180px]"
+                                    >
+                                        Save Changes
+                                    </SubmitButton>
+                                    <button
+                                        type="button"
+                                        onClick={closeContactModal}
+                                        className="w-full rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700 md:w-[180px]"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
             {testimonialsModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div
@@ -3856,7 +4489,10 @@ export default function LandingPage({
                                         Recent Submitted Testimonials
                                     </h4>
                                     <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
-                                        {(testimonialsSection?.testimonials ?? [])
+                                        {(
+                                            testimonialsSection?.testimonials ??
+                                            []
+                                        )
                                             .slice(0, 10)
                                             .map((row, index) => (
                                                 <div
@@ -3873,8 +4509,12 @@ export default function LandingPage({
                                                                     row.first_name,
                                                                     row.last_name,
                                                                 ]
-                                                                    .filter(Boolean)
-                                                                    .join(" ") ||
+                                                                    .filter(
+                                                                        Boolean,
+                                                                    )
+                                                                    .join(
+                                                                        " ",
+                                                                    ) ||
                                                                     "Anonymous User"}
                                                             </p>
                                                             <p className="text-xs text-slate-500">
@@ -3893,7 +4533,8 @@ export default function LandingPage({
                                                         </span>
                                                     </div>
                                                     <p className="text-xs text-slate-500">
-                                                        {row.role || "System User"}
+                                                        {row.role ||
+                                                            "System User"}
                                                     </p>
                                                     <p className="mt-2 text-sm text-slate-700">
                                                         {row.feedback || "-"}
@@ -3901,10 +4542,11 @@ export default function LandingPage({
                                                     {row.id ? (
                                                         <div className="mt-3 flex flex-wrap items-center gap-2">
                                                             {(() => {
-                                                                const status = String(
-                                                                    row.status ??
-                                                                        "",
-                                                                ).toLowerCase();
+                                                                const status =
+                                                                    String(
+                                                                        row.status ??
+                                                                            "",
+                                                                    ).toLowerCase();
                                                                 const busy =
                                                                     testimonialAction.id ===
                                                                         row.id &&
@@ -3920,32 +4562,36 @@ export default function LandingPage({
                                                                         "rejected";
                                                                 return (
                                                                     <>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() =>
-                                                                    updateTestimonialStatus(
-                                                                        row.id,
-                                                                        "approved",
-                                                                    )
-                                                                }
-                                                                disabled={approveDisabled}
-                                                                className="rounded-md border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
-                                                            >
-                                                                Approve
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() =>
-                                                                    updateTestimonialStatus(
-                                                                        row.id,
-                                                                        "rejected",
-                                                                    )
-                                                                }
-                                                                disabled={rejectDisabled}
-                                                                className="rounded-md border border-rose-300 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
-                                                            >
-                                                                Reject
-                                                            </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() =>
+                                                                                updateTestimonialStatus(
+                                                                                    row.id,
+                                                                                    "approved",
+                                                                                )
+                                                                            }
+                                                                            disabled={
+                                                                                approveDisabled
+                                                                            }
+                                                                            className="rounded-md border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                                                        >
+                                                                            Approve
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() =>
+                                                                                updateTestimonialStatus(
+                                                                                    row.id,
+                                                                                    "rejected",
+                                                                                )
+                                                                            }
+                                                                            disabled={
+                                                                                rejectDisabled
+                                                                            }
+                                                                            className="rounded-md border border-rose-300 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                                                        >
+                                                                            Reject
+                                                                        </button>
                                                                     </>
                                                                 );
                                                             })()}
@@ -3961,7 +4607,9 @@ export default function LandingPage({
                                 <div className="flex w-full flex-col gap-3 md:flex-row-reverse md:justify-start">
                                     <SubmitButton
                                         processing={testimonialsProcessing}
-                                        disabled={hasEmptyTestimonialsRequiredFields}
+                                        disabled={
+                                            hasEmptyTestimonialsRequiredFields
+                                        }
                                         className="w-full md:w-[180px]"
                                     >
                                         Save Changes

@@ -160,6 +160,7 @@ function App({
     howItWorksSection: customHowItWorksSection = null,
     testimonialsSection: customTestimonialsSection = null,
     faqSection: customFaqSection = null,
+    contactSection: customContactSection = null,
 }) {
     const [isDarkMode, setIsDarkMode] = useState(() => {
         if (typeof window === "undefined") return false;
@@ -567,6 +568,53 @@ function App({
         q: String(faq?.question ?? faq?.q ?? "").trim(),
         a: String(faq?.answer ?? faq?.a ?? "").trim(),
     }));
+    const defaultContactSection = {
+        badge_text: "Contact",
+        title_text: "Get In Touch",
+        subtitle_text: "Have questions about MCH-PEMS? We're here to help.",
+        email_label: "Email",
+        email_value: "mchpems@university.edu",
+        location_label: "Location",
+        location_value: "University Campus, Philippines",
+        phone_label: "Phone",
+        phone_value: "+63 912 345 6789",
+        form_name_label: "Full Name",
+        form_name_placeholder: "Enter your name",
+        form_email_label: "Email",
+        form_email_placeholder: "Enter your email",
+        form_message_label: "Message",
+        form_message_placeholder: "How can we help?",
+        form_button_label: "Send Message",
+    };
+    const contactSection =
+        customContactSection && typeof customContactSection === "object"
+            ? { ...defaultContactSection, ...customContactSection }
+            : defaultContactSection;
+    const contactItems = [
+        {
+            icon: "chat",
+            label:
+                contactSection.email_label || defaultContactSection.email_label,
+            value:
+                contactSection.email_value || defaultContactSection.email_value,
+        },
+        {
+            icon: "branches",
+            label:
+                contactSection.location_label ||
+                defaultContactSection.location_label,
+            value:
+                contactSection.location_value ||
+                defaultContactSection.location_value,
+        },
+        {
+            icon: "calendar",
+            label:
+                contactSection.phone_label || defaultContactSection.phone_label,
+            value:
+                contactSection.phone_value || defaultContactSection.phone_value,
+        },
+    ];
     const defaultTestimonialsSection = {
         badge_text: "Testimonials",
         title_text: "What Users Say",
@@ -2611,13 +2659,17 @@ function App({
                                         className:
                                             "neumorphic-flat px-4 py-2 inline-block text-sm font-bold mb-4",
                                         style: { color: "var(--accent)" },
-                                        children: "Contact",
+                                        children:
+                                            contactSection.badge_text ||
+                                            "Contact",
                                     }),
                                     /* @__PURE__ */ jsx("h2", {
                                         className:
                                             "text-3xl md:text-4xl font-bold mb-6",
                                         style: { color: "var(--text-primary)" },
-                                        children: "Get In Touch",
+                                        children:
+                                            contactSection.title_text ||
+                                            "Get In Touch",
                                     }),
                                     /* @__PURE__ */ jsx("p", {
                                         className: "mb-8",
@@ -2625,27 +2677,12 @@ function App({
                                             color: "var(--text-secondary)",
                                         },
                                         children:
+                                            contactSection.subtitle_text ||
                                             "Have questions about MCH-PEMS? We're here to help.",
                                     }),
                                     /* @__PURE__ */ jsx("div", {
                                         className: "space-y-6",
-                                        children: [
-                                            {
-                                                icon: "chat",
-                                                label: "Email",
-                                                value: "mchpems@university.edu",
-                                            },
-                                            {
-                                                icon: "branches",
-                                                label: "Location",
-                                                value: "University Campus, Philippines",
-                                            },
-                                            {
-                                                icon: "calendar",
-                                                label: "Phone",
-                                                value: "+63 912 345 6789",
-                                            },
-                                        ].map((item, i) =>
+                                        children: contactItems.map((item, i) =>
                                             /* @__PURE__ */ jsxs(
                                                 "div",
                                                 {
@@ -2724,11 +2761,14 @@ function App({
                                                     style: {
                                                         color: "var(--text-primary)",
                                                     },
-                                                    children: "Full Name",
+                                                    children:
+                                                        contactSection.form_name_label ||
+                                                        "Full Name",
                                                 }),
                                                 /* @__PURE__ */ jsx("input", {
                                                     type: "text",
                                                     placeholder:
+                                                        contactSection.form_name_placeholder ||
                                                         "Enter your name",
                                                     className:
                                                         "neumorphic-input w-full",
@@ -2743,11 +2783,14 @@ function App({
                                                     style: {
                                                         color: "var(--text-primary)",
                                                     },
-                                                    children: "Email",
+                                                    children:
+                                                        contactSection.form_email_label ||
+                                                        "Email",
                                                 }),
                                                 /* @__PURE__ */ jsx("input", {
                                                     type: "email",
                                                     placeholder:
+                                                        contactSection.form_email_placeholder ||
                                                         "Enter your email",
                                                     className:
                                                         "neumorphic-input w-full",
@@ -2762,13 +2805,16 @@ function App({
                                                     style: {
                                                         color: "var(--text-primary)",
                                                     },
-                                                    children: "Message",
+                                                    children:
+                                                        contactSection.form_message_label ||
+                                                        "Message",
                                                 }),
                                                 /* @__PURE__ */ jsx(
                                                     "textarea",
                                                     {
                                                         rows: 4,
                                                         placeholder:
+                                                            contactSection.form_message_placeholder ||
                                                             "How can we help?",
                                                         className:
                                                             "neumorphic-input w-full resize-none",
@@ -2783,7 +2829,9 @@ function App({
                                             style: {
                                                 background: "var(--accent)",
                                             },
-                                            children: "Send Message",
+                                            children:
+                                                contactSection.form_button_label ||
+                                                "Send Message",
                                         }),
                                     ],
                                 }),

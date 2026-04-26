@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\LandingPageFeature;
 use App\Models\LandingPageFeatureSection;
+use App\Models\LandingPageContactSection;
 use App\Models\LandingPageFaq;
 use App\Models\LandingPageFaqSection;
 use App\Models\LandingPageHeader;
@@ -34,6 +35,7 @@ class HomeController extends Controller
             'howItWorksSection' => $this->howItWorksSection(),
             'testimonialsSection' => $this->testimonialsSection(),
             'faqSection' => $this->faqSection(),
+            'contactSection' => $this->contactSection(),
         ]);
     }
 
@@ -427,6 +429,56 @@ class HomeController extends Controller
             'badge_text' => $section?->badge_text ?: $defaultSection['badge_text'],
             'title_text' => $section?->title_text ?: $defaultSection['title_text'],
             'faqs' => count($faqs) > 0 ? $faqs : $defaultFaqs,
+        ];
+    }
+
+    private function contactSection(): array
+    {
+        $defaults = [
+            'badge_text' => 'Contact',
+            'title_text' => 'Get In Touch',
+            'subtitle_text' => "Have questions about MCH-PEMS? We're here to help.",
+            'email_label' => 'Email',
+            'email_value' => 'mchpems@university.edu',
+            'location_label' => 'Location',
+            'location_value' => 'University Campus, Philippines',
+            'phone_label' => 'Phone',
+            'phone_value' => '+63 912 345 6789',
+            'form_name_label' => 'Full Name',
+            'form_name_placeholder' => 'Enter your name',
+            'form_email_label' => 'Email',
+            'form_email_placeholder' => 'Enter your email',
+            'form_message_label' => 'Message',
+            'form_message_placeholder' => 'How can we help?',
+            'form_button_label' => 'Send Message',
+        ];
+
+        if (! Schema::hasTable('landing_page_contact_sections')) {
+            return $defaults;
+        }
+
+        $section = LandingPageContactSection::query()->first();
+        if (! $section) {
+            return $defaults;
+        }
+
+        return [
+            'badge_text' => $section->badge_text ?: $defaults['badge_text'],
+            'title_text' => $section->title_text ?: $defaults['title_text'],
+            'subtitle_text' => $section->subtitle_text ?: $defaults['subtitle_text'],
+            'email_label' => $section->email_label ?: $defaults['email_label'],
+            'email_value' => $section->email_value ?: $defaults['email_value'],
+            'location_label' => $section->location_label ?: $defaults['location_label'],
+            'location_value' => $section->location_value ?: $defaults['location_value'],
+            'phone_label' => $section->phone_label ?: $defaults['phone_label'],
+            'phone_value' => $section->phone_value ?: $defaults['phone_value'],
+            'form_name_label' => $section->form_name_label ?: $defaults['form_name_label'],
+            'form_name_placeholder' => $section->form_name_placeholder ?: $defaults['form_name_placeholder'],
+            'form_email_label' => $section->form_email_label ?: $defaults['form_email_label'],
+            'form_email_placeholder' => $section->form_email_placeholder ?: $defaults['form_email_placeholder'],
+            'form_message_label' => $section->form_message_label ?: $defaults['form_message_label'],
+            'form_message_placeholder' => $section->form_message_placeholder ?: $defaults['form_message_placeholder'],
+            'form_button_label' => $section->form_button_label ?: $defaults['form_button_label'],
         ];
     }
 }

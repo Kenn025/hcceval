@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\LandingPageFeature;
 use App\Models\LandingPageFeatureSection;
+use App\Models\LandingPageContactSection;
 use App\Models\LandingPageFaq;
 use App\Models\LandingPageFaqSection;
 use App\Models\LandingPageHeader;
@@ -59,6 +60,24 @@ class LandingPageHeaderController extends Controller
     private const DEFAULT_FAQ_SECTION = [
         'badge_text' => 'FAQ',
         'title_text' => 'Frequently Asked Questions',
+    ];
+    private const DEFAULT_CONTACT_SECTION = [
+        'badge_text' => 'Contact',
+        'title_text' => 'Get In Touch',
+        'subtitle_text' => "Have questions about MCH-PEMS? We're here to help.",
+        'email_label' => 'Email',
+        'email_value' => 'mchpems@university.edu',
+        'location_label' => 'Location',
+        'location_value' => 'University Campus, Philippines',
+        'phone_label' => 'Phone',
+        'phone_value' => '+63 912 345 6789',
+        'form_name_label' => 'Full Name',
+        'form_name_placeholder' => 'Enter your name',
+        'form_email_label' => 'Email',
+        'form_email_placeholder' => 'Enter your email',
+        'form_message_label' => 'Message',
+        'form_message_placeholder' => 'How can we help?',
+        'form_button_label' => 'Send Message',
     ];
     private const DEFAULT_ROLES = [
         [
@@ -235,6 +254,7 @@ class LandingPageHeaderController extends Controller
             'howItWorksSection' => $this->howItWorksSectionData(),
             'testimonialsSection' => $this->testimonialsSectionData(),
             'faqSection' => $this->faqSectionData(),
+            'contactSection' => $this->contactSectionData(),
             'filters' => [
                 'search' => $search,
                 'per_page' => $perPage,
@@ -1062,6 +1082,43 @@ class LandingPageHeaderController extends Controller
         return back()->with('success', 'FAQ section updated successfully.');
     }
 
+    public function updateContactSection(Request $request)
+    {
+        if (! Schema::hasTable('landing_page_contact_sections')) {
+            return back()->withErrors([
+                'contact_section' => 'Contact section table is not available yet. Please run migrations first.',
+            ]);
+        }
+
+        $validated = $request->validate([
+            'badge_text' => 'required|string|max:120',
+            'title_text' => 'required|string|max:255',
+            'subtitle_text' => 'required|string|max:1000',
+            'email_label' => 'required|string|max:80',
+            'email_value' => 'required|string|max:255',
+            'location_label' => 'required|string|max:80',
+            'location_value' => 'required|string|max:255',
+            'phone_label' => 'required|string|max:80',
+            'phone_value' => 'required|string|max:80',
+            'form_name_label' => 'required|string|max:120',
+            'form_name_placeholder' => 'required|string|max:255',
+            'form_email_label' => 'required|string|max:120',
+            'form_email_placeholder' => 'required|string|max:255',
+            'form_message_label' => 'required|string|max:120',
+            'form_message_placeholder' => 'required|string|max:255',
+            'form_button_label' => 'required|string|max:120',
+        ]);
+
+        $section = LandingPageContactSection::query()->first();
+        if (! $section) {
+            $section = LandingPageContactSection::query()->create(self::DEFAULT_CONTACT_SECTION);
+        }
+
+        $section->update($validated);
+
+        return back()->with('success', 'Contact section updated successfully.');
+    }
+
     private function rolesSectionData(): array
     {
         $defaultRoles = collect(self::DEFAULT_ROLES)
@@ -1261,6 +1318,37 @@ class LandingPageHeaderController extends Controller
             'badge_text' => $section?->badge_text ?: self::DEFAULT_FAQ_SECTION['badge_text'],
             'title_text' => $section?->title_text ?: self::DEFAULT_FAQ_SECTION['title_text'],
             'faqs' => count($faqs) > 0 ? $faqs : $defaultFaqs,
+        ];
+    }
+
+    private function contactSectionData(): array
+    {
+        if (! Schema::hasTable('landing_page_contact_sections')) {
+            return self::DEFAULT_CONTACT_SECTION;
+        }
+
+        $section = LandingPageContactSection::query()->first();
+        if (! $section) {
+            return self::DEFAULT_CONTACT_SECTION;
+        }
+
+        return [
+            'badge_text' => $section->badge_text ?: self::DEFAULT_CONTACT_SECTION['badge_text'],
+            'title_text' => $section->title_text ?: self::DEFAULT_CONTACT_SECTION['title_text'],
+            'subtitle_text' => $section->subtitle_text ?: self::DEFAULT_CONTACT_SECTION['subtitle_text'],
+            'email_label' => $section->email_label ?: self::DEFAULT_CONTACT_SECTION['email_label'],
+            'email_value' => $section->email_value ?: self::DEFAULT_CONTACT_SECTION['email_value'],
+            'location_label' => $section->location_label ?: self::DEFAULT_CONTACT_SECTION['location_label'],
+            'location_value' => $section->location_value ?: self::DEFAULT_CONTACT_SECTION['location_value'],
+            'phone_label' => $section->phone_label ?: self::DEFAULT_CONTACT_SECTION['phone_label'],
+            'phone_value' => $section->phone_value ?: self::DEFAULT_CONTACT_SECTION['phone_value'],
+            'form_name_label' => $section->form_name_label ?: self::DEFAULT_CONTACT_SECTION['form_name_label'],
+            'form_name_placeholder' => $section->form_name_placeholder ?: self::DEFAULT_CONTACT_SECTION['form_name_placeholder'],
+            'form_email_label' => $section->form_email_label ?: self::DEFAULT_CONTACT_SECTION['form_email_label'],
+            'form_email_placeholder' => $section->form_email_placeholder ?: self::DEFAULT_CONTACT_SECTION['form_email_placeholder'],
+            'form_message_label' => $section->form_message_label ?: self::DEFAULT_CONTACT_SECTION['form_message_label'],
+            'form_message_placeholder' => $section->form_message_placeholder ?: self::DEFAULT_CONTACT_SECTION['form_message_placeholder'],
+            'form_button_label' => $section->form_button_label ?: self::DEFAULT_CONTACT_SECTION['form_button_label'],
         ];
     }
 
