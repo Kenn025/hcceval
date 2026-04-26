@@ -7,8 +7,10 @@ use App\Http\Requests\Admin\StoreTeacherRequest;
 use App\Http\Requests\Admin\UpdateTeacherRequest;
 use App\Models\Branch;
 use App\Models\Department;
+use App\Models\EducationLevel;
 use App\Models\Program;
 use App\Models\Strand;
+use App\Models\Subject;
 use App\Models\Teacher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,7 +24,11 @@ class TeacherController extends Controller
         $scopedId = $this->scopedBranchId();
         $branchId = $scopedId ?? $request->input('branch_id');
         $departmentId = $request->input('department_id');
+        $departmentType = $request->input('department_type');
         $programId = $request->input('program_id');
+        $programName = $request->input('program_name');
+        $strandId = $request->input('strand_id');
+        $strandName = $request->input('strand_name');
         $branches = Branch::query()
             ->select('id', 'name', 'code')
             ->where('is_deleted', 0)
@@ -40,7 +46,21 @@ class TeacherController extends Controller
             ->when($this->isBranchAdmin(), fn ($q) => $q->where('role', 'Program Chair'))
             ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
             ->when($departmentId, fn ($q) => $q->where('department_id', $departmentId))
+            ->when($departmentType, fn ($q) => $q->whereHas('department', function ($department) use ($departmentType) {
+                $department->where(function ($query) use ($departmentType) {
+                    match ($departmentType) {
+                        'college' => $query->where('name', 'like', '%College%')->orWhere('code', 'like', '%COL%'),
+                        'senior-high' => $query->where('name', 'like', '%Senior High%')->orWhere('code', 'like', '%SHS%'),
+                        'junior-high' => $query->where('name', 'like', '%Junior High%')->orWhere('code', 'like', '%JHS%'),
+                        'elementary' => $query->where('name', 'like', '%Elementary%')->orWhere('code', 'like', '%ELEM%'),
+                        default => $query->whereRaw('1 = 0'),
+                    };
+                });
+            }))
             ->when($programId, fn ($q) => $q->where('program_id', $programId))
+            ->when($programName, fn ($q) => $q->whereHas('program', fn ($program) => $program->where('name', $programName)->orWhere('name', 'like', $programName . ' - %')))
+            ->when($strandId, fn ($q) => $q->where('strand_id', $strandId))
+            ->when($strandName, fn ($q) => $q->whereHas('strand', fn ($strand) => $strand->where('name', $strandName)->orWhere('name', 'like', $strandName . ' - %')))
             ->when($search, fn ($q) => $q->where(function ($sub) use ($search) {
                 $sub->where('firstname', 'like', "%{$search}%")
                     ->orWhere('lastname', 'like', "%{$search}%")
@@ -52,13 +72,95 @@ class TeacherController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
+        $teacherIds = $teachers->getCollection()->pluck('id')->map(fn ($id) => (int) $id)->values();
+        $subjects = Subject::query()
+            ->select('id', 'code', 'name', 'department_id', 'program_id', 'strand_id', 'teacher_id')
+            ->with(['department:id,name', 'program:id,name', 'strand:id,name'])
+            ->where('is_deleted', 0)
+            ->where('is_activated', 1)
+            ->when($teacherIds->isEmpty(), fn ($query) => $query->whereRaw('1 = 0'))
+            ->when($teacherIds->isNotEmpty(), function ($query) use ($teacherIds) {
+                $query->where(function ($subjectQuery) use ($teacherIds) {
+                    foreach ($teacherIds as $teacherId) {
+                        $subjectQuery->orWhereJsonContains('teacher_id', $teacherId);
+                    }
+                });
+            })
+            ->get();
+
+        $subjectIds = $subjects->pluck('id')->map(fn ($id) => (int) $id)->values();
+        $yearLevels = EducationLevel::query()
+            ->select('id', 'department_id', 'program_id', 'strand_id', 'year_level', 'section', 'subject_id', 'subject_teacher_map')
+            ->with(['department:id,name', 'program:id,name', 'strand:id,name'])
+            ->where('is_deleted', 0)
+            ->where('is_activated', 1)
+            ->when($subjectIds->isEmpty(), fn ($query) => $query->whereRaw('1 = 0'))
+            ->when($subjectIds->isNotEmpty(), function ($query) use ($subjectIds) {
+                $query->where(function ($levelQuery) use ($subjectIds) {
+                    foreach ($subjectIds as $subjectId) {
+                        $levelQuery->orWhereJsonContains('subject_id', $subjectId);
+                    }
+                });
+            })
+            ->get();
+
+        $teachers->getCollection()->transform(function (Teacher $teacher) use ($subjects, $yearLevels) {
+            $teacherId = (int) $teacher->id;
+
+            $teacher->assigned_subjects = $subjects
+                ->filter(fn (Subject $subject) => collect($subject->teacher_id ?? [])->map(fn ($id) => (int) $id)->contains($teacherId))
+                ->flatMap(function (Subject $subject) use ($teacherId, $yearLevels) {
+                    $matchingYearLevels = $yearLevels
+                        ->filter(function (EducationLevel $yearLevel) use ($subject, $teacherId) {
+                            $subjectKey = (string) $subject->id;
+                            $levelSubjectIds = collect($yearLevel->subject_id ?? [])->map(fn ($id) => (int) $id);
+                            $assignedTeacherId = data_get($yearLevel->subject_teacher_map ?? [], $subjectKey);
+
+                            return $levelSubjectIds->contains((int) $subject->id)
+                                && (! $assignedTeacherId || (int) $assignedTeacherId === $teacherId);
+                        });
+
+                    if ($matchingYearLevels->isEmpty()) {
+                        return [[
+                            'subject_id' => $subject->id,
+                            'subject_code' => $subject->code,
+                            'subject_name' => $subject->name,
+                            'year_level_id' => null,
+                            'year_level' => null,
+                            'department' => $subject->department?->name,
+                            'program_strand' => $subject->program?->name ?? $subject->strand?->name,
+                        ]];
+                    }
+
+                    return $matchingYearLevels
+                        ->map(fn (EducationLevel $yearLevel) => [
+                            'subject_id' => $subject->id,
+                            'subject_code' => $subject->code,
+                            'subject_name' => $subject->name,
+                            'year_level_id' => $yearLevel->id,
+                            'year_level' => trim(($yearLevel->year_level ?? '-') . ' - ' . ($yearLevel->section ?? '-')),
+                            'department' => $yearLevel->department?->name ?? $subject->department?->name,
+                            'program_strand' => $yearLevel->program?->name ?? $yearLevel->strand?->name ?? $subject->program?->name ?? $subject->strand?->name,
+                        ]);
+                })
+                ->unique(fn ($item) => $item['subject_id'] . ':' . $item['year_level_id'])
+                ->values()
+                ->all();
+
+            return $teacher;
+        });
+
         return Inertia::render('Admin/Teachers', [
             'teachers'      => $teachers,
             'filters'       => [
                 'search' => $search, 
                 'branch_id' => $branchId,
                 'department_id' => $departmentId,
+                'department_type' => $departmentType,
                 'program_id' => $programId,
+                'program_name' => $programName,
+                'strand_id' => $strandId,
+                'strand_name' => $strandName,
                 'per_page' => $perPage,
             ],
             'branches'      => $branches,

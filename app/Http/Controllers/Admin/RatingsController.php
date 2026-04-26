@@ -54,14 +54,31 @@ class RatingsController extends Controller
             ->first();
     }
 
+    private function academicYearFromId(?int $id): ?object
+    {
+        if (! $id) {
+            return $this->activeAcademicYear();
+        }
+
+        return DB::table('academic_year')
+            ->select('id', 'from_year', 'to_year')
+            ->where('id', $id)
+            ->first();
+    }
+
     private function peerQuestionnaireTypeId(): ?int
+    {
+        return $this->questionnaireTypeIdByCode('QTYPE-PEER');
+    }
+
+    private function questionnaireTypeIdByCode(string $code): ?int
     {
         if (! Schema::hasTable('questionnaire_type')) {
             return null;
         }
 
         $id = DB::table('questionnaire_type')
-            ->where('code', 'QTYPE-PEER')
+            ->where('code', $code)
             ->value('id');
 
         return $id ? (int) $id : null;
@@ -180,28 +197,268 @@ class RatingsController extends Controller
 
     public function subjectArchives(Request $request)
     {
-        $request->merge(['archived' => true]);
-        return $this->subjectRatings($request);
+        $archiveYearId = $request->integer('archive_year_id');
+        $folders = $this->subjectArchiveFolders($request);
+
+        if (! $archiveYearId) {
+            return Inertia::render('Admin/Ratings', [
+                'ratings'    => $this->paginateCollection(collect(), $request),
+                'ratingType' => 'subject',
+                'filters'    => [
+                    'search' => $request->input('search', ''),
+                    'school_year' => '',
+                    'archive_year_id' => '',
+                    'archive_mode' => true,
+                ],
+                'schoolYears' => $this->schoolYears(),
+                'subjectRatingContext' => null,
+                'subjectArchiveContext' => [
+                    'folders' => $folders,
+                    'selectedFolder' => null,
+                ],
+            ]);
+        }
+
+        $selectedFolder = collect($folders)->firstWhere('id', $archiveYearId);
+        abort_unless($selectedFolder, 404);
+
+        $request->merge([
+            'school_year' => $selectedFolder['school_year'],
+            'archive_academic_year_id' => $archiveYearId,
+        ]);
+
+        $subjectRatingContext = $this->subjectRatingContext($request);
+        $request->merge([
+            'branch_id' => $subjectRatingContext['selectedBranchId'],
+            'department_id' => $subjectRatingContext['selectedDepartmentId'],
+            'program_id' => $subjectRatingContext['selectedProgramId'],
+            'strand_id' => $subjectRatingContext['selectedStrandId'],
+        ]);
+        $ratings = $this->subjectQuery($request)
+            ->orderByDesc('rs.id')
+            ->paginate(20)
+            ->withQueryString();
+
+        return Inertia::render('Admin/Ratings', [
+            'ratings'    => $ratings,
+            'ratingType' => 'subject',
+            'filters'    => [
+                'search' => $request->input('search', ''),
+                'school_year' => $selectedFolder['school_year'],
+                'archive_year_id' => $archiveYearId,
+                'archive_mode' => true,
+                'branch_id' => $subjectRatingContext['selectedBranchId'],
+                'department_id' => $subjectRatingContext['selectedDepartmentId'],
+                'program_id' => $subjectRatingContext['selectedProgramId'],
+                'strand_id' => $subjectRatingContext['selectedStrandId'],
+            ],
+            'schoolYears' => $this->schoolYears(),
+            'subjectRatingContext' => $subjectRatingContext,
+            'subjectArchiveContext' => [
+                'folders' => $folders,
+                'selectedFolder' => $selectedFolder,
+            ],
+        ]);
     }
 
     public function peerArchives(Request $request)
     {
-        $request->merge(['archived' => true]);
-        return $this->peerRatings($request);
+        $archiveYearId = $request->integer('archive_year_id');
+        $folders = $this->peerArchiveFolders($request);
+
+        if (! $archiveYearId) {
+            return Inertia::render('Admin/Ratings', [
+                'ratings'    => $this->paginateCollection(collect(), $request, 15),
+                'ratingType' => 'peer',
+                'filters'    => [
+                    'search' => $request->input('search', ''),
+                    'school_year' => '',
+                    'archive_year_id' => '',
+                    'archive_mode' => true,
+                ],
+                'schoolYears' => $this->schoolYears(),
+                'branches' => collect(),
+                'departments' => collect(),
+                'programs' => collect(),
+                'strands' => collect(),
+                'isBranchAdmin' => $this->isBranchAdmin(),
+                'selectedBranchId' => null,
+                'scopedBranchId' => $this->scopedBranchId(),
+                'peerArchiveContext' => [
+                    'folders' => $folders,
+                    'selectedFolder' => null,
+                ],
+            ]);
+        }
+
+        $selectedFolder = collect($folders)->firstWhere('id', $archiveYearId);
+        abort_unless($selectedFolder, 404);
+
+        $request->merge([
+            'school_year' => $selectedFolder['school_year'],
+            'archive_academic_year_id' => $archiveYearId,
+        ]);
+
+        $scopedId = $this->scopedBranchId();
+        $branchId = $scopedId ?? $request->input('branch_id');
+        $departmentGroup = $request->input('department_group', '');
+        $programGroup = $request->input('program_group', '');
+        $strandGroup = $request->input('strand_group', '');
+        $perPage = $request->integer('per_page', 15);
+        $perPage = in_array($perPage, [10, 15, 25, 50, 100], true) ? $perPage : 15;
+
+        $ratings = $this->peerArchiveRatings($request, $archiveYearId, $perPage);
+
+        return Inertia::render('Admin/Ratings', [
+            'ratings'    => $ratings,
+            'ratingType' => 'peer',
+            'filters'    => [
+                'search' => $request->input('search', ''),
+                'school_year' => $selectedFolder['school_year'],
+                'archive_year_id' => $archiveYearId,
+                'archive_mode' => true,
+                'branch_id' => $branchId,
+                'department_group' => $departmentGroup,
+                'program_group' => $programGroup,
+                'strand_group' => $strandGroup,
+                'per_page' => $perPage,
+            ],
+            'schoolYears' => $this->schoolYears(),
+            'branches' => Branch::query()
+                ->select('id', 'name', 'code')
+                ->where('is_deleted', 0)
+                ->where('code', '!=', 'OVERALL')
+                ->when($scopedId, fn ($query) => $query->where('id', $scopedId))
+                ->orderBy('name')
+                ->get(),
+            'departments' => Department::query()
+                ->select('id', 'name', 'code', 'branch_id', 'is_activated')
+                ->where('is_deleted', 0)
+                ->where('is_activated', 1)
+                ->when($scopedId, fn ($query) => $query->where('branch_id', $scopedId))
+                ->orderBy('name')
+                ->get(),
+            'programs' => Program::query()
+                ->select('id', 'name', 'department_id')
+                ->where('is_deleted', 0)
+                ->when($scopedId, fn ($query) => $query->whereHas('department', fn ($department) => $department->where('branch_id', $scopedId)))
+                ->orderBy('name')
+                ->get(),
+            'strands' => Strand::query()
+                ->select('id', 'name', 'department_id')
+                ->where('is_deleted', 0)
+                ->when($scopedId, fn ($query) => $query->whereHas('department', fn ($department) => $department->where('branch_id', $scopedId)))
+                ->orderBy('name')
+                ->get(),
+            'isBranchAdmin' => $this->isBranchAdmin(),
+            'selectedBranchId' => $branchId ? (int) $branchId : null,
+            'scopedBranchId' => $scopedId,
+            'peerArchiveContext' => [
+                'folders' => $folders,
+                'selectedFolder' => $selectedFolder,
+            ],
+        ]);
+    }
+
+    public function headArchives(Request $request)
+    {
+        $archiveYearId = $request->integer('archive_year_id');
+        $folders = $this->headArchiveFolders($request);
+
+        if (! $archiveYearId) {
+            return Inertia::render('Admin/Ratings', [
+                'ratings'    => $this->paginateCollection(collect(), $request, 15),
+                'ratingType' => 'head',
+                'filters'    => [
+                    'search' => $request->input('search', ''),
+                    'school_year' => '',
+                    'archive_year_id' => '',
+                    'archive_mode' => true,
+                ],
+                'schoolYears' => $this->schoolYears(),
+                'headArchiveContext' => [
+                    'folders' => $folders,
+                    'selectedFolder' => null,
+                ],
+            ]);
+        }
+
+        $selectedFolder = collect($folders)->firstWhere('id', $archiveYearId);
+        abort_unless($selectedFolder, 404);
+
+        $request->merge([
+            'school_year' => $selectedFolder['school_year'],
+            'archive_academic_year_id' => $archiveYearId,
+        ]);
+
+        return Inertia::render('Admin/Ratings', [
+            'ratings'    => $this->schoolHeadSubmissionRatings($request),
+            'ratingType' => 'head',
+            'filters'    => [
+                'search' => $request->input('search', ''),
+                'school_year' => $selectedFolder['school_year'],
+                'archive_year_id' => $archiveYearId,
+                'archive_mode' => true,
+            ],
+            'schoolYears' => $this->schoolYears(),
+            'headArchiveContext' => [
+                'folders' => $folders,
+                'selectedFolder' => $selectedFolder,
+            ],
+        ]);
     }
 
     public function employeeArchives(Request $request)
     {
-        $request->merge(['archived' => true]);
-        return $this->employeeRatings($request);
+        $archiveYearId = $request->integer('archive_year_id');
+        $folders = $this->employeeArchiveFolders($request);
+
+        if (! $archiveYearId) {
+            return Inertia::render('Admin/Ratings', [
+                'ratings'    => $this->paginateCollection(collect(), $request, 15),
+                'ratingType' => 'employee',
+                'filters'    => [
+                    'search' => $request->input('search', ''),
+                    'school_year' => '',
+                    'archive_year_id' => '',
+                    'archive_mode' => true,
+                ],
+                'schoolYears' => $this->schoolYears(),
+                'employeeArchiveContext' => [
+                    'folders' => $folders,
+                    'selectedFolder' => null,
+                ],
+            ]);
+        }
+
+        $selectedFolder = collect($folders)->firstWhere('id', $archiveYearId);
+        abort_unless($selectedFolder, 404);
+
+        $request->merge([
+            'school_year' => $selectedFolder['school_year'],
+            'archive_academic_year_id' => $archiveYearId,
+        ]);
+
+        return Inertia::render('Admin/Ratings', [
+            'ratings'    => $this->employeeSubmissionRatings($request),
+            'ratingType' => 'employee',
+            'filters'    => [
+                'search' => $request->input('search', ''),
+                'school_year' => $selectedFolder['school_year'],
+                'archive_year_id' => $archiveYearId,
+                'archive_mode' => true,
+            ],
+            'schoolYears' => $this->schoolYears(),
+            'employeeArchiveContext' => [
+                'folders' => $folders,
+                'selectedFolder' => $selectedFolder,
+            ],
+        ]);
     }
 
     public function headRatings(Request $request)
     {
-        $ratings = $this->headQuery($request)
-            ->orderByDesc('rh.id')
-            ->paginate(20)
-            ->withQueryString();
+        $ratings = $this->schoolHeadSubmissionRatings($request);
 
         return Inertia::render('Admin/Ratings', [
             'ratings'    => $ratings,
@@ -228,10 +485,11 @@ class RatingsController extends Controller
 
     public function exportHead(Request $request): StreamedResponse
     {
-        $rows = $this->headQuery($request)->orderByDesc('rh.id')->get();
-        return $this->streamCsv('head-ratings', ['#', 'Evaluatee', 'Rating', 'School Year'], $rows, fn ($r) => [
+        $rows = $this->schoolHeadSubmissionRatings($request, false);
+        return $this->streamCsv('school-head-ratings', ['#', 'School Head', 'Rating', 'Responses', 'School Year'], $rows, fn ($r) => [
             $r->rating_id, $r->teacher_name,
             $r->overall_rating ? number_format((float) $r->overall_rating, 2) : '',
+            $r->submission_count ?? 0,
             $r->school_year,
         ]);
     }
@@ -261,6 +519,7 @@ class RatingsController extends Controller
                 DB::raw("CONCAT(e.firstname, ' ', e.lastname) as teacher_name"),
                 DB::raw("JSON_UNQUOTE(JSON_EXTRACT(rh.overall_ratings, '$.average')) as overall_rating"),
                 'rh.submission_count',
+                'rh.item_ratings',
                 DB::raw("CONCAT(ay.from_year, '-', ay.to_year) as school_year")
             )
             ->when($branchId, fn ($q) => $q->where('e.branch_id', $branchId))
@@ -269,6 +528,237 @@ class RatingsController extends Controller
                     ->orWhere('e.lastname', 'like', "%{$search}%");
             }))
             ->when($schoolYear, fn ($q) => $q->whereRaw("CONCAT(ay.from_year, '-', ay.to_year) = ?", [$schoolYear]));
+    }
+
+    private function schoolHeadSubmissionRatings(Request $request, bool $paginate = true): LengthAwarePaginator|Collection
+    {
+        $search = trim((string) $request->input('search', ''));
+        $schoolYear = trim((string) $request->input('school_year', ''));
+        $archiveAcademicYearId = $request->integer('archive_academic_year_id');
+        $branchId = $this->scopedBranchId();
+        $questionnaireTypeId = $this->questionnaireTypeIdByCode('QTYPE-HEAD');
+
+        if (
+            ! Schema::hasTable('evaluation_submissions')
+            || ! Schema::hasColumn('evaluation_submissions', 'teacher_id')
+            || ! Schema::hasColumn('evaluation_submissions', 'questionnaire_type_id')
+            || ! $questionnaireTypeId
+        ) {
+            $items = collect();
+            return $paginate ? $this->paginateCollection($items, $request) : $items;
+        }
+
+        $rows = DB::table('evaluation_submissions as es')
+            ->leftJoin('teacher as t', 'es.teacher_id', '=', 't.id')
+            ->leftJoin('academic_year as ay', 'es.academic_year_id', '=', 'ay.id')
+            ->select(
+                'es.id',
+                'es.teacher_id',
+                'es.questionnaire_id',
+                'es.answers',
+                DB::raw("TRIM(CONCAT(t.firstname, ' ', COALESCE(t.middlename, ''), ' ', t.lastname)) as teacher_name"),
+                DB::raw("COALESCE(t.role, 'School Head') as teacher_role"),
+                DB::raw("CONCAT(ay.from_year, '-', ay.to_year) as school_year"),
+                'ay.term as semester'
+            )
+            ->where('es.questionnaire_type_id', $questionnaireTypeId)
+            ->when($archiveAcademicYearId, fn ($query) => $query->where('es.academic_year_id', $archiveAcademicYearId))
+            ->when($branchId, fn ($query) => $query->where('t.branch_id', $branchId))
+            ->when($schoolYear, fn ($query) => $query->whereRaw("CONCAT(ay.from_year, '-', ay.to_year) = ?", [$schoolYear]))
+            ->when($search, fn ($query) => $query->where(function ($sub) use ($search) {
+                $sub->where('t.firstname', 'like', "%{$search}%")
+                    ->orWhere('t.lastname', 'like', "%{$search}%")
+                    ->orWhere('t.role', 'like', "%{$search}%");
+            }))
+            ->orderByDesc('es.id')
+            ->get();
+
+        $questionnaireDetails = $this->peerQuestionnaireDetails(
+            $rows->pluck('questionnaire_id')->filter()->map(fn ($id) => (int) $id)->unique()->values()->all()
+        );
+
+        $items = $rows
+            ->groupBy(fn (object $row) => ((int) $row->teacher_id) . ':' . ((int) $row->questionnaire_id) . ':' . ($row->school_year ?? ''))
+            ->map(function (Collection $rows) use ($questionnaireDetails) {
+                $first = $rows->first();
+                $questionBuckets = [];
+
+                $rows->each(function (object $row) use (&$questionBuckets) {
+                    $answers = json_decode((string) ($row->answers ?? '[]'), true);
+
+                    if (! is_array($answers)) {
+                        return;
+                    }
+
+                    foreach ($answers as $answer) {
+                        $questionId = (int) ($answer['question_id'] ?? 0);
+                        $rating = $answer['rating'] ?? null;
+
+                        if (! $questionId || ! is_numeric($rating)) {
+                            continue;
+                        }
+
+                        $questionBuckets[$questionId] ??= [];
+                        $questionBuckets[$questionId][] = (float) $rating;
+                    }
+                });
+
+                $questionRatings = collect($questionBuckets)
+                    ->mapWithKeys(fn (array $values, int $questionId) => [
+                        (string) $questionId => [
+                            'average' => count($values) ? round(array_sum($values) / count($values), 2) : null,
+                            'count' => count($values),
+                        ],
+                    ])
+                    ->all();
+                $averages = collect($questionRatings)->pluck('average')->filter(fn ($value) => $value !== null);
+                $questionnaireId = $first->questionnaire_id ? (int) $first->questionnaire_id : null;
+
+                return (object) [
+                    'rating_id' => $first->id,
+                    'teacher_id' => $first->teacher_id,
+                    'teacher_name' => $first->teacher_name ?: 'School Head',
+                    'teacher_role' => $first->teacher_role ?: 'School Head',
+                    'overall_rating' => $averages->isNotEmpty() ? round($averages->avg(), 2) : null,
+                    'submission_count' => $rows->count(),
+                    'school_year' => $first->school_year,
+                    'semester' => $first->semester,
+                    'questionnaire_id' => $questionnaireId,
+                    'questionnaire' => $questionnaireId ? ($questionnaireDetails[$questionnaireId] ?? null) : null,
+                    'question_ratings' => $questionRatings,
+                ];
+            })
+            ->sortByDesc('rating_id')
+            ->values();
+
+        return $paginate ? $this->paginateCollection($items, $request) : $items;
+    }
+
+    private function employeeSubmissionRatings(Request $request, bool $paginate = true): LengthAwarePaginator|Collection
+    {
+        $search = trim((string) $request->input('search', ''));
+        $schoolYear = trim((string) $request->input('school_year', ''));
+        $archiveAcademicYearId = $request->integer('archive_academic_year_id');
+        $branchId = $this->scopedBranchId();
+        $questionnaireTypeId = $this->questionnaireTypeIdByCode('QTYPE-EMPLOYEE');
+
+        if (
+            ! Schema::hasTable('evaluation_submissions')
+            || ! Schema::hasColumn('evaluation_submissions', 'employee_id')
+            || ! Schema::hasColumn('evaluation_submissions', 'questionnaire_type_id')
+            || ! $questionnaireTypeId
+        ) {
+            $items = collect();
+            return $paginate ? $this->paginateCollection($items, $request) : $items;
+        }
+
+        $rows = DB::table('evaluation_submissions as es')
+            ->leftJoin('employee as e', 'es.employee_id', '=', 'e.id')
+            ->leftJoin('employee_department as ed', 'e.employee_department_id', '=', 'ed.id')
+            ->leftJoin('academic_year as ay', 'es.academic_year_id', '=', 'ay.id')
+            ->select(
+                'es.id',
+                'es.employee_id',
+                'es.questionnaire_id',
+                'es.answers',
+                DB::raw("TRIM(CONCAT(e.firstname, ' ', COALESCE(e.middlename, ''), ' ', e.lastname)) as teacher_name"),
+                DB::raw("COALESCE(e.role, 'Employee') as teacher_role"),
+                'ed.name as department_name',
+                DB::raw("CONCAT(ay.from_year, '-', ay.to_year) as school_year"),
+                'ay.term as semester'
+            )
+            ->where('es.questionnaire_type_id', $questionnaireTypeId)
+            ->whereNotNull('es.employee_id')
+            ->when($archiveAcademicYearId, fn ($query) => $query->where('es.academic_year_id', $archiveAcademicYearId))
+            ->when($branchId, fn ($query) => $query->where('e.branch_id', $branchId))
+            ->when($schoolYear, fn ($query) => $query->whereRaw("CONCAT(ay.from_year, '-', ay.to_year) = ?", [$schoolYear]))
+            ->when($search, fn ($query) => $query->where(function ($sub) use ($search) {
+                $sub->where('e.firstname', 'like', "%{$search}%")
+                    ->orWhere('e.lastname', 'like', "%{$search}%")
+                    ->orWhere('e.role', 'like', "%{$search}%")
+                    ->orWhere('ed.name', 'like', "%{$search}%");
+            }))
+            ->orderByDesc('es.id')
+            ->get();
+
+        $questionnaireDetails = $this->peerQuestionnaireDetails(
+            $rows->pluck('questionnaire_id')->filter()->map(fn ($id) => (int) $id)->unique()->values()->all()
+        );
+
+        $items = $rows
+            ->groupBy(fn (object $row) => ((int) $row->employee_id) . ':' . ((int) $row->questionnaire_id) . ':' . ($row->school_year ?? ''))
+            ->map(function (Collection $rows) use ($questionnaireDetails) {
+                $first = $rows->first();
+                $questionBuckets = [];
+
+                $rows->each(function (object $row) use (&$questionBuckets) {
+                    $answers = json_decode((string) ($row->answers ?? '[]'), true);
+
+                    if (! is_array($answers)) {
+                        return;
+                    }
+
+                    foreach ($answers as $answer) {
+                        $questionId = (int) ($answer['question_id'] ?? 0);
+                        $rating = $answer['rating'] ?? null;
+
+                        if (! $questionId || ! is_numeric($rating)) {
+                            continue;
+                        }
+
+                        $questionBuckets[$questionId] ??= [];
+                        $questionBuckets[$questionId][] = (float) $rating;
+                    }
+                });
+
+                $questionRatings = collect($questionBuckets)
+                    ->mapWithKeys(fn (array $values, int $questionId) => [
+                        (string) $questionId => [
+                            'average' => count($values) ? round(array_sum($values) / count($values), 2) : null,
+                            'count' => count($values),
+                        ],
+                    ])
+                    ->all();
+                $averages = collect($questionRatings)->pluck('average')->filter(fn ($value) => $value !== null);
+                $questionnaireId = $first->questionnaire_id ? (int) $first->questionnaire_id : null;
+
+                return (object) [
+                    'rating_id' => $first->id,
+                    'employee_id' => $first->employee_id,
+                    'teacher_name' => $first->teacher_name ?: 'Employee',
+                    'teacher_role' => $first->teacher_role ?: 'Employee',
+                    'department_name' => $first->department_name,
+                    'overall_rating' => $averages->isNotEmpty() ? round($averages->avg(), 2) : null,
+                    'submission_count' => $rows->count(),
+                    'school_year' => $first->school_year,
+                    'semester' => $first->semester,
+                    'questionnaire_id' => $questionnaireId,
+                    'questionnaire' => $questionnaireId ? ($questionnaireDetails[$questionnaireId] ?? null) : null,
+                    'question_ratings' => $questionRatings,
+                ];
+            })
+            ->sortByDesc('rating_id')
+            ->values();
+
+        return $paginate ? $this->paginateCollection($items, $request) : $items;
+    }
+
+    private function paginateCollection(Collection $items, Request $request, int $defaultPerPage = 20): LengthAwarePaginator
+    {
+        $perPage = $request->integer('per_page', $defaultPerPage);
+        $perPage = in_array($perPage, [10, 15, 20, 25, 50, 100], true) ? $perPage : $defaultPerPage;
+        $page = max(1, $request->integer('page', 1));
+
+        return new LengthAwarePaginator(
+            $items->forPage($page, $perPage)->values(),
+            $items->count(),
+            $perPage,
+            $page,
+            [
+                'path' => $request->url(),
+                'query' => $request->query(),
+            ]
+        );
     }
 
     private function branchQuery(Request $request)
@@ -464,6 +954,309 @@ class RatingsController extends Controller
             ->when($schoolYear, fn ($q) => $q->whereRaw("CONCAT(ay.from_year, '-', ay.to_year) = ?", [$schoolYear]));
     }
 
+    private function subjectArchiveFolders(Request $request): array
+    {
+        if (! Schema::hasTable('academic_year') || ! Schema::hasTable('evaluation_submissions')) {
+            return [];
+        }
+
+        $branchId = $this->scopedBranchId();
+        $activeAcademicYearId = $this->activeAcademicYear()?->id;
+        $subjectTypeId = $this->questionnaireTypeIdByCode('QTYPE-SUBJECT');
+
+        return DB::table('academic_year as ay')
+            ->join('evaluation_submissions as es', 'es.academic_year_id', '=', 'ay.id')
+            ->leftJoin('subject as s', 'es.subject_id', '=', 's.id')
+            ->leftJoin('department as d', 's.department_id', '=', 'd.id')
+            ->select(
+                'ay.id',
+                'ay.from_year',
+                'ay.to_year',
+                'ay.term',
+                DB::raw('COUNT(es.id) as submission_count'),
+                DB::raw('COUNT(DISTINCT es.subject_id) as subject_count')
+            )
+            ->whereNotNull('es.subject_id')
+            ->when($subjectTypeId, fn ($query) => $query->where('es.questionnaire_type_id', $subjectTypeId))
+            ->when($activeAcademicYearId, fn ($query) => $query->where('ay.id', '!=', $activeAcademicYearId))
+            ->when($branchId, fn ($query) => $query->where('d.branch_id', $branchId))
+            ->groupBy('ay.id', 'ay.from_year', 'ay.to_year', 'ay.term')
+            ->orderByDesc('ay.from_year')
+            ->orderByDesc('ay.to_year')
+            ->orderByDesc('ay.id')
+            ->get()
+            ->map(fn (object $period) => [
+                'id' => (int) $period->id,
+                'key' => (string) $period->id,
+                'school_year' => "{$period->from_year}-{$period->to_year}",
+                'term' => $period->term,
+                'label' => trim("{$period->from_year}-{$period->to_year} {$period->term}"),
+                'submission_count' => (int) $period->submission_count,
+                'subject_count' => (int) $period->subject_count,
+            ])
+            ->all();
+    }
+
+    private function peerArchiveFolders(Request $request): array
+    {
+        if (! Schema::hasTable('academic_year') || ! Schema::hasTable('evaluation_submissions')) {
+            return [];
+        }
+
+        $branchId = $this->scopedBranchId();
+        $activeAcademicYearId = $this->activeAcademicYear()?->id;
+        $peerTypeId = $this->peerQuestionnaireTypeId();
+
+        if (! $peerTypeId || ! Schema::hasColumn('evaluation_submissions', 'questionnaire_type_id')) {
+            return [];
+        }
+
+        return DB::table('academic_year as ay')
+            ->join('evaluation_submissions as es', 'es.academic_year_id', '=', 'ay.id')
+            ->leftJoin('teacher as t', 'es.teacher_id', '=', 't.id')
+            ->select(
+                'ay.id',
+                'ay.from_year',
+                'ay.to_year',
+                'ay.term',
+                DB::raw('COUNT(es.id) as submission_count'),
+                DB::raw('COUNT(DISTINCT es.teacher_id) as teacher_count')
+            )
+            ->where('es.questionnaire_type_id', $peerTypeId)
+            ->when($activeAcademicYearId, fn ($query) => $query->where('ay.id', '!=', $activeAcademicYearId))
+            ->when($branchId, fn ($query) => $query->where('t.branch_id', $branchId))
+            ->groupBy('ay.id', 'ay.from_year', 'ay.to_year', 'ay.term')
+            ->orderByDesc('ay.from_year')
+            ->orderByDesc('ay.to_year')
+            ->orderByDesc('ay.id')
+            ->get()
+            ->map(fn (object $period) => [
+                'id' => (int) $period->id,
+                'key' => (string) $period->id,
+                'school_year' => "{$period->from_year}-{$period->to_year}",
+                'term' => $period->term,
+                'label' => trim("{$period->from_year}-{$period->to_year} {$period->term}"),
+                'submission_count' => (int) $period->submission_count,
+                'record_count' => (int) $period->teacher_count,
+            ])
+            ->all();
+    }
+
+    private function headArchiveFolders(Request $request): array
+    {
+        if (! Schema::hasTable('academic_year') || ! Schema::hasTable('evaluation_submissions')) {
+            return [];
+        }
+
+        $branchId = $this->scopedBranchId();
+        $activeAcademicYearId = $this->activeAcademicYear()?->id;
+        $headTypeId = $this->questionnaireTypeIdByCode('QTYPE-HEAD');
+
+        if (! $headTypeId || ! Schema::hasColumn('evaluation_submissions', 'questionnaire_type_id')) {
+            return [];
+        }
+
+        return DB::table('academic_year as ay')
+            ->join('evaluation_submissions as es', 'es.academic_year_id', '=', 'ay.id')
+            ->leftJoin('teacher as t', 'es.teacher_id', '=', 't.id')
+            ->select(
+                'ay.id',
+                'ay.from_year',
+                'ay.to_year',
+                'ay.term',
+                DB::raw('COUNT(es.id) as submission_count'),
+                DB::raw('COUNT(DISTINCT es.teacher_id) as teacher_count')
+            )
+            ->where('es.questionnaire_type_id', $headTypeId)
+            ->when($activeAcademicYearId, fn ($query) => $query->where('ay.id', '!=', $activeAcademicYearId))
+            ->when($branchId, fn ($query) => $query->where('t.branch_id', $branchId))
+            ->groupBy('ay.id', 'ay.from_year', 'ay.to_year', 'ay.term')
+            ->orderByDesc('ay.from_year')
+            ->orderByDesc('ay.to_year')
+            ->orderByDesc('ay.id')
+            ->get()
+            ->map(fn (object $period) => [
+                'id' => (int) $period->id,
+                'key' => (string) $period->id,
+                'school_year' => "{$period->from_year}-{$period->to_year}",
+                'term' => $period->term,
+                'label' => trim("{$period->from_year}-{$period->to_year} {$period->term}"),
+                'submission_count' => (int) $period->submission_count,
+                'record_count' => (int) $period->teacher_count,
+            ])
+            ->all();
+    }
+
+    private function employeeArchiveFolders(Request $request): array
+    {
+        if (! Schema::hasTable('academic_year') || ! Schema::hasTable('evaluation_submissions')) {
+            return [];
+        }
+
+        $branchId = $this->scopedBranchId();
+        $activeAcademicYearId = $this->activeAcademicYear()?->id;
+        $employeeTypeId = $this->questionnaireTypeIdByCode('QTYPE-EMPLOYEE');
+
+        if (! $employeeTypeId || ! Schema::hasColumn('evaluation_submissions', 'questionnaire_type_id')) {
+            return [];
+        }
+
+        return DB::table('academic_year as ay')
+            ->join('evaluation_submissions as es', 'es.academic_year_id', '=', 'ay.id')
+            ->leftJoin('employee as e', 'es.employee_id', '=', 'e.id')
+            ->select(
+                'ay.id',
+                'ay.from_year',
+                'ay.to_year',
+                'ay.term',
+                DB::raw('COUNT(es.id) as submission_count'),
+                DB::raw('COUNT(DISTINCT es.employee_id) as employee_count')
+            )
+            ->where('es.questionnaire_type_id', $employeeTypeId)
+            ->when($activeAcademicYearId, fn ($query) => $query->where('ay.id', '!=', $activeAcademicYearId))
+            ->when($branchId, fn ($query) => $query->where('e.branch_id', $branchId))
+            ->groupBy('ay.id', 'ay.from_year', 'ay.to_year', 'ay.term')
+            ->orderByDesc('ay.from_year')
+            ->orderByDesc('ay.to_year')
+            ->orderByDesc('ay.id')
+            ->get()
+            ->map(fn (object $period) => [
+                'id' => (int) $period->id,
+                'key' => (string) $period->id,
+                'school_year' => "{$period->from_year}-{$period->to_year}",
+                'term' => $period->term,
+                'label' => trim("{$period->from_year}-{$period->to_year} {$period->term}"),
+                'submission_count' => (int) $period->submission_count,
+                'record_count' => (int) $period->employee_count,
+            ])
+            ->all();
+    }
+
+    private function peerArchiveRatings(Request $request, int $academicYearId, int $perPage): LengthAwarePaginator
+    {
+        $peerTypeId = $this->peerQuestionnaireTypeId();
+
+        if (! Schema::hasTable('evaluation_submissions') || ! Schema::hasColumn('evaluation_submissions', 'questionnaire_type_id') || ! $peerTypeId) {
+            return $this->paginateCollection(collect(), $request, $perPage);
+        }
+
+        $branchId = $this->scopedBranchId() ?? $request->input('branch_id');
+        $departmentGroup = strtolower(trim((string) $request->input('department_group', '')));
+        $programGroup = strtolower(trim((string) $request->input('program_group', '')));
+        $strandGroup = strtolower(trim((string) $request->input('strand_group', '')));
+        $search = trim((string) $request->input('search', ''));
+
+        $rows = DB::table('evaluation_submissions as es')
+            ->leftJoin('teacher as t', 'es.teacher_id', '=', 't.id')
+            ->leftJoin('branch as b', 't.branch_id', '=', 'b.id')
+            ->leftJoin('department as d', 't.department_id', '=', 'd.id')
+            ->leftJoin('program as p', 't.program_id', '=', 'p.id')
+            ->leftJoin('strand as s', 't.strand_id', '=', 's.id')
+            ->leftJoin('academic_year as ay', 'es.academic_year_id', '=', 'ay.id')
+            ->select(
+                'es.id',
+                'es.teacher_id',
+                'es.questionnaire_id',
+                'es.answers',
+                't.branch_id',
+                't.department_id',
+                't.program_id',
+                't.strand_id',
+                DB::raw("TRIM(CONCAT(t.firstname, ' ', COALESCE(t.middlename, ''), ' ', t.lastname)) as teacher_name"),
+                DB::raw("COALESCE(t.role, 'Teacher') as teacher_role"),
+                'b.name as branch_name',
+                'd.name as department_name',
+                'd.code as department_code',
+                'p.name as program_name',
+                's.name as strand_name',
+                DB::raw("CONCAT(ay.from_year, '-', ay.to_year) as school_year")
+            )
+            ->where('es.academic_year_id', $academicYearId)
+            ->where('es.questionnaire_type_id', $peerTypeId)
+            ->whereNotNull('es.teacher_id')
+            ->when($branchId, fn ($query) => $query->where('t.branch_id', $branchId))
+            ->when($departmentGroup !== '', fn ($query) => $query->whereRaw('LOWER(TRIM(COALESCE(d.name, ""))) = ?', [$departmentGroup]))
+            ->when($programGroup !== '', fn ($query) => $query->whereRaw('LOWER(TRIM(COALESCE(p.name, ""))) = ?', [$programGroup]))
+            ->when($strandGroup !== '', fn ($query) => $query->whereRaw('LOWER(TRIM(COALESCE(s.name, ""))) = ?', [$strandGroup]))
+            ->when($search, fn ($query) => $query->where(function ($sub) use ($search) {
+                $sub->where('t.firstname', 'like', "%{$search}%")
+                    ->orWhere('t.lastname', 'like', "%{$search}%")
+                    ->orWhere('d.name', 'like', "%{$search}%")
+                    ->orWhere('p.name', 'like', "%{$search}%")
+                    ->orWhere('s.name', 'like', "%{$search}%");
+            }))
+            ->orderByDesc('es.id')
+            ->get();
+
+        $questionnaireDetails = $this->peerQuestionnaireDetails(
+            $rows->pluck('questionnaire_id')->filter()->map(fn ($id) => (int) $id)->unique()->values()->all()
+        );
+
+        $items = $rows
+            ->groupBy(fn (object $row) => ((int) $row->teacher_id) . ':' . ((int) $row->questionnaire_id))
+            ->map(function (Collection $rows) use ($questionnaireDetails) {
+                $first = $rows->first();
+                $questionBuckets = [];
+
+                $rows->each(function (object $row) use (&$questionBuckets) {
+                    $answers = json_decode((string) ($row->answers ?? '[]'), true);
+
+                    if (! is_array($answers)) {
+                        return;
+                    }
+
+                    foreach ($answers as $answer) {
+                        $questionId = (int) ($answer['question_id'] ?? 0);
+                        $rating = $answer['rating'] ?? null;
+
+                        if (! $questionId || ! is_numeric($rating)) {
+                            continue;
+                        }
+
+                        $questionBuckets[$questionId] ??= [];
+                        $questionBuckets[$questionId][] = (float) $rating;
+                    }
+                });
+
+                $questionRatings = collect($questionBuckets)
+                    ->mapWithKeys(fn (array $values, int $questionId) => [
+                        (string) $questionId => [
+                            'average' => count($values) ? round(array_sum($values) / count($values), 2) : null,
+                            'count' => count($values),
+                        ],
+                    ])
+                    ->all();
+                $questionnaireId = $first->questionnaire_id ? (int) $first->questionnaire_id : null;
+                $questionnaire = $questionnaireId ? ($questionnaireDetails[$questionnaireId] ?? null) : null;
+
+                return (object) [
+                    'rating_id' => $first->id,
+                    'teacher_id' => $first->teacher_id,
+                    'branch_id' => $first->branch_id,
+                    'department_id' => $first->department_id,
+                    'program_id' => $first->program_id,
+                    'strand_id' => $first->strand_id,
+                    'teacher_name' => $first->teacher_name ?: 'Teacher',
+                    'teacher_role' => $first->teacher_role ?: 'Teacher',
+                    'branch_name' => $first->branch_name,
+                    'department_name' => $first->department_name,
+                    'department_code' => $first->department_code,
+                    'program_name' => $first->program_name,
+                    'strand_name' => $first->strand_name,
+                    'overall_rating' => $this->weightedPeerOverall($questionnaire, $questionRatings),
+                    'submission_count' => $rows->count(),
+                    'school_year' => $first->school_year,
+                    'questionnaire_id' => $questionnaireId,
+                    'questionnaire' => $questionnaire,
+                    'question_ratings' => $questionRatings,
+                ];
+            })
+            ->sortByDesc('rating_id')
+            ->values();
+
+        return $this->paginateCollection($items, $request, $perPage);
+    }
+
     private function subjectRatingContext(Request $request): array
     {
         $scopedBranchId = $this->scopedBranchId();
@@ -473,6 +1266,7 @@ class RatingsController extends Controller
         $requestedStrandId = $request->integer('strand_id');
         $search = trim((string) $request->input('search', ''));
         $schoolYear = trim((string) $request->input('school_year', ''));
+        $archiveAcademicYearId = $request->integer('archive_academic_year_id');
         $archived = $request->boolean('archived');
 
         $branches = DB::table('branch')
@@ -554,7 +1348,7 @@ class RatingsController extends Controller
             ->orderBy('s.name')
             ->get();
 
-        $ratings = $this->subjectSubmissionRatings($subjects->pluck('id')->all(), $schoolYear)
+        $ratings = $this->subjectSubmissionRatings($subjects->pluck('id')->all(), $schoolYear, $archiveAcademicYearId ?: null)
             ->groupBy('subject_id');
 
         $assignedTeacherIds = $subjects
@@ -629,7 +1423,7 @@ class RatingsController extends Controller
         ];
     }
 
-    private function subjectSubmissionRatings(array $subjectIds, string $schoolYear = ''): Collection
+    private function subjectSubmissionRatings(array $subjectIds, string $schoolYear = '', ?int $academicYearId = null): Collection
     {
         $subjectIds = collect($subjectIds)
             ->map(fn ($id) => (int) $id)
@@ -642,6 +1436,7 @@ class RatingsController extends Controller
         }
 
         $hasTeacherId = Schema::hasColumn('evaluation_submissions', 'teacher_id');
+        $subjectTypeId = $this->questionnaireTypeIdByCode('QTYPE-SUBJECT');
         $selects = [
             'es.id',
             'es.subject_id',
@@ -665,6 +1460,8 @@ class RatingsController extends Controller
             ->leftJoin('academic_year as ay', 'es.academic_year_id', '=', 'ay.id')
             ->select($selects)
             ->whereIn('es.subject_id', $subjectIds->all())
+            ->when($subjectTypeId, fn ($query) => $query->where('es.questionnaire_type_id', $subjectTypeId))
+            ->when($academicYearId, fn ($query) => $query->where('es.academic_year_id', $academicYearId))
             ->when($schoolYear, fn ($query) => $query->whereRaw("CONCAT(ay.from_year, '-', ay.to_year) = ?", [$schoolYear]));
 
         if ($hasTeacherId) {
@@ -1387,6 +2184,8 @@ class RatingsController extends Controller
                 're.id as rating_id',
                 DB::raw("CONCAT(e.firstname, ' ', e.lastname) as teacher_name"),
                 DB::raw("JSON_UNQUOTE(JSON_EXTRACT(re.overall_ratings, '$.average')) as overall_rating"),
+                're.submission_count',
+                're.item_ratings',
                 DB::raw("CONCAT(ay.from_year, '-', ay.to_year) as school_year")
             )
             ->when($branchId, fn ($q) => $q->where('e.branch_id', $branchId))

@@ -41,6 +41,18 @@ class EmployeePortalController extends Controller
         };
     }
 
+    private function questionnaireTypeIdForCategory(string $category): ?int
+    {
+        if (! Schema::hasTable('questionnaire_type')) {
+            return null;
+        }
+
+        $code = $category === 'head' ? 'QTYPE-HEAD' : 'QTYPE-EMPLOYEE';
+        $id = DB::table('questionnaire_type')->where('code', $code)->value('id');
+
+        return $id ? (int) $id : null;
+    }
+
     private function ratingsForCycle(int $employeeId, int $academicYearId): array
     {
         if (! Schema::hasTable('evaluation_submissions')) {
@@ -49,7 +61,7 @@ class EmployeePortalController extends Controller
 
         $rows = DB::table('evaluation_submissions as es')
             ->select(
-                'es.category',
+                'es.questionnaire_type_id',
                 'es.answers',
                 'es.submitted_at'
             )
@@ -236,7 +248,7 @@ class EmployeePortalController extends Controller
         $already = DB::table('evaluation_submissions')
             ->where('academic_year_id', $data['academic_year_id'])
             ->when(Schema::hasColumn('evaluation_submissions', 'employee_id'), fn ($query) => $query->where('employee_id', $data['evaluatee_id']))
-            ->when(Schema::hasColumn('evaluation_submissions', 'category'), fn ($query) => $query->where('category', $data['category']))
+            ->when($this->questionnaireTypeIdForCategory($data['category']), fn ($query, $typeId) => $query->where('questionnaire_type_id', $typeId))
             ->exists();
 
         if ($already) {
@@ -248,6 +260,7 @@ class EmployeePortalController extends Controller
 
         $submissionPayload = [
             'academic_year_id'  => $data['academic_year_id'],
+            'questionnaire_type_id' => $this->questionnaireTypeIdForCategory($data['category']),
             'answers'           => json_encode($data['answers']),
             'comments'          => json_encode(($data['comments'] ?? null) ? ['text' => $data['comments']] : []),
             'created_at'        => now(),
@@ -256,10 +269,6 @@ class EmployeePortalController extends Controller
 
         if (Schema::hasColumn('evaluation_submissions', 'employee_id')) {
             $submissionPayload['employee_id'] = $data['evaluatee_id'];
-        }
-
-        if (Schema::hasColumn('evaluation_submissions', 'category')) {
-            $submissionPayload['category'] = $data['category'];
         }
 
         if (Schema::hasColumn('evaluation_submissions', 'overall_average')) {

@@ -26,7 +26,7 @@ class QuestionController extends Controller
         return 'Q-' . str_pad((string) ($lastNumber + 1), 3, '0', STR_PAD_LEFT);
     }
 
-    private function getQuestions(string $search = '')
+    private function getQuestions(string $search = '', ?int $questionClassId = null, ?int $questionTypeId = null)
     {
         return DB::table('question')
             ->leftJoin('question_type as qt', 'qt.id', '=', 'question.question_type_id')
@@ -44,6 +44,8 @@ class QuestionController extends Controller
                 'question.is_deleted'
             )
             ->where('question.is_deleted', 0)
+            ->when($questionClassId, fn ($q) => $q->where('question.question_class_id', $questionClassId))
+            ->when($questionTypeId, fn ($q) => $q->where('question.question_type_id', $questionTypeId))
             ->when($search, fn ($q) => $q->where(function ($sub) use ($search) {
                 $sub->where('question.description', 'like', "%{$search}%")
                     ->orWhere('question.code', 'like', "%{$search}%")
@@ -78,13 +80,19 @@ class QuestionController extends Controller
     private function renderQuestionPage(Request $request, string $routeName, string $title, string $description)
     {
         $search = $request->input('search', '');
+        $questionClassId = $request->integer('question_class_id') ?: null;
+        $questionTypeId = $request->integer('question_type_id') ?: null;
 
         return Inertia::render('Admin/Questions', [
-            'questions' => $this->getQuestions($search),
+            'questions' => $this->getQuestions($search, $questionClassId, $questionTypeId),
             'questionTypes' => $this->getQuestionTypes(),
             'questionClasses' => $this->getQuestionClasses(),
             'nextQuestionCode' => $this->generateQuestionCode(),
-            'filters' => ['search' => $search],
+            'filters' => [
+                'search' => $search,
+                'question_class_id' => $questionClassId,
+                'question_type_id' => $questionTypeId,
+            ],
             'routeName' => $routeName,
             'title' => $title,
             'description' => $description,

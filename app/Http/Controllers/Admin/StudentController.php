@@ -13,6 +13,7 @@ use App\Models\Strand;
 use App\Models\Student;
 use App\Models\Subject;
 use App\Models\Teacher;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -25,7 +26,13 @@ class StudentController extends Controller
         $scopedId = $this->scopedBranchId();
         $branchId = $scopedId ?? $request->input('branch_id');
         $departmentId = $request->input('department_id');
+        $departmentType = $request->input('department_type');
         $programId = $request->input('program_id');
+        $programName = $request->input('program_name');
+        $strandId = $request->input('strand_id');
+        $strandName = $request->input('strand_name');
+        $yearLevelId = $request->input('year_level_id');
+        $yearLevel = $request->input('year_level');
         $branches = Branch::query()
             ->select('id', 'name', 'code')
             ->where('is_deleted', 0)
@@ -38,19 +45,34 @@ class StudentController extends Controller
         $perPage = in_array($perPage, [10, 20, 50, 100, 250]) ? $perPage : 20;
 
         $students = Student::query()
-            ->with(['branch:id,name', 'department:id,name', 'program:id,name', 'strand:id,name', 'yearLevel:id,year_level,section,strand_id', 'irregSubject:id,code,name'])
+            ->with(['branch:id,name', 'department:id,name', 'program:id,name', 'strand:id,name', 'yearLevel:id,year_level,section,strand_id,subject_id,subject_teacher_map', 'irregSubject:id,code,name'])
             ->where('is_deleted', 0)
             ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
             ->when($departmentId, fn ($q) => $q->where('department_id', $departmentId))
+            ->when($departmentType, fn ($q) => $q->whereHas('department', function ($department) use ($departmentType) {
+                $department->where(function ($query) use ($departmentType) {
+                    match ($departmentType) {
+                        'college' => $query->where('name', 'like', '%College%')->orWhere('code', 'like', '%COL%'),
+                        'senior-high' => $query->where('name', 'like', '%Senior High%')->orWhere('code', 'like', '%SHS%'),
+                        'junior-high' => $query->where('name', 'like', '%Junior High%')->orWhere('code', 'like', '%JHS%'),
+                        'elementary' => $query->where('name', 'like', '%Elementary%')->orWhere('code', 'like', '%ELEM%'),
+                        default => $query->whereRaw('1 = 0'),
+                    };
+                });
+            }))
             ->when($programId, fn ($q) => $q->where('program_id', $programId))
+            ->when($programName, fn ($q) => $q->whereHas('program', fn ($program) => $program->where('name', $programName)->orWhere('name', 'like', $programName . ' - %')))
+            ->when($strandId, fn ($q) => $q->where('strand_id', $strandId))
+            ->when($strandName, fn ($q) => $q->whereHas('strand', fn ($strand) => $strand->where('name', $strandName)->orWhere('name', 'like', $strandName . ' - %')))
+            ->when($yearLevelId, fn ($q) => $q->where('education_level_id', $yearLevelId))
+            ->when($yearLevel !== null && $yearLevel !== '', fn ($q) => $q->whereHas('yearLevel', fn ($level) => $level->where('year_level', $yearLevel)))
             ->when($search, fn ($q) => $q->where(function ($sub) use ($search) {
                 $sub->where('firstname', 'like', "%{$search}%")
                     ->orWhere('lastname', 'like', "%{$search}%")
                     ->orWhere('code', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%");
             }))
-            ->orderBy('lastname')
-            ->orderBy('firstname')
+            ->orderByDesc('id')
             ->paginate($perPage)
             ->withQueryString();
 
@@ -69,7 +91,7 @@ class StudentController extends Controller
 
         $teacherNames = $teachers->pluck('full_name', 'id');
         $subjectCollection = Subject::query()
-            ->select('id', 'code', 'name', 'department_id', 'program_id', 'strand_id', 'type', 'teacher_id')
+            ->select('id', 'code', 'name', 'department_id', 'program_id', 'strand_id', 'type', 'teacher_id', 'is_gened')
             ->where('is_deleted', 0)
             ->where('is_activated', 1)
             ->when($scopedId, fn ($q) => $q->whereHas('department', fn ($department) => $department->where('branch_id', $scopedId)))
@@ -92,6 +114,7 @@ class StudentController extends Controller
                     'program_id' => $subject->program_id,
                     'strand_id' => $subject->strand_id,
                     'type' => $subject->type,
+                    'is_gened' => (bool) $subject->is_gened,
                     'teacher_id' => $teacherIds->all(),
                     'assigned_teacher_names' => $teacherIds
                         ->map(fn ($id) => $teacherNames[$id] ?? null)
@@ -117,6 +140,7 @@ class StudentController extends Controller
                         'id' => $subject['id'],
                         'code' => $subject['code'],
                         'name' => $subject['name'],
+                        'is_gened' => $subject['is_gened'],
                         'teacher_id' => $teacherId ? (int) $teacherId : null,
                         'teacher_name' => $teacherId ? ($teacherNames[(int) $teacherId] ?? null) : null,
                     ];
@@ -137,6 +161,7 @@ class StudentController extends Controller
                         'id' => $subject['id'],
                         'code' => $subject['code'],
                         'name' => $subject['name'],
+                        'is_gened' => $subject['is_gened'],
                         'teacher_id' => $teacherId ? (int) $teacherId : null,
                         'teacher_name' => $teacherId ? ($teacherNames[(int) $teacherId] ?? null) : null,
                     ];
@@ -144,6 +169,54 @@ class StudentController extends Controller
                 ->filter()
                 ->values()
                 ->all();
+
+            $removedSubjectIds = $removedMap
+                ->keys()
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            $regularSubjects = collect($student->yearLevel?->subject_id ?? [])
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->reject(fn ($subjectId) => in_array($subjectId, $removedSubjectIds, true))
+                ->map(function (int $subjectId) use ($student, $subjectReference, $teacherNames) {
+                    $subject = $subjectReference->get($subjectId);
+
+                    if (! $subject) {
+                        return null;
+                    }
+
+                    $teacherId = data_get($student->yearLevel?->subject_teacher_map ?? [], (string) $subjectId);
+
+                    if (! $teacherId) {
+                        $teacherId = collect($subject['teacher_id'] ?? [])
+                            ->filter()
+                            ->map(fn ($id) => (int) $id)
+                            ->first();
+                    }
+
+                    return [
+                        'id' => $subject['id'],
+                        'code' => $subject['code'],
+                        'name' => $subject['name'],
+                        'is_gened' => $subject['is_gened'],
+                        'teacher_id' => $teacherId ? (int) $teacherId : null,
+                        'teacher_name' => $teacherId ? ($teacherNames[(int) $teacherId] ?? null) : null,
+                    ];
+                })
+                ->filter()
+                ->values();
+
+            $student->regular_subjects = [
+                'major' => $regularSubjects
+                    ->reject(fn ($subject) => (bool) ($subject['is_gened'] ?? false))
+                    ->values()
+                    ->all(),
+                'minor' => $regularSubjects
+                    ->filter(fn ($subject) => (bool) ($subject['is_gened'] ?? false))
+                    ->values()
+                    ->all(),
+            ];
 
             return $student;
         });
@@ -154,7 +227,13 @@ class StudentController extends Controller
                 'search' => $search,
                 'branch_id' => $branchId,
                 'department_id' => $departmentId,
+                'department_type' => $departmentType,
                 'program_id' => $programId,
+                'program_name' => $programName,
+                'strand_id' => $strandId,
+                'strand_name' => $strandName,
+                'year_level_id' => $yearLevelId,
+                'year_level' => $yearLevel,
                 'per_page' => $perPage,
             ],
             'branches'    => $branches,
@@ -202,6 +281,11 @@ class StudentController extends Controller
     public function store(StoreStudentRequest $request)
     {
         $payload = $this->studentPayloadFromRequest($request);
+
+        if ($message = $this->emailInUseMessage($payload['email'])) {
+            return back()->withErrors(['email' => $message])->withInput();
+        }
+
         Student::create($this->mapStudentPayload($payload));
 
         return back()->with('success', 'Student created successfully.');
@@ -210,9 +294,29 @@ class StudentController extends Controller
     public function update(UpdateStudentRequest $request, Student $student)
     {
         $payload = $this->studentPayloadFromRequest($request);
+
+        if ($message = $this->emailInUseMessage($payload['email'], $student->id)) {
+            return back()->withErrors(['email' => $message])->withInput();
+        }
+
         $student->update($this->mapStudentPayload($payload, false));
 
         return back()->with('success', 'Student updated successfully.');
+    }
+
+    public function checkEmailAvailability(Request $request)
+    {
+        $validated = $request->validate([
+            'email' => 'required|email|max:150',
+            'student_id' => 'nullable|integer',
+        ]);
+
+        $message = $this->emailInUseMessage($validated['email'], $validated['student_id'] ?? null);
+
+        return response()->json([
+            'available' => $message === null,
+            'message' => $message,
+        ]);
     }
 
     public function destroy(Student $student)
@@ -416,7 +520,7 @@ class StudentController extends Controller
                 }
 
                 $subject = Subject::query()
-                    ->select('id', 'department_id', 'program_id', 'strand_id', 'teacher_id')
+                    ->select('id', 'department_id', 'program_id', 'strand_id', 'teacher_id', 'is_gened')
                     ->where('id', $subjectId)
                     ->where('is_deleted', 0)
                     ->where('is_activated', 1)
@@ -428,10 +532,17 @@ class StudentController extends Controller
                     ]);
                 }
 
-                if (! empty($payload['program_id']) && (int) ($subject->program_id ?? 0) !== (int) $payload['program_id']) {
-                    throw ValidationException::withMessages([
-                        'irreg_subject_ids' => 'Irregular subjects must belong to the selected program.',
-                    ]);
+                if (! empty($payload['program_id'])) {
+                    $selectedProgramId = (int) $payload['program_id'];
+                    $subjectProgramId = (int) ($subject->program_id ?? 0);
+                    $isGenEdSubject = (bool) $subject->is_gened;
+
+                    if (! $isGenEdSubject && $subjectProgramId !== $selectedProgramId) {
+                        throw ValidationException::withMessages([
+                            'irreg_subject_ids' => 'Irregular major subjects must belong to the selected program.',
+                        ]);
+                    }
+
                 }
 
                 if (! empty($payload['strand_id']) && (int) ($subject->strand_id ?? 0) !== (int) $payload['strand_id']) {
@@ -458,5 +569,34 @@ class StudentController extends Controller
         }
 
         return $payload;
+    }
+
+    private function emailInUseMessage(?string $email, ?int $ignoreStudentId = null): ?string
+    {
+        $normalizedEmail = strtolower(trim((string) $email));
+
+        if ($normalizedEmail === '') {
+            return null;
+        }
+
+        $checks = [
+            ['table' => 'admin', 'label' => 'an admin account', 'ignore_id' => null],
+            ['table' => 'teacher', 'label' => 'a teacher account', 'ignore_id' => null],
+            ['table' => 'student', 'label' => 'a student account', 'ignore_id' => $ignoreStudentId],
+            ['table' => 'employee', 'label' => 'an employee account', 'ignore_id' => null],
+        ];
+
+        foreach ($checks as $check) {
+            $exists = DB::table($check['table'])
+                ->whereRaw('LOWER(email) = ?', [$normalizedEmail])
+                ->when($check['ignore_id'], fn ($query, $id) => $query->where('id', '!=', $id))
+                ->exists();
+
+            if ($exists) {
+                return "This email is already used by {$check['label']}.";
+            }
+        }
+
+        return null;
     }
 }

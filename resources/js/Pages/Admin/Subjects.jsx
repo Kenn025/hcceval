@@ -17,6 +17,7 @@ const ROUTE_MAP = {
     'junior-high': 'admin.junior-high.subjects',
     'grade-school': 'admin.grade-school.subjects',
 };
+const hasValue = (value) => String(value ?? '').trim() !== '';
 
 const getFirstErrorMessage = (formErrors, fallback) => {
     const firstValue = Object.values(formErrors ?? {})[0];
@@ -97,7 +98,7 @@ export default function Subjects({
         'grade-school': (department) => /elementary|grade school/i.test(department.name ?? '') || /elem/i.test(department.code ?? ''),
     };
 
-    const { data, setData, errors, processing, reset, clearErrors } = useForm({
+    const blankFormData = () => ({
         branch_id: activeBranchId,
         department_id: '',
         program_id: '',
@@ -109,8 +110,12 @@ export default function Subjects({
         teacher_ids: [''],
     });
 
+    const { data, setData, errors, processing, reset, clearErrors } = useForm(blankFormData());
+
     const { isDirty } = useFormDirty(data, editing?.id ?? 'new');
     const [confirmUpdateOpen, setConfirmUpdateOpen] = useState(false);
+    const [createDraft, setCreateDraft] = useState(null);
+    const [editDrafts, setEditDrafts] = useState({});
 
     const filteredDepartments = useMemo(
         () => departments.filter((department) => {
@@ -150,6 +155,11 @@ export default function Subjects({
         )),
         [teachers, autoDepartmentId, data.branch_id],
     );
+    const isFormComplete = hasValue(data.branch_id)
+        && hasValue(data.name)
+        && (educationType !== 'college' || hasValue(data.program_id))
+        && (educationType !== 'senior-high' || hasValue(data.strand_id));
+    const isSubmitDisabled = !isFormComplete || (Boolean(editing) && !isDirty);
 
     useEffect(() => {
         if (!errorNotification) {
@@ -169,34 +179,12 @@ export default function Subjects({
         }
     }, [autoDepartmentId, data.department_id, setData]);
 
-    const openCreate = () => {
-        reset();
-        setSubmitError('');
-        setErrorNotification('');
-        setData({
-            branch_id: activeBranchId,
-            department_id: '',
-            program_id: '',
-            strand_id: '',
-            name: '',
-            type: subjectType,
-            is_gened: false,
-            is_activated: true,
-            teacher_ids: [''],
-        });
-        clearErrors();
-        setEditing(null);
-        setSlideOpen(true);
-    };
-
-    const openEdit = (row) => {
+    const formDataFromSubject = (row) => {
         const teacherIds = Array.isArray(row.teacher_id) && row.teacher_id.length > 0
             ? row.teacher_id.map((id) => String(id))
             : [''];
 
-        setSubmitError('');
-        setErrorNotification('');
-        setData({
+        return {
             branch_id: String(row.department?.branch_id ?? activeBranchId ?? ''),
             department_id: String(row.department_id ?? ''),
             program_id: String(row.program_id ?? ''),
@@ -206,7 +194,63 @@ export default function Subjects({
             is_gened: Boolean(row.is_gened),
             is_activated: Boolean(row.is_activated),
             teacher_ids: teacherIds,
-        });
+        };
+    };
+
+    const updateFormData = (nextData) => {
+        setData(nextData);
+
+        if (editing) {
+            setEditDrafts((drafts) => ({
+                ...drafts,
+                [editing.id]: nextData,
+            }));
+        } else {
+            setCreateDraft(nextData);
+        }
+    };
+
+    const updateField = (field, value) => {
+        updateFormData({ ...data, [field]: value });
+    };
+
+    const closeSlideOver = () => {
+        setSlideOpen(false);
+    };
+
+    const cancelSlideOver = () => {
+        if (editing) {
+            setEditDrafts((drafts) => {
+                const nextDrafts = { ...drafts };
+                delete nextDrafts[editing.id];
+
+                return nextDrafts;
+            });
+            setData(formDataFromSubject(editing));
+        } else {
+            setCreateDraft(null);
+            setData(blankFormData());
+        }
+
+        setSubmitError('');
+        setErrorNotification('');
+        clearErrors();
+        setSlideOpen(false);
+    };
+
+    const openCreate = () => {
+        setSubmitError('');
+        setErrorNotification('');
+        setData(createDraft ?? blankFormData());
+        clearErrors();
+        setEditing(null);
+        setSlideOpen(true);
+    };
+
+    const openEdit = (row) => {
+        setSubmitError('');
+        setErrorNotification('');
+        setData(editDrafts[row.id] ?? formDataFromSubject(row));
         clearErrors();
         setEditing(row);
         setSlideOpen(true);
@@ -225,21 +269,21 @@ export default function Subjects({
     const updateTeacherSlot = (index, value) => {
         const nextTeacherIds = [...data.teacher_ids];
         nextTeacherIds[index] = value;
-        setData('teacher_ids', nextTeacherIds);
+        updateField('teacher_ids', nextTeacherIds);
     };
 
     const addTeacherSlot = () => {
-        setData('teacher_ids', [...data.teacher_ids, '']);
+        updateField('teacher_ids', [...data.teacher_ids, '']);
     };
 
     const removeTeacherSlot = (index) => {
         const nextTeacherIds = data.teacher_ids.filter((_, teacherIndex) => teacherIndex !== index);
-        setData('teacher_ids', nextTeacherIds.length > 0 ? nextTeacherIds : ['']);
+        updateField('teacher_ids', nextTeacherIds.length > 0 ? nextTeacherIds : ['']);
     };
 
     const submit = (e) => {
         e.preventDefault();
-        if (editing && !isDirty) return;
+        if (isSubmitDisabled) return;
         if (editing) { setConfirmUpdateOpen(true); return; }
         performSave();
     };
@@ -256,6 +300,16 @@ export default function Subjects({
             onSuccess: () => {
                 setSlideOpen(false);
                 setConfirmUpdateOpen(false);
+                if (editing) {
+                    setEditDrafts((drafts) => {
+                        const nextDrafts = { ...drafts };
+                        delete nextDrafts[editing.id];
+
+                        return nextDrafts;
+                    });
+                } else {
+                    setCreateDraft(null);
+                }
                 reset();
             },
             onError: (formErrors) => {
@@ -462,7 +516,7 @@ export default function Subjects({
                 )}
             </SlideOver>
 
-            <SlideOver open={slideOpen} onClose={() => setSlideOpen(false)} title={editing ? 'Edit Subject' : 'New Subject'} width="max-w-xl">
+            <SlideOver open={slideOpen} onClose={closeSlideOver} title={editing ? 'Edit Subject' : 'New Subject'} width="max-w-xl">
                 <form onSubmit={submit} className="space-y-4">
                     {(submitError || Object.keys(errors).length > 0) && (
                         <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
@@ -471,7 +525,7 @@ export default function Subjects({
                     )}
 
                     <FormField label="Branch" error={errors.branch_id} required>
-                        <SelectInput value={data.branch_id} onChange={(e) => setData({ ...data, branch_id: e.target.value, department_id: '', program_id: '', strand_id: '', teacher_ids: [''] })}>
+                        <SelectInput value={data.branch_id} onChange={(e) => updateFormData({ ...data, branch_id: e.target.value, department_id: '', program_id: '', strand_id: '', teacher_ids: [''] })}>
                             <option value="">Select branch...</option>
                             {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
                         </SelectInput>
@@ -479,7 +533,7 @@ export default function Subjects({
 
                     {educationType === 'college' && (
                         <FormField label="Program" error={errors.program_id} required>
-                            <SelectInput value={data.program_id} onChange={(e) => setData('program_id', e.target.value)} disabled={!data.branch_id}>
+                            <SelectInput value={data.program_id} onChange={(e) => updateField('program_id', e.target.value)} disabled={!data.branch_id}>
                                 <option value="">Select program...</option>
                                 {filteredPrograms.map((program) => <option key={program.id} value={program.id}>{program.name}</option>)}
                             </SelectInput>
@@ -488,7 +542,7 @@ export default function Subjects({
 
                     {educationType === 'senior-high' && (
                         <FormField label="Strand" error={errors.strand_id} required>
-                            <SelectInput value={data.strand_id} onChange={(e) => setData('strand_id', e.target.value)} disabled={!data.branch_id}>
+                            <SelectInput value={data.strand_id} onChange={(e) => updateField('strand_id', e.target.value)} disabled={!data.branch_id}>
                                 <option value="">Select strand...</option>
                                 {filteredStrands.map((strand) => <option key={strand.id} value={strand.id}>{strand.name}</option>)}
                             </SelectInput>
@@ -496,7 +550,7 @@ export default function Subjects({
                     )}
 
                     <FormField label="Subject Name" error={errors.name} required>
-                        <TextInput value={data.name} onChange={(e) => setData('name', e.target.value)} />
+                        <TextInput value={data.name} onChange={(e) => updateField('name', e.target.value)} />
                     </FormField>
 
                     {showsGenEd && (
@@ -519,7 +573,7 @@ export default function Subjects({
                                             type="radio"
                                             name="is_gened"
                                             checked={data.is_gened === option.value}
-                                            onChange={() => setData('is_gened', option.value)}
+                                            onChange={() => updateField('is_gened', option.value)}
                                             className="sr-only"
                                         />
                                         {option.label}
@@ -557,12 +611,12 @@ export default function Subjects({
                     </div>
 
                     <label className="flex items-center gap-2 text-sm text-slate-700">
-                        <input type="checkbox" checked={data.is_activated} onChange={(e) => setData('is_activated', e.target.checked)} className="rounded border-slate-300" /> Active
+                        <input type="checkbox" checked={data.is_activated} onChange={(e) => updateField('is_activated', e.target.checked)} className="rounded border-slate-300" /> Active
                     </label>
 
                     <div className="flex gap-3 pt-2">
-                        <button type="button" onClick={() => setSlideOpen(false)} className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700">Cancel</button>
-                        <SubmitButton processing={processing} disabled={Boolean(editing) && !isDirty} className="flex-1">
+                        <button type="button" onClick={cancelSlideOver} className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700">Cancel</button>
+                        <SubmitButton processing={processing} disabled={isSubmitDisabled} className="flex-1">
                             {editing ? 'Update' : 'Create'}
                         </SubmitButton>
                     </div>
