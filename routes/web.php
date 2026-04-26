@@ -31,6 +31,7 @@ use App\Http\Controllers\BugReportController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\TestimonialFeedbackController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', HomeController::class)->name('home');
@@ -192,6 +193,8 @@ Route::middleware('auth')->group(function () {
             Route::put('/admin/landing-page/features-section', [LandingPageHeaderController::class, 'updateFeaturesSection'])->name('admin.landing-page.features-section.update');
             Route::put('/admin/landing-page/roles-section', [LandingPageHeaderController::class, 'updateRolesSection'])->name('admin.landing-page.roles-section.update');
             Route::put('/admin/landing-page/how-it-works-section', [LandingPageHeaderController::class, 'updateHowItWorksSection'])->name('admin.landing-page.how-it-works-section.update');
+            Route::put('/admin/landing-page/testimonials-section', [LandingPageHeaderController::class, 'updateTestimonialsSection'])->name('admin.landing-page.testimonials-section.update');
+            Route::put('/admin/landing-page/testimonials/{landingPageTestimonial}/status', [LandingPageHeaderController::class, 'updateTestimonialStatus'])->name('admin.landing-page.testimonials.status.update');
             Route::put('/admin/landing-page/{landingPageHeader}', [LandingPageHeaderController::class, 'update']);
             Route::delete('/admin/landing-page/{landingPageHeader}', [LandingPageHeaderController::class, 'destroy']);
         });
@@ -208,6 +211,8 @@ Route::middleware('auth')->group(function () {
 
     // Bug Reports
     Route::post('/bug-report', [BugReportController::class, 'store'])->name('bug-report.store');
+    Route::post('/testimonials/feedback', [TestimonialFeedbackController::class, 'store'])->name('testimonials.store');
+    Route::get('/testimonials/feedback/mine', [TestimonialFeedbackController::class, 'mine'])->name('testimonials.mine');
     Route::middleware(['student.auth', 'teacher.auth', 'employee.auth']);
 
     // Notifications (admin)
@@ -229,6 +234,8 @@ Route::prefix('portal')->name('portal.')->group(function () {
     Route::get('/login', [ClientLoginController::class, 'showLogin'])->name('login');
     Route::post('/logout', [ClientLoginController::class, 'logout'])->name('logout');
     Route::post('/bug-report', [BugReportController::class, 'store'])->name('bug-report.store');
+    Route::post('/testimonials/feedback', [TestimonialFeedbackController::class, 'store'])->name('testimonials.store');
+    Route::get('/testimonials/feedback/mine', [TestimonialFeedbackController::class, 'mine'])->name('testimonials.mine');
 
     // Password reset for client users (student / teacher / employee)
     Route::get('/password/forgot', [ClientPasswordResetController::class, 'showRequest'])->name('password.request');

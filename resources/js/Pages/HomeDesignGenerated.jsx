@@ -158,6 +158,7 @@ function App({
     featuresSection: customFeaturesSection = null,
     rolesSection: customRolesSection = null,
     howItWorksSection: customHowItWorksSection = null,
+    testimonialsSection: customTestimonialsSection = null,
 }) {
     const [isDarkMode, setIsDarkMode] = useState(() => {
         if (typeof window === "undefined") return false;
@@ -408,8 +409,7 @@ function App({
         steps: defaultHowItWorksSteps,
     };
     const howItWorksSection =
-        customHowItWorksSection &&
-        typeof customHowItWorksSection === "object"
+        customHowItWorksSection && typeof customHowItWorksSection === "object"
             ? {
                   ...defaultHowItWorksSection,
                   ...customHowItWorksSection,
@@ -425,8 +425,7 @@ function App({
         howItWorksSection.steps.length > 0
             ? howItWorksSection.steps.map((step, index) => ({
                   step: String(
-                      step?.step_number ??
-                          String(index + 1).padStart(2, "0"),
+                      step?.step_number ?? String(index + 1).padStart(2, "0"),
                   ),
                   title: String(step?.title || ""),
                   desc: String(step?.subtitle || step?.desc || ""),
@@ -437,7 +436,8 @@ function App({
                   desc: step.subtitle,
               }));
     const resolveHowItWorksIcon = (title, desc = "") => {
-        const text = `${String(title || "")} ${String(desc || "")}`.toLowerCase();
+        const text =
+            `${String(title || "")} ${String(desc || "")}`.toLowerCase();
 
         if (
             /(register|signup|sign up|create account|account|enroll|join|add user)/.test(
@@ -447,15 +447,27 @@ function App({
             return UserPlus;
         }
 
-        if (/(configure|setup|set up|settings|custom|options|preferences)/.test(text)) {
+        if (
+            /(configure|setup|set up|settings|custom|options|preferences)/.test(
+                text,
+            )
+        ) {
             return Settings2;
         }
 
-        if (/(evaluate|assessment|assess|review|verify|check|approval)/.test(text)) {
+        if (
+            /(evaluate|assessment|assess|review|verify|check|approval)/.test(
+                text,
+            )
+        ) {
             return CircleCheck;
         }
 
-        if (/(analyze|analysis|report|insight|analytics|dashboard|metrics)/.test(text)) {
+        if (
+            /(analyze|analysis|report|insight|analytics|dashboard|metrics)/.test(
+                text,
+            )
+        ) {
             return BarChart3;
         }
 
@@ -530,33 +542,82 @@ function App({
             a: "Yes, we provide comprehensive training materials, video tutorials, and dedicated support to ensure smooth adoption across all user roles.",
         },
     ];
-    const testimonials = [
-        {
-            name: "Dr. Maria Santos",
-            role: "Dean of Engineering",
-            text: "This system has revolutionized our evaluation process. The holistic approach provides invaluable insights we never had before.",
-            avatar: "graduation",
-        },
-        {
-            name: "Prof. Juan Cruz",
-            role: "Faculty Member",
-            text: "The peer evaluation feature has fostered continuous improvement. I can track my growth with actionable feedback.",
-            avatar: "teachers",
-        },
-        {
-            name: "Ana Reyes",
-            role: "Administrator",
-            text: "Managing evaluations across campuses is now seamless. The analytics dashboard provides real-time insights.",
-            avatar: "briefcase",
-        },
-    ];
+    const defaultTestimonialsSection = {
+        badge_text: "Testimonials",
+        title_text: "What Users Say",
+        testimonials: [
+            {
+                first_name: "Maria",
+                last_name: "Santos",
+                role: "Dean of Engineering",
+                feedback:
+                    "This system has revolutionized our evaluation process. The holistic approach provides invaluable insights we never had before.",
+                profile_photo_path: null,
+            },
+            {
+                first_name: "Juan",
+                last_name: "Cruz",
+                role: "Faculty Member",
+                feedback:
+                    "The peer evaluation feature has fostered continuous improvement. I can track my growth with actionable feedback.",
+                profile_photo_path: null,
+            },
+            {
+                first_name: "Ana",
+                last_name: "Reyes",
+                role: "Administrator",
+                feedback:
+                    "Managing evaluations across campuses is now seamless. The analytics dashboard provides real-time insights.",
+                profile_photo_path: null,
+            },
+        ],
+    };
+    const testimonialsSection =
+        customTestimonialsSection &&
+        typeof customTestimonialsSection === "object"
+            ? {
+                  ...defaultTestimonialsSection,
+                  ...customTestimonialsSection,
+                  testimonials:
+                      Array.isArray(customTestimonialsSection.testimonials) &&
+                      customTestimonialsSection.testimonials.length > 0
+                          ? customTestimonialsSection.testimonials
+                          : defaultTestimonialsSection.testimonials,
+              }
+            : defaultTestimonialsSection;
+    const testimonials = (
+        Array.isArray(testimonialsSection.testimonials) &&
+        testimonialsSection.testimonials.length > 0
+            ? testimonialsSection.testimonials
+            : defaultTestimonialsSection.testimonials
+    ).map((item) => ({
+        name:
+            `${String(item?.first_name ?? "").trim()} ${String(item?.last_name ?? "").trim()}`.trim() ||
+            "Anonymous User",
+        role: String(item?.role ?? "").trim() || "System User",
+        text: String(item?.feedback ?? "").trim(),
+        profilePhotoPath: String(item?.profile_photo_path ?? "").trim(),
+    }));
+    const resolveTestimonialAvatar = (role) => {
+        const value = String(role ?? "").toLowerCase();
+        if (/(dean|admin|head|manager)/.test(value)) return "briefcase";
+        if (/(teacher|faculty|prof)/.test(value)) return "teachers";
+        if (/(student|learner)/.test(value)) return "students";
+        return "graduation";
+    };
     const [currentTestimonial, setCurrentTestimonial] = useState(0);
+    const activeTestimonial =
+        testimonials[currentTestimonial] ?? testimonials[0];
     useEffect(() => {
+        if (testimonials.length <= 1) {
+            setCurrentTestimonial(0);
+            return () => {};
+        }
         const timer = setInterval(() => {
             setCurrentTestimonial((prev) => (prev + 1) % testimonials.length);
         }, 5e3);
         return () => clearInterval(timer);
-    }, []);
+    }, [testimonials.length]);
     const scrollTo = (id) => {
         document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
         setMenuOpen(false);
@@ -2304,12 +2365,16 @@ function App({
                                     className:
                                         "neumorphic-flat px-4 py-2 inline-block text-sm font-bold mb-4",
                                     style: { color: "var(--accent)" },
-                                    children: "Testimonials",
+                                    children:
+                                        testimonialsSection.badge_text ||
+                                        "Testimonials",
                                 }),
                                 /* @__PURE__ */ jsx("h2", {
                                     className: "text-3xl md:text-4xl font-bold",
                                     style: { color: "var(--text-primary)" },
-                                    children: "What Users Say",
+                                    children:
+                                        testimonialsSection.title_text ||
+                                        "What Users Say",
                                 }),
                             ],
                         }),
@@ -2325,8 +2390,7 @@ function App({
                                     className:
                                         "text-lg md:text-xl mb-5 leading-relaxed",
                                     style: { color: "var(--text-primary)" },
-                                    children:
-                                        testimonials[currentTestimonial].text,
+                                    children: activeTestimonial?.text ?? "",
                                 }),
                                 /* @__PURE__ */ jsxs("div", {
                                     className: "flex items-center gap-3",
@@ -2337,16 +2401,28 @@ function App({
                                             style: {
                                                 color: "var(--accent)",
                                             },
-                                            children: /* @__PURE__ */ jsx(
-                                                AppIcon,
-                                                {
-                                                    name: testimonials[
-                                                        currentTestimonial
-                                                    ].avatar,
-                                                    className: "h-8 w-8",
-                                                    strokeWidth: 1.9,
-                                                },
-                                            ),
+                                            children:
+                                                activeTestimonial?.profilePhotoPath
+                                                    ? /* @__PURE__ */ jsx(
+                                                          "img",
+                                                          {
+                                                              src: activeTestimonial.profilePhotoPath,
+                                                              alt: activeTestimonial.name,
+                                                              className:
+                                                                  "h-12 w-12 rounded-full object-cover",
+                                                          },
+                                                      )
+                                                    : /* @__PURE__ */ jsx(
+                                                          AppIcon,
+                                                          {
+                                                              name: resolveTestimonialAvatar(
+                                                                  activeTestimonial?.role,
+                                                              ),
+                                                              className:
+                                                                  "h-8 w-8",
+                                                              strokeWidth: 1.9,
+                                                          },
+                                                      ),
                                         }),
                                         /* @__PURE__ */ jsxs("div", {
                                             children: [
@@ -2357,9 +2433,8 @@ function App({
                                                         color: "var(--text-primary)",
                                                     },
                                                     children:
-                                                        testimonials[
-                                                            currentTestimonial
-                                                        ].name,
+                                                        activeTestimonial?.name ??
+                                                        "Anonymous User",
                                                 }),
                                                 /* @__PURE__ */ jsx("div", {
                                                     className: "text-sm",
@@ -2367,9 +2442,8 @@ function App({
                                                         color: "var(--text-secondary)",
                                                     },
                                                     children:
-                                                        testimonials[
-                                                            currentTestimonial
-                                                        ].role,
+                                                        activeTestimonial?.role ??
+                                                        "System User",
                                                 }),
                                             ],
                                         }),

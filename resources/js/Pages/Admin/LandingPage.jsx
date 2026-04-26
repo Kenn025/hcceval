@@ -105,12 +105,36 @@ function normalizeHowItWorksSection(howItWorksSection = {}) {
     };
 }
 
+function normalizeTestimonialsSection(testimonialsSection = {}) {
+    return {
+        badge_text: String(testimonialsSection.badge_text ?? "").trim(),
+        title_text: String(testimonialsSection.title_text ?? "").trim(),
+    };
+}
+
 function normalizeStatKey(value) {
     return String(value ?? "")
         .trim()
         .toLowerCase()
         .replace(/\s+/g, "_")
         .replace(/[^a-z0-9_]/g, "");
+}
+
+function formatTestimonialStatus(value) {
+    return String(value ?? "pending")
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function testimonialStatusClass(value) {
+    const status = String(value ?? "").toLowerCase();
+    if (status === "approved") {
+        return "bg-emerald-50 text-emerald-700";
+    }
+    if (status === "rejected") {
+        return "bg-rose-50 text-rose-700";
+    }
+    return "bg-amber-50 text-amber-700";
 }
 
 const ITEM_TYPE_OPTIONS = [
@@ -159,6 +183,11 @@ export default function LandingPage({
         subtitle_text: "",
         steps: [],
     },
+    testimonialsSection = {
+        badge_text: "",
+        title_text: "",
+        testimonials: [],
+    },
 }) {
     const canEditStats =
         (statsSection ?? []).length > 0 &&
@@ -181,6 +210,11 @@ export default function LandingPage({
     const [howItWorksModalOpen, setHowItWorksModalOpen] = useState(false);
     const [pendingHowItWorksScrollToIndex, setPendingHowItWorksScrollToIndex] =
         useState(null);
+    const [testimonialsModalOpen, setTestimonialsModalOpen] = useState(false);
+    const [testimonialAction, setTestimonialAction] = useState({
+        id: null,
+        status: null,
+    });
     const linkContainerRefs = useRef([]);
     const statContainerRefs = useRef([]);
     const featureContainerRefs = useRef([]);
@@ -192,6 +226,7 @@ export default function LandingPage({
     const initialFeaturesSnapshotRef = useRef("{}");
     const initialRolesSnapshotRef = useRef("{}");
     const initialHowItWorksSnapshotRef = useRef("{}");
+    const initialTestimonialsSnapshotRef = useRef("{}");
 
     const { data, setData, errors, processing, reset, clearErrors } = useForm({
         headers: [],
@@ -268,6 +303,17 @@ export default function LandingPage({
         subtitle_text: "",
         steps: [],
         delete_ids: [],
+    });
+    const {
+        data: testimonialsData,
+        setData: setTestimonialsData,
+        errors: testimonialsErrors,
+        processing: testimonialsProcessing,
+        reset: resetTestimonials,
+        clearErrors: clearTestimonialsErrors,
+    } = useForm({
+        badge_text: "",
+        title_text: "",
     });
 
     const openEdit = () => {
@@ -442,12 +488,29 @@ export default function LandingPage({
         );
         setHowItWorksModalOpen(true);
     };
+    const openTestimonialsEdit = () => {
+        clearTestimonialsErrors();
+        const nextTestimonialsData = {
+            badge_text: testimonialsSection?.badge_text ?? "",
+            title_text: testimonialsSection?.title_text ?? "",
+        };
+        setTestimonialsData(nextTestimonialsData);
+        initialTestimonialsSnapshotRef.current = JSON.stringify(
+            normalizeTestimonialsSection(nextTestimonialsData),
+        );
+        setTestimonialsModalOpen(true);
+    };
     const closeHowItWorksModal = () => {
         resetHowItWorks();
         setHowItWorksModalOpen(false);
         clearHowItWorksErrors();
         setPendingHowItWorksScrollToIndex(null);
         howItWorksContainerRefs.current = [];
+    };
+    const closeTestimonialsModal = () => {
+        resetTestimonials();
+        setTestimonialsModalOpen(false);
+        clearTestimonialsErrors();
     };
 
     const updateRow = (index, key, value) => {
@@ -531,7 +594,8 @@ export default function LandingPage({
     useEffect(() => {
         if (!featuresModalOpen || pendingFeaturesScrollToIndex === null) return;
 
-        const target = featureContainerRefs.current[pendingFeaturesScrollToIndex];
+        const target =
+            featureContainerRefs.current[pendingFeaturesScrollToIndex];
         if (target) {
             target.scrollIntoView({ behavior: "smooth", block: "start" });
             setPendingFeaturesScrollToIndex(null);
@@ -551,10 +615,7 @@ export default function LandingPage({
         }
     }, [rolesData.roles?.length, rolesModalOpen, pendingRolesScrollToIndex]);
     useEffect(() => {
-        if (
-            !howItWorksModalOpen ||
-            pendingHowItWorksScrollToIndex === null
-        ) {
+        if (!howItWorksModalOpen || pendingHowItWorksScrollToIndex === null) {
             return;
         }
 
@@ -815,7 +876,7 @@ export default function LandingPage({
         next[index] = { ...next[index], [key]: value };
         setRolesData("roles", next);
     };
-const removeRoleRow = (index) => {
+    const removeRoleRow = (index) => {
         const row = (rolesData.roles ?? [])[index];
         const nextRows = withRoleSortOrder(
             (rolesData.roles ?? []).filter((_, i) => i !== index),
@@ -880,10 +941,9 @@ const removeRoleRow = (index) => {
             ...(howItWorksData.steps ?? []),
             {
                 id: null,
-                step_number: String((howItWorksData.steps ?? []).length + 1).padStart(
-                    2,
-                    "0",
-                ),
+                step_number: String(
+                    (howItWorksData.steps ?? []).length + 1,
+                ).padStart(2, "0"),
                 title: "",
                 subtitle: "",
                 sort_order: 0,
@@ -988,7 +1048,9 @@ const removeRoleRow = (index) => {
         return sectionHasEmpty || rowHasEmpty;
     }, [rolesData]);
     const hasRolesSectionChanges = useMemo(() => {
-        const currentSnapshot = JSON.stringify(normalizeRolesSection(rolesData));
+        const currentSnapshot = JSON.stringify(
+            normalizeRolesSection(rolesData),
+        );
         return currentSnapshot !== initialRolesSnapshotRef.current;
     }, [rolesData]);
     const submitRolesSection = (event) => {
@@ -1025,10 +1087,7 @@ const removeRoleRow = (index) => {
     }, [howItWorksData]);
     const submitHowItWorksSection = (event) => {
         event.preventDefault();
-        if (
-            hasEmptyHowItWorksRequiredFields ||
-            !hasHowItWorksSectionChanges
-        ) {
+        if (hasEmptyHowItWorksRequiredFields || !hasHowItWorksSectionChanges) {
             return;
         }
         router.post(
@@ -1038,6 +1097,54 @@ const removeRoleRow = (index) => {
                 ...howItWorksData,
             },
             { onSuccess: closeHowItWorksModal },
+        );
+    };
+    const hasEmptyTestimonialsRequiredFields = useMemo(() => {
+        return (
+            String(testimonialsData.badge_text ?? "").trim() === "" ||
+            String(testimonialsData.title_text ?? "").trim() === ""
+        );
+    }, [testimonialsData]);
+    const submitTestimonialsSection = (event) => {
+        event.preventDefault();
+        if (hasEmptyTestimonialsRequiredFields) {
+            return;
+        }
+
+        router.put(
+            route("admin.landing-page.testimonials-section.update"),
+            testimonialsData,
+            { onSuccess: closeTestimonialsModal },
+        );
+    };
+    const updateTestimonialStatus = (testimonialId, status) => {
+        if (!testimonialId) return;
+        const current = (testimonialsSection?.testimonials ?? []).find(
+            (row) => Number(row.id) === Number(testimonialId),
+        );
+        if (
+            String(current?.status ?? "").toLowerCase() ===
+            String(status ?? "").toLowerCase()
+        ) {
+            return;
+        }
+
+        setTestimonialAction({ id: testimonialId, status });
+
+        router.put(
+            route("admin.landing-page.testimonials.status.update", {
+                landingPageTestimonial: testimonialId,
+            }),
+            { status },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onFinish: () =>
+                    setTestimonialAction({
+                        id: null,
+                        status: null,
+                    }),
+            },
         );
     };
 
@@ -1206,9 +1313,7 @@ const removeRoleRow = (index) => {
                             <tr className="border-b border-slate-100 bg-slate-50/70 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 <th className="px-4 py-3 sm:px-5">#</th>
                                 <th className="px-4 py-3 sm:px-5">Metric</th>
-                                <th className="px-4 py-3 sm:px-5">
-                                    Value
-                                </th>
+                                <th className="px-4 py-3 sm:px-5">Value</th>
                                 <th className="px-4 py-3 sm:px-5">
                                     Text Label
                                 </th>
@@ -1345,31 +1450,54 @@ const removeRoleRow = (index) => {
                         </thead>
                         <tbody className="text-sm text-slate-700">
                             <tr className="border-b border-slate-100">
-                                <td className="px-4 py-3 font-medium sm:px-5">Badge</td>
-                                <td className="px-4 py-3 sm:px-5">{rolesSection?.badge_text || "-"}</td>
+                                <td className="px-4 py-3 font-medium sm:px-5">
+                                    Badge
+                                </td>
+                                <td className="px-4 py-3 sm:px-5">
+                                    {rolesSection?.badge_text || "-"}
+                                </td>
                             </tr>
                             <tr className="border-b border-slate-100">
-                                <td className="px-4 py-3 font-medium sm:px-5">Title</td>
-                                <td className="px-4 py-3 sm:px-5">{rolesSection?.title_text || "-"}</td>
+                                <td className="px-4 py-3 font-medium sm:px-5">
+                                    Title
+                                </td>
+                                <td className="px-4 py-3 sm:px-5">
+                                    {rolesSection?.title_text || "-"}
+                                </td>
                             </tr>
                             <tr className="border-b border-slate-100">
-                                <td className="px-4 py-3 font-medium sm:px-5">Subtitle</td>
-                                <td className="px-4 py-3 sm:px-5">{rolesSection?.subtitle_text || "-"}</td>
+                                <td className="px-4 py-3 font-medium sm:px-5">
+                                    Subtitle
+                                </td>
+                                <td className="px-4 py-3 sm:px-5">
+                                    {rolesSection?.subtitle_text || "-"}
+                                </td>
                             </tr>
                             <tr>
-                                <td className="px-4 py-3 font-medium sm:px-5 align-top">Roles</td>
+                                <td className="px-4 py-3 font-medium sm:px-5 align-top">
+                                    Roles
+                                </td>
                                 <td className="px-4 py-3 sm:px-5">
                                     <div className="space-y-1">
-                                        {(rolesSection?.roles ?? []).map((row, index) => (
-                                            <div key={row.id ?? `role-summary-${index}`}>
-                                                <span className="font-medium text-slate-900">
-                                                    {row.title || `Role ${index + 1}`}
-                                                </span>
-                                                <span className="text-slate-500">
-                                                    {" "}- {row.desc_text || "-"}
-                                                </span>
-                                            </div>
-                                        ))}
+                                        {(rolesSection?.roles ?? []).map(
+                                            (row, index) => (
+                                                <div
+                                                    key={
+                                                        row.id ??
+                                                        `role-summary-${index}`
+                                                    }
+                                                >
+                                                    <span className="font-medium text-slate-900">
+                                                        {row.title ||
+                                                            `Role ${index + 1}`}
+                                                    </span>
+                                                    <span className="text-slate-500">
+                                                        {" "}
+                                                        - {row.desc_text || "-"}
+                                                    </span>
+                                                </div>
+                                            ),
+                                        )}
                                     </div>
                                 </td>
                             </tr>
@@ -1454,6 +1582,100 @@ const removeRoleRow = (index) => {
                                                 </div>
                                             ),
                                         )}
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section className="mb-4 rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-5">
+                    <h2 className="text-base font-semibold text-slate-900">
+                        Testimonials
+                    </h2>
+                    <button
+                        type="button"
+                        onClick={openTestimonialsEdit}
+                        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                    >
+                        Edit
+                    </button>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="min-w-full">
+                        <thead>
+                            <tr className="border-b border-slate-100 bg-slate-50/70 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                <th className="px-4 py-3 sm:px-5">Field</th>
+                                <th className="px-4 py-3 sm:px-5">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody className="text-sm text-slate-700">
+                            <tr className="border-b border-slate-100">
+                                <td className="px-4 py-3 font-medium sm:px-5">
+                                    Badge
+                                </td>
+                                <td className="px-4 py-3 sm:px-5">
+                                    {testimonialsSection?.badge_text || "-"}
+                                </td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                                <td className="px-4 py-3 font-medium sm:px-5">
+                                    Title
+                                </td>
+                                <td className="px-4 py-3 sm:px-5">
+                                    {testimonialsSection?.title_text || "-"}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td className="px-4 py-3 font-medium sm:px-5 align-top">
+                                    Latest Feedback
+                                </td>
+                                <td className="px-4 py-3 sm:px-5">
+                                    <div className="space-y-2">
+                                        {(
+                                            testimonialsSection?.testimonials ??
+                                            []
+                                        )
+                                            .slice(0, 10)
+                                            .map((row, index) => (
+                                                <div
+                                                    key={
+                                                        row.id ??
+                                                        `testimonial-summary-${index}`
+                                                    }
+                                                    className="rounded-lg border border-slate-200 bg-slate-50 p-3"
+                                                >
+                                                    <div className="mb-1 flex items-center justify-between gap-2">
+                                                        <span className="font-medium text-slate-900">
+                                                            {[
+                                                                row.first_name,
+                                                                row.last_name,
+                                                            ]
+                                                                .filter(Boolean)
+                                                                .join(" ") ||
+                                                                "Anonymous User"}
+                                                        </span>
+                                                        <span
+                                                            className={`rounded-full px-2 py-0.5 text-xs font-semibold ${testimonialStatusClass(
+                                                                row.status,
+                                                            )}`}
+                                                        >
+                                                            {formatTestimonialStatus(
+                                                                row.status,
+                                                            )}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-xs text-slate-500">
+                                                        {row.role ||
+                                                            "System User"}
+                                                    </p>
+                                                    <p className="mt-2 text-sm text-slate-700">
+                                                        {row.feedback || "-"}
+                                                    </p>
+                                                </div>
+                                            ))}
                                     </div>
                                 </td>
                             </tr>
@@ -1802,7 +2024,7 @@ const removeRoleRow = (index) => {
                                                 </button>
                                             </div>
                                         </div>
-                                            <div className="grid gap-3 md:grid-cols-2">
+                                        <div className="grid gap-3 md:grid-cols-2">
                                             <FormField
                                                 label="Metric"
                                                 error={
@@ -2027,8 +2249,10 @@ const removeRoleRow = (index) => {
                                                         aria-label={`Move Feature #${index + 1} down`}
                                                         disabled={
                                                             index ===
-                                                            (featuresData.features ??
-                                                                []).length -
+                                                            (
+                                                                featuresData.features ??
+                                                                []
+                                                            ).length -
                                                                 1
                                                         }
                                                         className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
@@ -2055,7 +2279,7 @@ const removeRoleRow = (index) => {
                                                     </button>
                                                 </div>
                                             </div>
-                                        <div className="grid gap-3 md:grid-cols-3">
+                                            <div className="grid gap-3 md:grid-cols-3">
                                                 <FormField
                                                     label="Card Title"
                                                     error={
@@ -2277,8 +2501,10 @@ const removeRoleRow = (index) => {
                                                         aria-label={`Move How It Works #${index + 1} down`}
                                                         disabled={
                                                             index ===
-                                                            (howItWorksData.steps ??
-                                                                []).length -
+                                                            (
+                                                                howItWorksData.steps ??
+                                                                []
+                                                            ).length -
                                                                 1
                                                         }
                                                         className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
@@ -2720,7 +2946,10 @@ const removeRoleRow = (index) => {
                             </button>
                         </div>
 
-                        <form onSubmit={submitRolesSection} className="space-y-4">
+                        <form
+                            onSubmit={submitRolesSection}
+                            className="space-y-4"
+                        >
                             <div className="max-h-[60vh] overflow-y-auto space-y-3 pr-1">
                                 <div className="grid gap-3 md:grid-cols-3">
                                     <FormField
@@ -2731,7 +2960,10 @@ const removeRoleRow = (index) => {
                                         <TextInput
                                             value={rolesData.badge_text}
                                             onChange={(event) =>
-                                                updateRoleField("badge_text", event.target.value)
+                                                updateRoleField(
+                                                    "badge_text",
+                                                    event.target.value,
+                                                )
                                             }
                                         />
                                     </FormField>
@@ -2743,7 +2975,10 @@ const removeRoleRow = (index) => {
                                         <TextInput
                                             value={rolesData.title_text}
                                             onChange={(event) =>
-                                                updateRoleField("title_text", event.target.value)
+                                                updateRoleField(
+                                                    "title_text",
+                                                    event.target.value,
+                                                )
                                             }
                                         />
                                     </FormField>
@@ -2755,7 +2990,10 @@ const removeRoleRow = (index) => {
                                         <TextInput
                                             value={rolesData.subtitle_text}
                                             onChange={(event) =>
-                                                updateRoleField("subtitle_text", event.target.value)
+                                                updateRoleField(
+                                                    "subtitle_text",
+                                                    event.target.value,
+                                                )
                                             }
                                         />
                                     </FormField>
@@ -2765,7 +3003,8 @@ const removeRoleRow = (index) => {
                                     <div
                                         key={row.id ?? `role-${index}`}
                                         ref={(el) => {
-                                            roleContainerRefs.current[index] = el;
+                                            roleContainerRefs.current[index] =
+                                                el;
                                         }}
                                         className="rounded-lg border border-slate-200 bg-slate-50 p-4"
                                     >
@@ -2776,29 +3015,52 @@ const removeRoleRow = (index) => {
                                             <div className="flex items-center gap-2">
                                                 <button
                                                     type="button"
-                                                    onClick={() => moveRoleRow(index, "up")}
+                                                    onClick={() =>
+                                                        moveRoleRow(index, "up")
+                                                    }
                                                     aria-label={`Move Role #${index + 1} up`}
                                                     disabled={index === 0}
                                                     className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
                                                 >
-                                                    <AppIcon name="arrow-up" className="h-4 w-4" />
+                                                    <AppIcon
+                                                        name="arrow-up"
+                                                        className="h-4 w-4"
+                                                    />
                                                 </button>
                                                 <button
                                                     type="button"
-                                                    onClick={() => moveRoleRow(index, "down")}
+                                                    onClick={() =>
+                                                        moveRoleRow(
+                                                            index,
+                                                            "down",
+                                                        )
+                                                    }
                                                     aria-label={`Move Role #${index + 1} down`}
-                                                    disabled={index === (rolesData.roles ?? []).length - 1}
+                                                    disabled={
+                                                        index ===
+                                                        (rolesData.roles ?? [])
+                                                            .length -
+                                                            1
+                                                    }
                                                     className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
                                                 >
-                                                    <AppIcon name="arrow-down" className="h-4 w-4" />
+                                                    <AppIcon
+                                                        name="arrow-down"
+                                                        className="h-4 w-4"
+                                                    />
                                                 </button>
                                                 <button
                                                     type="button"
-                                                    onClick={() => removeRoleRow(index)}
+                                                    onClick={() =>
+                                                        removeRoleRow(index)
+                                                    }
                                                     aria-label={`Delete Role #${index + 1}`}
                                                     className="rounded-lg border border-rose-200 bg-white p-1.5 text-rose-600 hover:bg-rose-50"
                                                 >
-                                                    <AppIcon name="trash" className="h-4 w-4" />
+                                                    <AppIcon
+                                                        name="trash"
+                                                        className="h-4 w-4"
+                                                    />
                                                 </button>
                                             </div>
                                         </div>
@@ -2806,78 +3068,174 @@ const removeRoleRow = (index) => {
                                         <div className="grid gap-3 md:grid-cols-2 mb-3">
                                             <FormField
                                                 label="Title"
-                                                error={rolesErrors[`roles.${index}.title`]}
+                                                error={
+                                                    rolesErrors[
+                                                        `roles.${index}.title`
+                                                    ]
+                                                }
                                                 required
                                             >
                                                 <TextInput
                                                     value={row.title ?? ""}
                                                     onChange={(event) =>
-                                                        updateRoleRow(index, "title", event.target.value)
+                                                        updateRoleRow(
+                                                            index,
+                                                            "title",
+                                                            event.target.value,
+                                                        )
                                                     }
                                                     placeholder="e.g. Faculty"
                                                 />
                                             </FormField>
                                             <FormField
                                                 label="Description"
-                                                error={rolesErrors[`roles.${index}.desc_text`]}
+                                                error={
+                                                    rolesErrors[
+                                                        `roles.${index}.desc_text`
+                                                    ]
+                                                }
                                             >
                                                 <TextInput
                                                     value={row.desc_text ?? ""}
                                                     onChange={(event) =>
-                                                        updateRoleRow(index, "desc_text", event.target.value)
+                                                        updateRoleRow(
+                                                            index,
+                                                            "desc_text",
+                                                            event.target.value,
+                                                        )
                                                     }
                                                 />
                                             </FormField>
                                             <FormField
                                                 label="Icon Type"
-                                                error={rolesErrors[`roles.${index}.icon_type`]}
+                                                error={
+                                                    rolesErrors[
+                                                        `roles.${index}.icon_type`
+                                                    ]
+                                                }
                                             >
                                                 <SelectInput
-                                                    value={row.icon_type ?? "faculty"}
+                                                    value={
+                                                        row.icon_type ??
+                                                        "faculty"
+                                                    }
                                                     onChange={(event) =>
-                                                        updateRoleRow(index, "icon_type", event.target.value)
+                                                        updateRoleRow(
+                                                            index,
+                                                            "icon_type",
+                                                            event.target.value,
+                                                        )
                                                     }
                                                 >
-                                                    <option value="faculty">Faculty</option>
-                                                    <option value="peer">Peer</option>
-                                                    <option value="student">Student</option>
-                                                    <option value="admin">Administrator</option>
+                                                    <option value="faculty">
+                                                        Faculty
+                                                    </option>
+                                                    <option value="peer">
+                                                        Peer
+                                                    </option>
+                                                    <option value="student">
+                                                        Student
+                                                    </option>
+                                                    <option value="admin">
+                                                        Administrator
+                                                    </option>
                                                 </SelectInput>
                                             </FormField>
                                             <FormField
                                                 label="Progress (%)"
-                                                error={rolesErrors[`roles.${index}.progress`]}
+                                                error={
+                                                    rolesErrors[
+                                                        `roles.${index}.progress`
+                                                    ]
+                                                }
                                             >
                                                 <div className="flex items-center gap-3">
                                                     <TextInput
                                                         type="text"
                                                         inputMode="numeric"
-                                                        value={String(row.progress ?? "")}
+                                                        value={String(
+                                                            row.progress ?? "",
+                                                        )}
                                                         placeholder="0–100"
                                                         className="flex-1"
                                                         onChange={(event) => {
-                                                            const raw = event.target.value.replace(/[^0-9]/g, "");
-                                                            const clamped = raw === "" ? "" : String(Math.min(100, parseInt(raw, 10)));
-                                                            updateRoleRow(index, "progress", clamped);
+                                                            const raw =
+                                                                event.target.value.replace(
+                                                                    /[^0-9]/g,
+                                                                    "",
+                                                                );
+                                                            const clamped =
+                                                                raw === ""
+                                                                    ? ""
+                                                                    : String(
+                                                                          Math.min(
+                                                                              100,
+                                                                              parseInt(
+                                                                                  raw,
+                                                                                  10,
+                                                                              ),
+                                                                          ),
+                                                                      );
+                                                            updateRoleRow(
+                                                                index,
+                                                                "progress",
+                                                                clamped,
+                                                            );
                                                         }}
                                                     />
                                                     {(() => {
-                                                        const pct = Math.min(100, Math.max(0, Number(row.progress) || 0));
+                                                        const pct = Math.min(
+                                                            100,
+                                                            Math.max(
+                                                                0,
+                                                                Number(
+                                                                    row.progress,
+                                                                ) || 0,
+                                                            ),
+                                                        );
                                                         const r = 24;
-                                                        const circ = 2 * Math.PI * r;
-                                                        const offset = circ * (1 - pct / 100);
+                                                        const circ =
+                                                            2 * Math.PI * r;
+                                                        const offset =
+                                                            circ *
+                                                            (1 - pct / 100);
                                                         return (
-                                                            <svg viewBox="0 0 60 60" className="w-14 h-14 shrink-0">
-                                                                <circle cx="30" cy="30" r={r} fill="none" stroke="#e2e8f0" strokeWidth="5" />
+                                                            <svg
+                                                                viewBox="0 0 60 60"
+                                                                className="w-14 h-14 shrink-0"
+                                                            >
                                                                 <circle
-                                                                    cx="30" cy="30" r={r}
-                                                                    fill="none" stroke="#3b82f6" strokeWidth="5"
-                                                                    strokeDasharray={circ}
-                                                                    strokeDashoffset={offset}
+                                                                    cx="30"
+                                                                    cy="30"
+                                                                    r={r}
+                                                                    fill="none"
+                                                                    stroke="#e2e8f0"
+                                                                    strokeWidth="5"
+                                                                />
+                                                                <circle
+                                                                    cx="30"
+                                                                    cy="30"
+                                                                    r={r}
+                                                                    fill="none"
+                                                                    stroke="#3b82f6"
+                                                                    strokeWidth="5"
+                                                                    strokeDasharray={
+                                                                        circ
+                                                                    }
+                                                                    strokeDashoffset={
+                                                                        offset
+                                                                    }
                                                                     strokeLinecap="round"
                                                                     transform="rotate(-90 30 30)"
                                                                 />
-                                                                <text x="30" y="34" textAnchor="middle" fontSize="10" fontWeight="700" fill="#3b82f6">
+                                                                <text
+                                                                    x="30"
+                                                                    y="34"
+                                                                    textAnchor="middle"
+                                                                    fontSize="10"
+                                                                    fontWeight="700"
+                                                                    fill="#3b82f6"
+                                                                >
                                                                     {pct}%
                                                                 </text>
                                                             </svg>
@@ -2894,32 +3252,55 @@ const removeRoleRow = (index) => {
                                                 </span>
                                                 <button
                                                     type="button"
-                                                    onClick={() => addFeatureToRole(index)}
+                                                    onClick={() =>
+                                                        addFeatureToRole(index)
+                                                    }
                                                     className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
                                                 >
                                                     + Add
                                                 </button>
                                             </div>
                                             <div className="space-y-2">
-                                                {(row.features ?? []).map((feat, fi) => (
-                                                    <div key={fi} className="flex gap-2">
-                                                        <TextInput
-                                                            value={feat}
-                                                            onChange={(event) =>
-                                                                updateFeatureInRole(index, fi, event.target.value)
-                                                            }
-                                                            placeholder={`Feature ${fi + 1}`}
-                                                        />
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => removeFeatureFromRole(index, fi)}
-                                                            aria-label={`Remove feature ${fi + 1}`}
-                                                            className="shrink-0 rounded-lg border border-rose-200 bg-white p-1.5 text-rose-600 hover:bg-rose-50"
+                                                {(row.features ?? []).map(
+                                                    (feat, fi) => (
+                                                        <div
+                                                            key={fi}
+                                                            className="flex gap-2"
                                                         >
-                                                            <AppIcon name="trash" className="h-4 w-4" />
-                                                        </button>
-                                                    </div>
-                                                ))}
+                                                            <TextInput
+                                                                value={feat}
+                                                                onChange={(
+                                                                    event,
+                                                                ) =>
+                                                                    updateFeatureInRole(
+                                                                        index,
+                                                                        fi,
+                                                                        event
+                                                                            .target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                                placeholder={`Feature ${fi + 1}`}
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    removeFeatureFromRole(
+                                                                        index,
+                                                                        fi,
+                                                                    )
+                                                                }
+                                                                aria-label={`Remove feature ${fi + 1}`}
+                                                                className="shrink-0 rounded-lg border border-rose-200 bg-white p-1.5 text-rose-600 hover:bg-rose-50"
+                                                            >
+                                                                <AppIcon
+                                                                    name="trash"
+                                                                    className="h-4 w-4"
+                                                                />
+                                                            </button>
+                                                        </div>
+                                                    ),
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -2930,7 +3311,10 @@ const removeRoleRow = (index) => {
                                 <div className="flex flex-col md:flex-row-reverse gap-3 md:justify-start w-full">
                                     <SubmitButton
                                         processing={rolesProcessing}
-                                        disabled={hasEmptyRolesRequiredFields || !hasRolesSectionChanges}
+                                        disabled={
+                                            hasEmptyRolesRequiredFields ||
+                                            !hasRolesSectionChanges
+                                        }
                                         className="w-full md:w-[180px]"
                                     >
                                         Save Changes
@@ -2949,6 +3333,208 @@ const removeRoleRow = (index) => {
                 </div>
             )}
 
+            {testimonialsModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div
+                        className="absolute inset-0 bg-slate-950/40"
+                        onClick={closeTestimonialsModal}
+                    />
+                    <div
+                        className="relative w-full max-w-3xl rounded-xl bg-white p-6 shadow-2xl"
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div className="mb-4 flex items-center justify-between">
+                            <h3 className="text-base font-semibold text-slate-900">
+                                Edit Testimonials Section
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={closeTestimonialsModal}
+                                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                                aria-label="Close modal"
+                            >
+                                <svg
+                                    className="h-5 w-5"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={2}
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M6 18L18 6M6 6l12 12"
+                                    />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <form
+                            onSubmit={submitTestimonialsSection}
+                            className="space-y-4"
+                        >
+                            <div className="space-y-3">
+                                <div className="grid gap-3 md:grid-cols-2">
+                                    <FormField
+                                        label="Badge"
+                                        error={testimonialsErrors.badge_text}
+                                        required
+                                    >
+                                        <TextInput
+                                            value={testimonialsData.badge_text}
+                                            onChange={(event) =>
+                                                setTestimonialsData(
+                                                    "badge_text",
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                    </FormField>
+                                    <FormField
+                                        label="Title"
+                                        error={testimonialsErrors.title_text}
+                                        required
+                                    >
+                                        <TextInput
+                                            value={testimonialsData.title_text}
+                                            onChange={(event) =>
+                                                setTestimonialsData(
+                                                    "title_text",
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                    </FormField>
+                                </div>
+
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                                    <h4 className="mb-3 text-sm font-semibold text-slate-900">
+                                        Recent Submitted Testimonials
+                                    </h4>
+                                    <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+                                        {(testimonialsSection?.testimonials ?? [])
+                                            .slice(0, 10)
+                                            .map((row, index) => (
+                                                <div
+                                                    key={
+                                                        row.id ??
+                                                        `testimonial-modal-item-${index}`
+                                                    }
+                                                    className="rounded-lg border border-slate-200 bg-white p-3"
+                                                >
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <div>
+                                                            <p className="font-medium text-slate-900">
+                                                                {[
+                                                                    row.first_name,
+                                                                    row.last_name,
+                                                                ]
+                                                                    .filter(Boolean)
+                                                                    .join(" ") ||
+                                                                    "Anonymous User"}
+                                                            </p>
+                                                            <p className="text-xs text-slate-500">
+                                                                {row.created_at ||
+                                                                    "-"}
+                                                            </p>
+                                                        </div>
+                                                        <span
+                                                            className={`rounded-full px-2 py-0.5 text-xs font-semibold ${testimonialStatusClass(
+                                                                row.status,
+                                                            )}`}
+                                                        >
+                                                            {formatTestimonialStatus(
+                                                                row.status,
+                                                            )}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-xs text-slate-500">
+                                                        {row.role || "System User"}
+                                                    </p>
+                                                    <p className="mt-2 text-sm text-slate-700">
+                                                        {row.feedback || "-"}
+                                                    </p>
+                                                    {row.id ? (
+                                                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                                                            {(() => {
+                                                                const status = String(
+                                                                    row.status ??
+                                                                        "",
+                                                                ).toLowerCase();
+                                                                const busy =
+                                                                    testimonialAction.id ===
+                                                                        row.id &&
+                                                                    testimonialAction.status !==
+                                                                        null;
+                                                                const approveDisabled =
+                                                                    busy ||
+                                                                    status ===
+                                                                        "approved";
+                                                                const rejectDisabled =
+                                                                    busy ||
+                                                                    status ===
+                                                                        "rejected";
+                                                                return (
+                                                                    <>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    updateTestimonialStatus(
+                                                                        row.id,
+                                                                        "approved",
+                                                                    )
+                                                                }
+                                                                disabled={approveDisabled}
+                                                                className="rounded-md border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                                            >
+                                                                Approve
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    updateTestimonialStatus(
+                                                                        row.id,
+                                                                        "rejected",
+                                                                    )
+                                                                }
+                                                                disabled={rejectDisabled}
+                                                                className="rounded-md border border-rose-300 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                                            >
+                                                                Reject
+                                                            </button>
+                                                                    </>
+                                                                );
+                                                            })()}
+                                                        </div>
+                                                    ) : null}
+                                                </div>
+                                            ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="pt-2">
+                                <div className="flex w-full flex-col gap-3 md:flex-row-reverse md:justify-start">
+                                    <SubmitButton
+                                        processing={testimonialsProcessing}
+                                        disabled={hasEmptyTestimonialsRequiredFields}
+                                        className="w-full md:w-[180px]"
+                                    >
+                                        Save Changes
+                                    </SubmitButton>
+                                    <button
+                                        type="button"
+                                        onClick={closeTestimonialsModal}
+                                        className="w-full rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700 md:w-[180px]"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </AdminLayout>
     );
 }

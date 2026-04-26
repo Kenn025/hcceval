@@ -1,6 +1,7 @@
 import AppIcon from "@/Components/AppIcon";
 import FlashNotification from "@/Components/FlashNotification";
 import NotificationBell from "@/Components/NotificationBell";
+import TestimonialFeedbackWidget from "@/Components/TestimonialFeedbackWidget";
 import useSystemTooltip from "@/Components/useSystemTooltip";
 import { Head, Link, usePage, useForm, router } from "@inertiajs/react";
 import { Moon, Sun } from "lucide-react";
@@ -728,7 +729,9 @@ export default function AdminLayout({
                                                 type="button"
                                                 onClick={() => {
                                                     setShowUserMenu(false);
-                                                    router.visit(route("profile.edit"));
+                                                    router.visit(
+                                                        route("profile.edit"),
+                                                    );
                                                 }}
                                                 className={[
                                                     "flex w-full items-center gap-2.5 px-3 py-2.5 text-sm transition",
@@ -1025,6 +1028,12 @@ export default function AdminLayout({
                     </div>
                 </div>
             )}
+
+            <TestimonialFeedbackWidget
+                visible={role !== "superadmin"}
+                storeUrl={route("testimonials.store")}
+                historyUrl={route("testimonials.mine")}
+            />
         </>
     );
 }

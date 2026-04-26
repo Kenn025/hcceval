@@ -1,6 +1,7 @@
 import AppIcon from "@/Components/AppIcon";
 import FlashNotification from "@/Components/FlashNotification";
 import NotificationBell from "@/Components/NotificationBell";
+import TestimonialFeedbackWidget from "@/Components/TestimonialFeedbackWidget";
 import useSystemTooltip from "@/Components/useSystemTooltip";
 import { Head, router, useForm } from "@inertiajs/react";
 import { Moon, Sun } from "lucide-react";
@@ -1032,6 +1033,12 @@ export default function PortalLayout({
                     </div>
                 </div>
             )}
+
+            <TestimonialFeedbackWidget
+                visible={true}
+                storeUrl={route("portal.testimonials.store")}
+                historyUrl={route("portal.testimonials.mine")}
+            />
         </>
     );
 }

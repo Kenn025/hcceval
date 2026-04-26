@@ -12,6 +12,8 @@ use App\Models\LandingPageHowItWorksStep;
 use App\Models\LandingPageRole;
 use App\Models\LandingPageRolesSection;
 use App\Models\LandingPageStat;
+use App\Models\LandingPageTestimonial;
+use App\Models\LandingPageTestimonialSection;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -47,6 +49,10 @@ class LandingPageHeaderController extends Controller
         'badge_text' => 'Process',
         'title_text' => 'How It Works',
         'subtitle_text' => 'Simple evaluation process in four steps',
+    ];
+    private const DEFAULT_TESTIMONIAL_SECTION = [
+        'badge_text' => 'Testimonials',
+        'title_text' => 'What Users Say',
     ];
     private const DEFAULT_ROLES = [
         [
@@ -194,6 +200,7 @@ class LandingPageHeaderController extends Controller
             'featuresSection' => $this->featureSectionData(),
             'rolesSection' => $this->rolesSectionData(),
             'howItWorksSection' => $this->howItWorksSectionData(),
+            'testimonialsSection' => $this->testimonialsSectionData(),
             'filters' => [
                 'search' => $search,
                 'per_page' => $perPage,
@@ -877,6 +884,55 @@ class LandingPageHeaderController extends Controller
         return back()->with('success', 'How It Works section updated successfully.');
     }
 
+    public function updateTestimonialsSection(Request $request)
+    {
+        if (! Schema::hasTable('landing_page_testimonial_sections')) {
+            return back()->withErrors([
+                'testimonials_section' => 'Testimonials section table is not available yet. Please run migrations first.',
+            ]);
+        }
+
+        $validated = $request->validate([
+            'badge_text' => 'required|string|max:120',
+            'title_text' => 'required|string|max:255',
+        ]);
+
+        $section = LandingPageTestimonialSection::query()->first();
+        if (! $section) {
+            $section = LandingPageTestimonialSection::query()->create(self::DEFAULT_TESTIMONIAL_SECTION);
+        }
+
+        $section->update([
+            'badge_text' => $validated['badge_text'],
+            'title_text' => $validated['title_text'],
+        ]);
+
+        return back()->with('success', 'Testimonials section updated successfully.');
+    }
+
+    public function updateTestimonialStatus(Request $request, LandingPageTestimonial $landingPageTestimonial)
+    {
+        if (! Schema::hasTable('landing_page_testimonials')) {
+            return back()->withErrors([
+                'testimonials_section' => 'Testimonials table is not available yet. Please run migrations first.',
+            ]);
+        }
+
+        $validated = $request->validate([
+            'status' => 'required|in:approved,rejected',
+        ]);
+
+        if ((string) $landingPageTestimonial->status === (string) $validated['status']) {
+            return back()->with('success', 'Testimonial is already marked as ' . $validated['status'] . '.');
+        }
+
+        $landingPageTestimonial->update([
+            'status' => $validated['status'],
+        ]);
+
+        return back()->with('success', 'Testimonial status updated successfully.');
+    }
+
     private function rolesSectionData(): array
     {
         $defaultRoles = collect(self::DEFAULT_ROLES)
@@ -966,6 +1022,75 @@ class LandingPageHeaderController extends Controller
             'title_text' => $section?->title_text ?: self::DEFAULT_HOW_IT_WORKS_SECTION['title_text'],
             'subtitle_text' => $section?->subtitle_text ?: self::DEFAULT_HOW_IT_WORKS_SECTION['subtitle_text'],
             'steps' => count($steps) > 0 ? $steps : $defaultSteps,
+        ];
+    }
+
+    private function testimonialsSectionData(): array
+    {
+        $defaultTestimonials = [
+            [
+                'id' => null,
+                'feedback' => 'This system has revolutionized our evaluation process. The holistic approach provides invaluable insights we never had before.',
+                'first_name' => 'Maria',
+                'last_name' => 'Santos',
+                'role' => 'Dean of Engineering',
+                'profile_photo_path' => null,
+                'status' => 'approved',
+                'created_at' => null,
+            ],
+            [
+                'id' => null,
+                'feedback' => 'The peer evaluation feature has fostered continuous improvement. I can track my growth with actionable feedback.',
+                'first_name' => 'Juan',
+                'last_name' => 'Cruz',
+                'role' => 'Faculty Member',
+                'profile_photo_path' => null,
+                'status' => 'approved',
+                'created_at' => null,
+            ],
+            [
+                'id' => null,
+                'feedback' => 'Managing evaluations across campuses is now seamless. The analytics dashboard provides real-time insights.',
+                'first_name' => 'Ana',
+                'last_name' => 'Reyes',
+                'role' => 'Administrator',
+                'profile_photo_path' => null,
+                'status' => 'approved',
+                'created_at' => null,
+            ],
+        ];
+
+        if (! Schema::hasTable('landing_page_testimonial_sections') || ! Schema::hasTable('landing_page_testimonials')) {
+            return [
+                ...self::DEFAULT_TESTIMONIAL_SECTION,
+                'testimonials' => $defaultTestimonials,
+            ];
+        }
+
+        $section = LandingPageTestimonialSection::query()->first();
+        $testimonials = LandingPageTestimonial::query()
+            ->where('is_active', 1)
+            ->orderBy('sort_order')
+            ->orderByDesc('id')
+            ->limit(10)
+            ->get(['id', 'feedback', 'first_name', 'last_name', 'role', 'profile_photo_path', 'status', 'created_at'])
+            ->map(fn(LandingPageTestimonial $testimonial) => [
+                'id' => $testimonial->id,
+                'feedback' => $testimonial->feedback,
+                'first_name' => $testimonial->first_name,
+                'last_name' => $testimonial->last_name,
+                'role' => $testimonial->role,
+                'profile_photo_path' => $testimonial->profile_photo_path,
+                'status' => $testimonial->status,
+                'created_at' => optional($testimonial->created_at)->format('Y-m-d H:i:s'),
+            ])
+            ->values()
+            ->all();
+
+        return [
+            'badge_text' => $section?->badge_text ?: self::DEFAULT_TESTIMONIAL_SECTION['badge_text'],
+            'title_text' => $section?->title_text ?: self::DEFAULT_TESTIMONIAL_SECTION['title_text'],
+            'testimonials' => count($testimonials) > 0 ? $testimonials : $defaultTestimonials,
         ];
     }
 

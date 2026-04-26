@@ -11,6 +11,8 @@ use App\Models\LandingPageHowItWorksStep;
 use App\Models\LandingPageRole;
 use App\Models\LandingPageRolesSection;
 use App\Models\LandingPageStat;
+use App\Models\LandingPageTestimonial;
+use App\Models\LandingPageTestimonialSection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -28,6 +30,7 @@ class HomeController extends Controller
             'featuresSection' => $this->featuresSection(),
             'rolesSection' => $this->rolesSection(),
             'howItWorksSection' => $this->howItWorksSection(),
+            'testimonialsSection' => $this->testimonialsSection(),
         ]);
     }
 
@@ -301,6 +304,66 @@ class HomeController extends Controller
             'title_text' => $section?->title_text ?: $defaultSection['title_text'],
             'subtitle_text' => $section?->subtitle_text ?: $defaultSection['subtitle_text'],
             'steps' => count($steps) > 0 ? $steps : $defaultSteps,
+        ];
+    }
+
+    private function testimonialsSection(): array
+    {
+        $defaultTestimonials = [
+            [
+                'feedback' => 'This system has revolutionized our evaluation process. The holistic approach provides invaluable insights we never had before.',
+                'first_name' => 'Maria',
+                'last_name' => 'Santos',
+                'role' => 'Dean of Engineering',
+                'profile_photo_path' => null,
+            ],
+            [
+                'feedback' => 'The peer evaluation feature has fostered continuous improvement. I can track my growth with actionable feedback.',
+                'first_name' => 'Juan',
+                'last_name' => 'Cruz',
+                'role' => 'Faculty Member',
+                'profile_photo_path' => null,
+            ],
+            [
+                'feedback' => 'Managing evaluations across campuses is now seamless. The analytics dashboard provides real-time insights.',
+                'first_name' => 'Ana',
+                'last_name' => 'Reyes',
+                'role' => 'Administrator',
+                'profile_photo_path' => null,
+            ],
+        ];
+        $defaultSection = [
+            'badge_text' => 'Testimonials',
+            'title_text' => 'What Users Say',
+            'testimonials' => $defaultTestimonials,
+        ];
+
+        if (! Schema::hasTable('landing_page_testimonial_sections') || ! Schema::hasTable('landing_page_testimonials')) {
+            return $defaultSection;
+        }
+
+        $section = LandingPageTestimonialSection::query()->first();
+        $testimonials = LandingPageTestimonial::query()
+            ->where('is_active', 1)
+            ->where('status', 'approved')
+            ->orderBy('sort_order')
+            ->orderByDesc('id')
+            ->limit(10)
+            ->get(['feedback', 'first_name', 'last_name', 'role', 'profile_photo_path'])
+            ->map(fn(LandingPageTestimonial $testimonial) => [
+                'feedback' => $testimonial->feedback,
+                'first_name' => $testimonial->first_name,
+                'last_name' => $testimonial->last_name,
+                'role' => $testimonial->role,
+                'profile_photo_path' => $testimonial->profile_photo_path,
+            ])
+            ->values()
+            ->all();
+
+        return [
+            'badge_text' => $section?->badge_text ?: $defaultSection['badge_text'],
+            'title_text' => $section?->title_text ?: $defaultSection['title_text'],
+            'testimonials' => count($testimonials) > 0 ? $testimonials : $defaultTestimonials,
         ];
     }
 }
