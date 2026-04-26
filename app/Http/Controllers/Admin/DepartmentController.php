@@ -40,7 +40,7 @@ class DepartmentController extends Controller
                         ->orWhereHas('branch', fn ($branchQuery) => $branchQuery->where('name', 'like', "%{$search}%"));
                 });
             })
-            ->orderBy('name')
+            ->orderByDesc('id')
             ->paginate($perPage)
             ->withQueryString();
 

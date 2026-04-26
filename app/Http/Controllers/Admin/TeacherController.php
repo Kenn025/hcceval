@@ -11,6 +11,7 @@ use App\Models\Program;
 use App\Models\Strand;
 use App\Models\Teacher;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class TeacherController extends Controller
@@ -95,6 +96,11 @@ class TeacherController extends Controller
     public function store(StoreTeacherRequest $request)
     {
         $payload = $this->teacherPayloadFromRequest($request);
+
+        if ($message = $this->emailInUseMessage($payload['email'])) {
+            return back()->withErrors(['email' => $message])->withInput();
+        }
+
         Teacher::create($this->mapTeacherPayload($payload));
 
         return back()->with('success', 'Teacher created successfully.');
@@ -103,9 +109,29 @@ class TeacherController extends Controller
     public function update(UpdateTeacherRequest $request, Teacher $teacher)
     {
         $payload = $this->teacherPayloadFromRequest($request);
+
+        if ($message = $this->emailInUseMessage($payload['email'], $teacher->id)) {
+            return back()->withErrors(['email' => $message])->withInput();
+        }
+
         $teacher->update($this->mapTeacherPayload($payload, false));
 
         return back()->with('success', 'Teacher updated successfully.');
+    }
+
+    public function checkEmailAvailability(Request $request)
+    {
+        $validated = $request->validate([
+            'email' => 'required|email|max:150',
+            'teacher_id' => 'nullable|integer',
+        ]);
+
+        $message = $this->emailInUseMessage($validated['email'], $validated['teacher_id'] ?? null);
+
+        return response()->json([
+            'available' => $message === null,
+            'message' => $message,
+        ]);
     }
 
     public function destroy(Teacher $teacher)
@@ -207,5 +233,34 @@ class TeacherController extends Controller
             'password' => $request->input('password'),
             'role' => $request->input('role', 'Teacher'),
         ];
+    }
+
+    private function emailInUseMessage(?string $email, ?int $ignoreTeacherId = null): ?string
+    {
+        $normalizedEmail = strtolower(trim((string) $email));
+
+        if ($normalizedEmail === '') {
+            return null;
+        }
+
+        $checks = [
+            ['table' => 'admin', 'label' => 'an admin account', 'ignore_id' => null],
+            ['table' => 'teacher', 'label' => 'a teacher account', 'ignore_id' => $ignoreTeacherId],
+            ['table' => 'student', 'label' => 'a student account', 'ignore_id' => null],
+            ['table' => 'employee', 'label' => 'an employee account', 'ignore_id' => null],
+        ];
+
+        foreach ($checks as $check) {
+            $exists = DB::table($check['table'])
+                ->whereRaw('LOWER(email) = ?', [$normalizedEmail])
+                ->when($check['ignore_id'], fn ($query, $id) => $query->where('id', '!=', $id))
+                ->exists();
+
+            if ($exists) {
+                return "This email is already used by {$check['label']}.";
+            }
+        }
+
+        return null;
     }
 }

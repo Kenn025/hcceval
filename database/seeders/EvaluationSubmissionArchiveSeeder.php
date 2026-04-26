@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Schema;
 
 class EvaluationSubmissionArchiveSeeder extends Seeder
 {
+    private const ARCHIVE_OPENED_AT = '2026-04-26 00:00:00';
+
     public function run(): void
     {
         if (
@@ -345,6 +347,7 @@ class EvaluationSubmissionArchiveSeeder extends Seeder
         }
 
         $this->seedPeerRatings(1, $olderAcademicYearId, $activeAcademicYearId);
+        $this->syncAcademicYearSummaries(array_filter([1, $olderAcademicYearId, $olderSecondSemesterAcademicYearId, $activeAcademicYearId]));
     }
 
     private function insertSubmission(array $payload): ?int
@@ -377,25 +380,129 @@ class EvaluationSubmissionArchiveSeeder extends Seeder
 
     private function ensureAcademicYear(int $fromYear, int $toYear, string $term): int
     {
-        $existingId = DB::table('academic_year')
+        $existing = DB::table('academic_year')
             ->where('from_year', $fromYear)
             ->where('to_year', $toYear)
             ->where('term', $term)
-            ->value('id');
+            ->first(['id']);
 
-        if ($existingId) {
-            return (int) $existingId;
+        if ($existing) {
+            $updates = [
+                'created_at' => self::ARCHIVE_OPENED_AT,
+                'updated_at' => self::ARCHIVE_OPENED_AT,
+            ];
+
+            if (Schema::hasColumns('academic_year', ['date_opened', 'date_closed'])) {
+                $updates['date_opened'] = self::ARCHIVE_OPENED_AT;
+                $updates['date_closed'] = null;
+            }
+
+            DB::table('academic_year')->where('id', $existing->id)->update($updates);
+
+            return (int) $existing->id;
         }
 
-        return (int) DB::table('academic_year')->insertGetId([
+        $payload = [
             'from_year' => $fromYear,
             'to_year' => $toYear,
             'term' => $term,
             'is_activated' => 0,
             'is_deleted' => 0,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+            'created_at' => self::ARCHIVE_OPENED_AT,
+            'updated_at' => self::ARCHIVE_OPENED_AT,
+        ];
+
+        if (Schema::hasColumns('academic_year', ['date_opened', 'date_closed'])) {
+            $payload['date_opened'] = self::ARCHIVE_OPENED_AT;
+            $payload['date_closed'] = null;
+        }
+
+        return (int) DB::table('academic_year')->insertGetId($payload);
+    }
+
+    private function syncAcademicYearSummaries(array $academicYearIds): void
+    {
+        if (! Schema::hasColumns('academic_year', [
+            'total_assigned_questions',
+            'total_evaluation_submitted',
+            'date_opened',
+            'date_closed',
+        ])) {
+            return;
+        }
+
+        $questionTotals = $this->questionTotalsByAcademicYear();
+        $submissionStats = $this->submissionStatsByAcademicYear();
+
+        foreach ($academicYearIds as $academicYearId) {
+            $stats = $submissionStats[(int) $academicYearId] ?? ['submissions' => 0, 'submitted_questions' => 0];
+
+            DB::table('academic_year')->where('id', $academicYearId)->update([
+                'total_assigned_questions' => (int) ($questionTotals[(int) $academicYearId] ?? 0),
+                'total_evaluation_submitted' => (int) $stats['submissions'],
+            ]);
+        }
+    }
+
+    private function submissionStatsByAcademicYear(): array
+    {
+        return DB::table('evaluation_submissions')
+            ->select('academic_year_id', 'answers')
+            ->whereNotNull('academic_year_id')
+            ->get()
+            ->groupBy('academic_year_id')
+            ->map(function ($rows) {
+                return [
+                    'submissions' => $rows->count(),
+                    'submitted_questions' => $rows->sum(function (object $row) {
+                        $answers = json_decode((string) $row->answers, true);
+
+                        return is_array($answers) ? count($answers) : 0;
+                    }),
+                ];
+            })
+            ->all();
+    }
+
+    private function questionTotalsByAcademicYear(): array
+    {
+        $questionnaireQuestionCounts = DB::table('questionnaires')
+            ->select('id', 'items')
+            ->get()
+            ->mapWithKeys(fn (object $questionnaire) => [
+                (int) $questionnaire->id => $this->countQuestionnaireQuestions($questionnaire->items),
+            ]);
+
+        return DB::table('questionnaire_distribution')
+            ->select('academic_year_id', 'questionnaire_id')
+            ->where('is_deleted', 0)
+            ->whereNotNull('academic_year_id')
+            ->get()
+            ->groupBy('academic_year_id')
+            ->map(fn ($rows) => $rows->sum(
+                fn (object $row) => (int) ($questionnaireQuestionCounts[(int) $row->questionnaire_id] ?? 0)
+            ))
+            ->all();
+    }
+
+    private function countQuestionnaireQuestions(?string $items): int
+    {
+        $payload = json_decode((string) $items, true);
+
+        if (! is_array($payload)) {
+            return 0;
+        }
+
+        $scaleQuestions = collect($payload['scale_questions'] ?? [])
+            ->flatMap(fn ($group) => $group['questions'] ?? [])
+            ->map(fn ($question) => (int) ($question['question_id'] ?? $question))
+            ->filter();
+
+        $commentQuestions = collect(data_get($payload, 'comment_section.questions', []))
+            ->map(fn ($question) => (int) ($question['question_id'] ?? $question))
+            ->filter();
+
+        return $scaleQuestions->merge($commentQuestions)->unique()->count();
     }
 
     private function activeAcademicYearId(): ?int

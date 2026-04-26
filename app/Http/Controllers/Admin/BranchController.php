@@ -9,6 +9,7 @@ use App\Models\Department;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class BranchController extends Controller
@@ -34,7 +35,7 @@ class BranchController extends Controller
             ->with(['departments' => fn ($query) => $query
                 ->select('id', 'branch_id', 'code', 'name', 'is_activated')
                 ->where('is_deleted', 0)
-                ->orderBy('id')])
+                ->orderByDesc('id')])
             ->with(['admins' => fn ($query) => $query
                 ->select('id', 'branch_id', 'code', 'name', 'email', 'role', 'is_activated')
                 ->where('is_deleted', 0)
@@ -58,9 +59,17 @@ class BranchController extends Controller
             'is_active' => 'boolean',
             'department_levels' => 'required|array|min:1',
             'department_levels.*' => 'in:elementary,junior_high,senior_high,college',
-            'admin_email' => 'nullable|email|max:150',
-            'admin_password' => 'nullable|string|min:6|max:100',
+            'admin_email' => 'required|email|max:150',
+            'admin_password' => 'required|string|min:6|max:100',
         ]);
+
+        $existingAccountType = $this->existingEmailAccountType($validated['admin_email']);
+
+        if ($existingAccountType) {
+            throw ValidationException::withMessages([
+                'admin_email' => "This email is already used by {$this->accountTypeArticle($existingAccountType)} {$existingAccountType} account.",
+            ]);
+        }
 
         DB::transaction(function () use ($validated) {
             $branchCode = $this->generateUniqueBranchCode($validated['name']);
@@ -245,19 +254,39 @@ class BranchController extends Controller
 
     private function generateUniqueAdminEmail(string $branchName, ?string $preferredEmail = null): string
     {
-        $base = $preferredEmail
-            ? Str::before(strtolower($preferredEmail), '@')
-            : 'admin.' . Str::of($branchName)->lower()->replaceMatches('/[^a-z0-9]+/', '.')->trim('.')->value();
+        if ($preferredEmail) {
+            return strtolower(trim($preferredEmail));
+        }
+
+        $base = 'admin.' . Str::of($branchName)->lower()->replaceMatches('/[^a-z0-9]+/', '.')->trim('.')->value();
         $base = trim($base, '.') ?: 'admin.branch';
         $candidate = $base . '@hcc.local';
         $suffix = 2;
 
-        while (Admin::query()->where('email', $candidate)->exists()) {
+        while ($this->existingEmailAccountType($candidate)) {
             $candidate = $base . $suffix . '@hcc.local';
             $suffix++;
         }
 
         return $candidate;
+    }
+
+    private function existingEmailAccountType(string $email): ?string
+    {
+        $normalizedEmail = strtolower(trim($email));
+
+        foreach (['admin', 'teacher', 'employee', 'student'] as $table) {
+            if (DB::table($table)->whereRaw('LOWER(email) = ?', [$normalizedEmail])->exists()) {
+                return $table;
+            }
+        }
+
+        return null;
+    }
+
+    private function accountTypeArticle(string $accountType): string
+    {
+        return in_array($accountType, ['admin', 'employee'], true) ? 'an' : 'a';
     }
 
     private function generateUniqueAdminCode(string $branchCode): string

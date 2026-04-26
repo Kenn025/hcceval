@@ -10,6 +10,7 @@ use App\Models\EmployeeDepartment;
 use App\Models\Program;
 use App\Models\Strand;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class EmployeeController extends Controller
@@ -37,8 +38,7 @@ class EmployeeController extends Controller
                     ->orWhere('code', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%");
             }))
-            ->orderBy('lastname')
-            ->orderBy('firstname')
+            ->orderByDesc('id')
             ->paginate(20)
             ->withQueryString();
 
@@ -73,6 +73,11 @@ class EmployeeController extends Controller
     public function store(\App\Http\Requests\Admin\StoreEmployeeRequest $request)
     {
         $payload = $this->employeePayloadFromRequest($request);
+
+        if ($message = $this->emailInUseMessage($payload['email'])) {
+            return back()->withErrors(['email' => $message])->withInput();
+        }
+
         Employee::create($this->mapEmployeePayload($payload));
 
         return back()->with('success', 'Employee created successfully.');
@@ -81,9 +86,29 @@ class EmployeeController extends Controller
     public function update(\App\Http\Requests\Admin\UpdateEmployeeRequest $request, Employee $employee)
     {
         $payload = $this->employeePayloadFromRequest($request);
+
+        if ($message = $this->emailInUseMessage($payload['email'], $employee->id)) {
+            return back()->withErrors(['email' => $message])->withInput();
+        }
+
         $employee->update($this->mapEmployeePayload($payload, false));
 
         return back()->with('success', 'Employee updated successfully.');
+    }
+
+    public function checkEmailAvailability(Request $request)
+    {
+        $validated = $request->validate([
+            'email' => 'required|email|max:150',
+            'employee_id' => 'nullable|integer',
+        ]);
+
+        $message = $this->emailInUseMessage($validated['email'], $validated['employee_id'] ?? null);
+
+        return response()->json([
+            'available' => $message === null,
+            'message' => $message,
+        ]);
     }
 
     public function destroy(Employee $employee)
@@ -98,7 +123,7 @@ class EmployeeController extends Controller
         $branchId = $validated['branch_id'] ?: null;
 
         $payload = [
-            'code' => $validated['employee_no'] ?: $this->generateEmployeeCode($branchId ? (int) $branchId : null),
+            'code' => ($validated['employee_no'] ?? null) ?: $this->generateEmployeeCode($branchId ? (int) $branchId : null),
             'branch_id' => $branchId,
             'department_id' => $validated['department_id'] ?: null,
             'employee_department_id' => $validated['employee_department_id'] ?: null,
@@ -108,7 +133,7 @@ class EmployeeController extends Controller
             'middlename' => $validated['middle_name'] ?: null,
             'lastname' => $validated['last_name'],
             'email' => $validated['email'] ?: null,
-            'role' => $validated['role'] ?: null,
+            'role' => 'Employee',
             'is_activated' => true,
             'is_deleted' => 0,
         ];
@@ -139,8 +164,37 @@ class EmployeeController extends Controller
             'suffix_name' => $request->input('suffix_name'),
             'email' => $request->input('email'),
             'password' => $request->input('password'),
-            'role' => $request->input('role', 'Employee'),
+            'role' => 'Employee',
         ];
+    }
+
+    private function emailInUseMessage(?string $email, ?int $ignoreEmployeeId = null): ?string
+    {
+        $normalizedEmail = strtolower(trim((string) $email));
+
+        if ($normalizedEmail === '') {
+            return null;
+        }
+
+        $checks = [
+            ['table' => 'admin', 'label' => 'an admin account', 'ignore_id' => null],
+            ['table' => 'teacher', 'label' => 'a teacher account', 'ignore_id' => null],
+            ['table' => 'student', 'label' => 'a student account', 'ignore_id' => null],
+            ['table' => 'employee', 'label' => 'an employee account', 'ignore_id' => $ignoreEmployeeId],
+        ];
+
+        foreach ($checks as $check) {
+            $exists = DB::table($check['table'])
+                ->whereRaw('LOWER(email) = ?', [$normalizedEmail])
+                ->when($check['ignore_id'], fn ($query, $id) => $query->where('id', '!=', $id))
+                ->exists();
+
+            if ($exists) {
+                return "This email is already used by {$check['label']}.";
+            }
+        }
+
+        return null;
     }
 
     protected function generateEmployeeCode(?int $branchId = null): string

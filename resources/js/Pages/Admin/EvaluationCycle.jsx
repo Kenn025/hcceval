@@ -1,5 +1,5 @@
 import ConfirmDialog from '@/Components/Admin/ConfirmDialog';
-import FormField, { SelectInput, TextInput } from '@/Components/Admin/FormField';
+import FormField, { SelectInput } from '@/Components/Admin/FormField';
 import SlideOver from '@/Components/Admin/SlideOver';
 import SubmitButton from '@/Components/Admin/SubmitButton';
 import AppIcon from '@/Components/AppIcon';
@@ -7,313 +7,264 @@ import AdminLayout from '@/Layouts/AdminLayout';
 import { router, useForm } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
-const SEMESTER_OPTIONS = ['1st Semester', '2nd Semester', 'Summer'];
+function formatDate(value) {
+    if (!value) {
+        return '-';
+    }
 
-const STATUS_OPTIONS = [
-    { value: 'active', label: 'Active' },
-    { value: 'inactive', label: 'Inactive' },
-    { value: 'closed', label: 'Closed' },
-];
+    return new Intl.DateTimeFormat('en-US', {
+        month: 'short',
+        day: '2-digit',
+        year: 'numeric',
+    }).format(new Date(value));
+}
 
-function StatusPill({ status }) {
-    const styles = {
-        active: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
-        inactive: 'bg-slate-100 text-slate-600 ring-slate-200',
-        closed: 'bg-rose-50 text-rose-700 ring-rose-200',
+function formatNumber(value) {
+    return new Intl.NumberFormat('en-US').format(Number(value) || 0);
+}
+
+function cycleRank(cycle) {
+    const termOrder = {
+        '1st Semester': 1,
+        '2nd Semester': 2,
+        Summer: 3,
     };
 
-    return (
-        <span className={['inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1', styles[status] ?? styles.inactive].join(' ')}>
-            {status}
-        </span>
-    );
+    return (Number(cycle?.year_start) || 0) * 10 + (termOrder[cycle?.semester] ?? 0);
 }
 
 export default function EvaluationCycle({ cycles = [], activeCycle = null }) {
     const [slideOpen, setSlideOpen] = useState(false);
-    const [editing, setEditing] = useState(null);
-    const [deleteTarget, setDeleteTarget] = useState(null);
     const [confirmSave, setConfirmSave] = useState(false);
-    const activeLabel = activeCycle
-        ? `${activeCycle.school_year} ${activeCycle.semester}`
-        : 'No active academic year set';
+    const [saving, setSaving] = useState(false);
 
-    const { data, setData, errors, processing, clearErrors, put } = useForm({
-        year_start: 2025,
-        year_end: 2026,
-        semester: '1st Semester',
-        status: 'inactive',
+    const selectableCycles = useMemo(
+        () => [...cycles]
+            .filter((cycle) => cycle.status !== 'closed')
+            .sort((first, second) => cycleRank(first) - cycleRank(second)),
+        [cycles],
+    );
+
+    const pastCycles = useMemo(
+        () => {
+            if (!activeCycle) {
+                return cycles.filter((cycle) => cycle.status !== 'active');
+            }
+
+            const activeRank = cycleRank(activeCycle);
+
+            return cycles.filter((cycle) => cycle.status !== 'active' && cycleRank(cycle) < activeRank);
+        },
+        [activeCycle, cycles],
+    );
+
+    const { data, setData } = useForm({
+        cycle_id: activeCycle?.year_id ? String(activeCycle.year_id) : '',
     });
 
-    const summary = useMemo(() => {
-        const active = cycles.filter((cycle) => cycle.status === 'active').length;
-        const inactive = cycles.filter((cycle) => cycle.status === 'inactive').length;
-        const closed = cycles.filter((cycle) => cycle.status === 'closed').length;
+    const selectedCycle = selectableCycles.find((cycle) => String(cycle.year_id) === String(data.cycle_id));
+    const activeYear = activeCycle?.school_year ?? 'No active academic year';
+    const activeTerm = activeCycle?.semester ?? 'No active term';
 
-        return { active, inactive, closed, total: cycles.length };
-    }, [cycles]);
-
-    const openEdit = (cycle) => {
-        clearErrors();
-        setEditing(cycle);
-        setData({
-            year_start: cycle.year_start,
-            year_end: cycle.year_end,
-            semester: cycle.semester,
-            status: cycle.status,
-        });
+    const openChange = () => {
+        setData('cycle_id', activeCycle?.year_id ? String(activeCycle.year_id) : '');
         setSlideOpen(true);
     };
 
-    const closeSlide = () => {
+    const closeChange = () => {
         setSlideOpen(false);
-        setEditing(null);
-        clearErrors();
-    };
-
-    const handleSaveConfirm = () => {
-        const options = {
-            preserveScroll: true,
-            onSuccess: () => {
-                setConfirmSave(false);
-                closeSlide();
-            },
-        };
-
-        if (editing) {
-            put(`/admin/evaluation-cycle/${editing.year_id}`, options);
-        }
+        setConfirmSave(false);
     };
 
     const submit = (event) => {
         event.preventDefault();
-        setConfirmSave(true);
-    };
 
-    const deleteCycle = () => {
-        if (!deleteTarget) {
+        if (!selectedCycle || String(selectedCycle.year_id) === String(activeCycle?.year_id ?? '')) {
+            closeChange();
             return;
         }
 
-        router.delete(`/admin/evaluation-cycle/${deleteTarget.year_id}`, {
-            preserveScroll: true,
-            onSuccess: () => setDeleteTarget(null),
-        });
+        setConfirmSave(true);
+    };
+
+    const changeActiveCycle = () => {
+        if (!selectedCycle) {
+            return;
+        }
+
+        setSaving(true);
+        router.put(
+            `/admin/evaluation-cycle/${selectedCycle.year_id}`,
+            {
+                year_start: selectedCycle.year_start,
+                year_end: selectedCycle.year_end,
+                semester: selectedCycle.semester,
+                status: 'active',
+            },
+            {
+                preserveScroll: true,
+                onSuccess: closeChange,
+                onFinish: () => setSaving(false),
+            },
+        );
     };
 
     return (
         <AdminLayout title="Academic Year" activeRoute="admin.evaluation-cycle" breadcrumbs={['System Controls']}>
-            <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-                <div>
-                    <h2 className="text-base font-semibold text-slate-900">Academic Year</h2>
-                    <p className="text-sm text-slate-500">Manage school years, terms, and the active evaluation cycle.</p>
-                </div>
+            <div className="mb-6">
+                <h2 className="text-base font-semibold text-slate-900">Academic Year</h2>
+                <p className="text-sm text-slate-500">Set the active evaluation term and review past academic year activity.</p>
             </div>
 
-            <div className="mb-5 grid gap-3 md:grid-cols-4">
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:col-span-2">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+            <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="flex items-center gap-4">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
                             <AppIcon name="calendar" className="h-5 w-5" />
                         </div>
                         <div className="min-w-0">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Current Active Term</p>
-                            <p className="truncate text-base font-semibold text-slate-900">{activeLabel}</p>
-                        </div>
-                    </div>
-                </div>
-                {[
-                    ['Active', summary.active, 'text-emerald-700'],
-                    ['Inactive', summary.inactive, 'text-slate-700'],
-                    ['Closed', summary.closed, 'text-rose-700'],
-                ].map(([label, value, color]) => (
-                    <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-                        <p className={['mt-1 text-2xl font-semibold tabular-nums', color].join(' ')}>{value}</p>
-                    </div>
-                ))}
-            </div>
-
-            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                {/* Desktop Table View */}
-                <div className="hidden md:block overflow-x-auto">
-                    <table className="min-w-full divide-y divide-slate-200">
-                        <thead className="bg-slate-50">
-                            <tr>
-                                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">School Year</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Term</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Status</th>
-                                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200">
-                            {cycles.length > 0 ? cycles.map((cycle) => (
-                                <tr key={cycle.year_id} className="hover:bg-slate-50/80">
-                                    <td className="px-4 py-3 text-sm font-semibold text-slate-900">{cycle.school_year}</td>
-                                    <td className="px-4 py-3 text-sm text-slate-600">{cycle.semester}</td>
-                                    <td className="px-4 py-3 text-sm"><StatusPill status={cycle.status} /></td>
-                                    <td className="px-4 py-3">
-                                        <div className="flex justify-end gap-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => openEdit(cycle)}
-                                                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                                            >
-                                                Edit
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setDeleteTarget(cycle)}
-                                                className="rounded-lg bg-rose-50 px-3 py-1.5 text-sm font-medium text-rose-700 transition hover:bg-rose-100"
-                                            >
-                                                Close
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            )) : (
-                                <tr>
-                                    <td colSpan="4" className="px-4 py-8 text-center text-sm text-slate-500">
-                                        No academic years found yet.
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-
-                {/* Mobile Card View */}
-                <div className="md:hidden divide-y divide-slate-100">
-                    {cycles.length > 0 ? cycles.map((cycle) => (
-                        <div key={`card-${cycle.year_id}`} className="p-4 active:bg-slate-50 transition-colors">
-                            <div className="flex items-start justify-between gap-4">
-                                <div className="flex-1 space-y-3">
-                                    <div>
-                                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">School Year</div>
-                                        <div className="mt-0.5 text-sm font-semibold text-slate-900">{cycle.school_year}</div>
-                                    </div>
-                                    <div>
-                                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Term</div>
-                                        <div className="mt-0.5 text-sm font-medium text-slate-600">{cycle.semester}</div>
-                                    </div>
-                                    <div>
-                                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Status</div>
-                                        <div className="mt-1"><StatusPill status={cycle.status} /></div>
-                                    </div>
-                                </div>
-                                <div className="flex flex-col gap-2 shrink-0">
-                                    <button
-                                        type="button"
-                                        onClick={() => openEdit(cycle)}
-                                        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm"
-                                    >
-                                        Edit
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setDeleteTarget(cycle)}
-                                        className="rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-medium text-rose-600 shadow-sm"
-                                    >
-                                        Close
-                                    </button>
-                                </div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Active Academic Year</p>
+                            <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                                <h3 className="text-2xl font-semibold text-slate-900">{activeYear}</h3>
+                                <p className="text-base font-medium text-slate-600">{activeTerm}</p>
                             </div>
                         </div>
-                    )) : (
-                        <div className="px-4 py-8 text-center text-sm text-slate-500">
-                            No academic years found yet.
-                        </div>
-                    )}
+                    </div>
+                    <button
+                        type="button"
+                        onClick={openChange}
+                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+                    >
+                        <AppIcon name="edit" className="h-4 w-4" />
+                        Change
+                    </button>
                 </div>
             </div>
 
-            <SlideOver
-                open={slideOpen}
-                onClose={closeSlide}
-                title="Edit Academic Year"
-            >
-                <form onSubmit={submit} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-3">
-                        <FormField label="From Year" error={errors.year_start} required>
-                            <TextInput
-                                type="number"
-                                min="2000"
-                                max="2100"
-                                value={data.year_start}
-                                onChange={(event) => {
-                                    const value = Number(event.target.value);
-                                    setData({
-                                        ...data,
-                                        year_start: value,
-                                        year_end: Math.max(value + 1, Number(data.year_end) || value + 1),
-                                    });
-                                }}
-                            />
-                        </FormField>
-                        <FormField label="To Year" error={errors.year_end} required>
-                            <TextInput
-                                type="number"
-                                min="2000"
-                                max="2100"
-                                value={data.year_end}
-                                onChange={(event) => setData('year_end', Number(event.target.value))}
-                            />
-                        </FormField>
+            <div>
+                <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                        <h3 className="text-sm font-semibold text-slate-900">Past Academic Years</h3>
+                        <p className="text-xs text-slate-500">Assigned questions, evaluation submissions, and cycle dates.</p>
+                    </div>
+                </div>
+
+                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    <div className="hidden overflow-x-auto md:block">
+                        <table className="min-w-full divide-y divide-slate-200">
+                            <thead className="bg-slate-50">
+                                <tr>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Academic Year</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Term</th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Total Assigned Questions</th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Total Evaluation Submitted</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Date Opened</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Date Closed</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-200">
+                                {pastCycles.length > 0 ? pastCycles.map((cycle) => (
+                                    <tr key={cycle.year_id} className="hover:bg-slate-50/80">
+                                        <td className="px-4 py-3 text-sm font-semibold text-slate-900">{cycle.school_year}</td>
+                                        <td className="px-4 py-3 text-sm text-slate-600">{cycle.semester}</td>
+                                        <td className="px-4 py-3 text-right text-sm font-medium tabular-nums text-slate-700">{formatNumber(cycle.total_assigned_questions)}</td>
+                                        <td className="px-4 py-3 text-right text-sm font-medium tabular-nums text-slate-700">{formatNumber(cycle.total_evaluation_submitted)}</td>
+                                        <td className="px-4 py-3 text-sm text-slate-600">{formatDate(cycle.opened_at)}</td>
+                                        <td className="px-4 py-3 text-sm text-slate-600">{formatDate(cycle.closed_at)}</td>
+                                    </tr>
+                                )) : (
+                                    <tr>
+                                        <td colSpan="6" className="px-4 py-8 text-center text-sm text-slate-500">
+                                            No past academic years found yet.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
                     </div>
 
-                    <FormField label="Term" error={errors.semester} required>
-                        <SelectInput value={data.semester} onChange={(event) => setData('semester', event.target.value)}>
-                            {SEMESTER_OPTIONS.map((semester) => (
-                                <option key={semester} value={semester}>{semester}</option>
+                    <div className="divide-y divide-slate-100 md:hidden">
+                        {pastCycles.length > 0 ? pastCycles.map((cycle) => (
+                            <div key={`card-${cycle.year_id}`} className="p-4">
+                                <div className="flex items-start justify-between gap-4">
+                                    <div>
+                                        <p className="text-sm font-semibold text-slate-900">{cycle.school_year}</p>
+                                        <p className="mt-0.5 text-sm text-slate-600">{cycle.semester}</p>
+                                    </div>
+                                </div>
+                                <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                                    <div>
+                                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Assigned Questions</p>
+                                        <p className="mt-1 font-medium tabular-nums text-slate-900">{formatNumber(cycle.total_assigned_questions)}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Evaluations Submitted</p>
+                                        <p className="mt-1 font-medium tabular-nums text-slate-900">{formatNumber(cycle.total_evaluation_submitted)}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Opened</p>
+                                        <p className="mt-1 font-medium text-slate-900">{formatDate(cycle.opened_at)}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Closed</p>
+                                        <p className="mt-1 font-medium text-slate-900">{formatDate(cycle.closed_at)}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )) : (
+                            <div className="px-4 py-8 text-center text-sm text-slate-500">
+                                No past academic years found yet.
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            <SlideOver open={slideOpen} onClose={closeChange} title="Change Academic Year">
+                <form onSubmit={submit} className="space-y-4">
+                    <FormField label="Academic Year" required>
+                        <SelectInput value={data.cycle_id} onChange={(event) => setData('cycle_id', event.target.value)}>
+                            <option value="">Select academic year...</option>
+                            {selectableCycles.map((cycle) => (
+                                <option key={cycle.year_id} value={cycle.year_id}>
+                                    {cycle.school_year} - {cycle.semester}
+                                </option>
                             ))}
                         </SelectInput>
                     </FormField>
 
-                    <FormField label="Status" error={errors.status} required>
-                        <SelectInput value={data.status} onChange={(event) => setData('status', event.target.value)}>
-                            {STATUS_OPTIONS.map((status) => (
-                                <option key={status.value} value={status.value}>{status.label}</option>
-                            ))}
-                        </SelectInput>
-                    </FormField>
-
-                    {data.status === 'active' ? (
-                        <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                            Saving this as active will mark other academic years as inactive.
+                    {selectedCycle ? (
+                        <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+                            {selectedCycle.school_year} {selectedCycle.semester} will become the active evaluation term.
                         </div>
                     ) : null}
 
                     <div className="flex justify-end gap-3 border-t border-slate-200 pt-4">
                         <button
                             type="button"
-                            onClick={closeSlide}
+                            onClick={closeChange}
                             className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                         >
                             Cancel
                         </button>
-                        <SubmitButton className="px-4" processing={processing}>
-                            Save Changes
+                        <SubmitButton
+                            className="px-4"
+                            processing={saving}
+                            disabled={!selectedCycle || String(selectedCycle.year_id) === String(activeCycle?.year_id ?? '')}
+                        >
+                            Set Active
                         </SubmitButton>
                     </div>
                 </form>
             </SlideOver>
 
             <ConfirmDialog
-                open={Boolean(deleteTarget)}
-                title="Close academic year?"
-                message={deleteTarget ? `This will close ${deleteTarget.school_year} ${deleteTarget.semester}. It will no longer be active.` : ''}
-                confirmLabel="Close"
-                onCancel={() => setDeleteTarget(null)}
-                onConfirm={deleteCycle}
-            />
-
-            <ConfirmDialog
                 open={confirmSave}
-                title="Save Changes?"
-                message={data.status === 'active' 
-                    ? "Are you sure you want to save these changes? Setting this cycle as 'Active' will automatically deactivate all other cycles." 
-                    : "Are you sure you want to save the changes to this academic year?"}
-                onConfirm={handleSaveConfirm}
+                title="Change active academic year?"
+                message={selectedCycle ? `Set ${selectedCycle.school_year} ${selectedCycle.semester} as the active evaluation term? Other academic years will be marked inactive.` : ''}
+                confirmLabel="Set Active"
+                danger={false}
+                onConfirm={changeActiveCycle}
                 onCancel={() => setConfirmSave(false)}
             />
         </AdminLayout>

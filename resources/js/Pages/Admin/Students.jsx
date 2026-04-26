@@ -97,6 +97,8 @@ export default function Students({
     const [submitError, setSubmitError] = useState('');
     const [subjectListOpen, setSubjectListOpen] = useState(false);
     const [subjectListMode, setSubjectListMode] = useState('year-level');
+    const [createDraft, setCreateDraft] = useState(null);
+    const [editDrafts, setEditDrafts] = useState({});
     const activeBranchId = String(selectedBranchId ?? scopedBranchId ?? '');
     const selectedFilterBranchId = String(filters.branch_id ?? activeBranchId ?? '');
     const selectedFilterDepartmentId = String(filters.department_id ?? '');
@@ -431,28 +433,79 @@ export default function Students({
         setSubjectListOpen(true);
     };
 
+    const closeSlideOver = () => {
+        const draft = {
+            student_no: data.student_no,
+            branch_id: data.branch_id,
+            department_id: data.department_id,
+            program_id: data.program_id,
+            strand_id: data.strand_id,
+            year_level_id: data.year_level_id,
+            removed_subject_ids: data.removed_subject_ids,
+            is_irreg: data.is_irreg,
+            irreg_subject_ids: data.irreg_subject_ids,
+            irreg_subject_teacher_ids: data.irreg_subject_teacher_ids,
+            first_name: data.first_name,
+            middle_name: data.middle_name,
+            last_name: data.last_name,
+            suffix_name: data.suffix_name,
+            email: data.email,
+            password: data.password,
+            status: data.status,
+        };
+
+        if (editing) {
+            setEditDrafts((drafts) => ({
+                ...drafts,
+                [editing.id]: draft,
+            }));
+        } else {
+            setCreateDraft(draft);
+        }
+
+        setSubjectListOpen(false);
+        setSlideOpen(false);
+    };
+    const cancelSlideOver = () => {
+        if (editing) {
+            setEditDrafts((drafts) => {
+                const nextDrafts = { ...drafts };
+                delete nextDrafts[editing.id];
+                return nextDrafts;
+            });
+        } else {
+            setCreateDraft(null);
+        }
+
+        setSubjectListOpen(false);
+        setSlideOpen(false);
+        reset();
+    };
+
     const openCreate = () => {
+        const draft = createDraft ?? {};
+
         reset();
         setDetailOpen(false);
         setViewing(null);
         setData({
-            student_no: '',
-            branch_id: activeBranchId,
-            department_id: '',
-            program_id: '',
-            strand_id: '',
-            year_level_id: '',
-            removed_subject_ids: [],
-            is_irreg: false,
-            irreg_subject_ids: [],
-            irreg_subject_teacher_ids: {},
-            first_name: '',
-            middle_name: '',
-            last_name: '',
-            suffix_name: '',
-            email: '',
-            password: '',
-            status: 'active',
+            student_no: draft.student_no ?? '',
+            branch_id: draft.branch_id ?? activeBranchId,
+            department_id: draft.department_id ?? '',
+            program_id: draft.program_id ?? '',
+            strand_id: draft.strand_id ?? '',
+            year_level_id: draft.year_level_id ?? '',
+            removed_subject_ids: draft.removed_subject_ids ?? [],
+            is_irreg: draft.is_irreg ?? false,
+            irreg_subject_ids: draft.irreg_subject_ids ?? [],
+            irreg_subject_teacher_ids: draft.irreg_subject_teacher_ids ?? {},
+            first_name: draft.first_name ?? '',
+            middle_name: draft.middle_name ?? '',
+            last_name: draft.last_name ?? '',
+            suffix_name: draft.suffix_name ?? '',
+            email: draft.email ?? '',
+            password: draft.password ?? '',
+            status: draft.status ?? 'active',
         });
         setShowPassword(false);
         setSubjectListOpen(false);
@@ -467,28 +520,30 @@ export default function Students({
     };
 
     const openEdit = (row) => {
+        const draft = editDrafts[row.id] ?? {};
+
         setDetailOpen(false);
         setViewing(null);
         setData({
-            student_no: row.student_no,
-            branch_id: String(row.branch_id ?? ''),
-            department_id: String(row.department_id ?? ''),
-            program_id: String(row.program_id ?? ''),
-            strand_id: String(row.strand_id ?? ''),
-            year_level_id: String(row.year_level_id ?? ''),
-            removed_subject_ids: Object.keys(parseTeacherMap(row.removed_subject_map)),
-            is_irreg: Boolean(row.is_irreg),
-            irreg_subject_ids: Object.keys(parseTeacherMap(row.irreg_subject_map)),
-            irreg_subject_teacher_ids: Object.fromEntries(
+            student_no: draft.student_no ?? row.student_no,
+            branch_id: draft.branch_id ?? String(row.branch_id ?? ''),
+            department_id: draft.department_id ?? String(row.department_id ?? ''),
+            program_id: draft.program_id ?? String(row.program_id ?? ''),
+            strand_id: draft.strand_id ?? String(row.strand_id ?? ''),
+            year_level_id: draft.year_level_id ?? String(row.year_level_id ?? ''),
+            removed_subject_ids: draft.removed_subject_ids ?? Object.keys(parseTeacherMap(row.removed_subject_map)),
+            is_irreg: draft.is_irreg ?? Boolean(row.is_irreg),
+            irreg_subject_ids: draft.irreg_subject_ids ?? Object.keys(parseTeacherMap(row.irreg_subject_map)),
+            irreg_subject_teacher_ids: draft.irreg_subject_teacher_ids ?? Object.fromEntries(
                 Object.entries(parseTeacherMap(row.irreg_subject_map)).map(([subjectId, teacherId]) => [String(subjectId), String(teacherId ?? '')])
             ),
-            first_name: row.first_name,
-            middle_name: row.middle_name ?? '',
-            last_name: row.last_name,
-            suffix_name: row.suffix_name ?? '',
-            email: row.email ?? '',
-            password: '',
-            status: row.is_active ? 'active' : 'inactive',
+            first_name: draft.first_name ?? row.first_name,
+            middle_name: draft.middle_name ?? row.middle_name ?? '',
+            last_name: draft.last_name ?? row.last_name,
+            suffix_name: draft.suffix_name ?? row.suffix_name ?? '',
+            email: draft.email ?? row.email ?? '',
+            password: draft.password ?? '',
+            status: draft.status ?? (row.is_active ? 'active' : 'inactive'),
         });
         setShowPassword(false);
         setSubjectListOpen(false);
@@ -516,8 +571,19 @@ export default function Students({
 
         request(url, data, {
             onSuccess: () => {
+                const savedEditingId = editing?.id;
+
                 setSlideOpen(false);
                 setConfirmUpdateOpen(false);
+                if (savedEditingId) {
+                    setEditDrafts((drafts) => {
+                        const nextDrafts = { ...drafts };
+                        delete nextDrafts[savedEditingId];
+                        return nextDrafts;
+                    });
+                } else {
+                    setCreateDraft(null);
+                }
                 reset();
             },
             onError: (formErrors) => {
@@ -739,7 +805,7 @@ export default function Students({
                 )}
             </SlideOver>
 
-            <SlideOver open={slideOpen} onClose={() => setSlideOpen(false)} title={editing ? 'Edit Student' : 'New Student'} width="max-w-xl">
+            <SlideOver open={slideOpen} onClose={closeSlideOver} title={editing ? 'Edit Student' : 'New Student'} width="max-w-xl">
                 <form onSubmit={submit} className="space-y-4">
                     {(submitError || Object.keys(errors).length > 0) && (
                         <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
@@ -916,6 +982,9 @@ export default function Students({
                         <div className="relative">
                             <TextInput
                                 type={showPassword ? 'text' : 'password'}
+                                autoComplete="new-password"
+                                data-lpignore="true"
+                                data-1p-ignore="true"
                                 value={data.password}
                                 onChange={(e) => setData('password', e.target.value)}
                                 placeholder={editing ? '••••••••' : 'Defaults to hcc1234'}
@@ -933,7 +1002,7 @@ export default function Students({
                     </FormField>
 
                     <div className="flex gap-3 pt-2">
-                        <button type="button" onClick={() => setSlideOpen(false)} className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700">Cancel</button>
+                        <button type="button" onClick={cancelSlideOver} className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700">Cancel</button>
                         <SubmitButton
                             processing={processing}
                             disabled={Boolean(editing) && !studentIsDirty}
