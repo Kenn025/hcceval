@@ -12,7 +12,7 @@ class Teacher extends Model
     protected $fillable = [
         'code', 'branch_id', 'department_id', 'program_id', 'strand_id',
         'firstname', 'middlename', 'lastname',
-        'email', 'password', 'role', 'personal_info', 'evaluation_submission_ids', 'assigned_subject_ids', 'is_activated', 'is_deleted',
+        'email', 'password', 'profile_photo_path', 'role', 'personal_info', 'evaluation_submission_ids', 'assigned_subject_ids', 'is_activated', 'is_deleted',
     ];
 
     protected $hidden = ['password'];
