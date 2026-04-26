@@ -4,6 +4,7 @@ import ResourceTable from '@/Components/Admin/ResourceTable';
 import SlideOver from '@/Components/Admin/SlideOver';
 import SubmitButton from '@/Components/Admin/SubmitButton';
 import StatusBadge from '@/Components/Admin/StatusBadge';
+import useFormDirty from '@/Components/Admin/useFormDirty';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { router, useForm } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
@@ -71,6 +72,8 @@ export default function Questionnaires({ questionnaires, questionnaireTypes, que
         notes: '',
         is_active: true,
     });
+
+    const { isDirty } = useFormDirty(data, editing?.questionnaire_id ?? 'new');
 
     const openCreate = () => {
         reset();
@@ -193,6 +196,7 @@ export default function Questionnaires({ questionnaires, questionnaireTypes, que
 
     const submit = (e) => {
         e.preventDefault();
+        if (editing && !isDirty) return;
         setConfirmSave(true);
     };
 
@@ -422,7 +426,7 @@ export default function Questionnaires({ questionnaires, questionnaireTypes, que
 
                     <div className="flex gap-3 pt-2">
                         <button type="button" onClick={() => setSlideOpen(false)} className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700">Cancel</button>
-                        <SubmitButton processing={processing} className="flex-1">
+                        <SubmitButton processing={processing} disabled={Boolean(editing) && !isDirty} className="flex-1">
                             {editing ? 'Update' : 'Create'}
                         </SubmitButton>
                     </div>

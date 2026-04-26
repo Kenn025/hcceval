@@ -4,7 +4,9 @@ import ResourceTable from '@/Components/Admin/ResourceTable';
 import SlideOver from '@/Components/Admin/SlideOver';
 import SubmitButton from '@/Components/Admin/SubmitButton';
 import StatusBadge from '@/Components/Admin/StatusBadge';
+import useFormDirty from '@/Components/Admin/useFormDirty';
 import AppIcon from '@/Components/AppIcon';
+import AppConfirmDialog from '@/Components/ConfirmDialog';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { router, useForm } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
@@ -54,6 +56,9 @@ export default function Employees({
         password: '',
         role: 'Employee',
     });
+
+    const { isDirty: employeeIsDirty } = useFormDirty(data, editing?.id ?? 'new');
+    const [confirmUpdateOpen, setConfirmUpdateOpen] = useState(false);
 
     const selectedBranch = useMemo(
         () => branches.find((branch) => String(branch.id) === String(data.branch_id)),
@@ -115,6 +120,15 @@ export default function Employees({
 
     const submit = (e) => {
         e.preventDefault();
+        if (editing && !employeeIsDirty) return;
+        if (editing) {
+            setConfirmUpdateOpen(true);
+            return;
+        }
+        performSave();
+    };
+
+    const performSave = () => {
         setSubmitError('');
         const url = editing ? route('admin.employees') + '/' + editing.id : route('admin.employees');
         const request = editing
@@ -124,11 +138,13 @@ export default function Employees({
         request(url, data, {
             onSuccess: () => {
                 setSlideOpen(false);
+                setConfirmUpdateOpen(false);
                 reset();
             },
             onError: (formErrors) => {
                 const firstError = Object.values(formErrors)[0];
                 setSubmitError(firstError || 'Unable to save employee.');
+                setConfirmUpdateOpen(false);
             },
         });
     };
@@ -316,7 +332,7 @@ export default function Employees({
                     </FormField>
                     <div className="flex gap-3 pt-2">
                         <button type="button" onClick={() => setSlideOpen(false)} className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700">Cancel</button>
-                        <SubmitButton processing={processing} className="flex-1">
+                        <SubmitButton processing={processing} disabled={Boolean(editing) && !employeeIsDirty} className="flex-1">
                             {editing ? 'Update' : 'Create'}
                         </SubmitButton>
                     </div>
@@ -324,6 +340,17 @@ export default function Employees({
             </SlideOver>
 
             <ConfirmDialog open={Boolean(deleteTarget)} onConfirm={() => { router.delete(route('admin.employees') + '/' + deleteTarget.id, { onSuccess: () => setDeleteTarget(null) }); }} onCancel={() => setDeleteTarget(null)} title="Delete Employee" message={`Delete employee "${deleteTarget?.first_name} ${deleteTarget?.last_name}"?`} />
+
+            <AppConfirmDialog
+                open={confirmUpdateOpen}
+                title="Save changes?"
+                message={`Save changes to ${`${editing?.first_name ?? ''} ${editing?.last_name ?? ''}`.trim() || 'this employee'}?`}
+                confirmLabel="Update"
+                tone="primary"
+                loading={processing}
+                onConfirm={performSave}
+                onCancel={() => setConfirmUpdateOpen(false)}
+            />
         </AdminLayout>
     );
 }

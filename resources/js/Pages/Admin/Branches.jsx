@@ -4,7 +4,9 @@ import ResourceTable from '@/Components/Admin/ResourceTable';
 import SlideOver from '@/Components/Admin/SlideOver';
 import SubmitButton from '@/Components/Admin/SubmitButton';
 import StatusBadge from '@/Components/Admin/StatusBadge';
+import useFormDirty from '@/Components/Admin/useFormDirty';
 import AppIcon from '@/Components/AppIcon';
+import AppConfirmDialog from '@/Components/ConfirmDialog';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { router, useForm, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
@@ -120,6 +122,9 @@ export default function Branches({ branches, filters }) {
         is_main: false,
         is_active: true,
     });
+
+    const { isDirty: branchIsDirty } = useFormDirty(data, editing?.id ?? 'new');
+    const [confirmUpdateOpen, setConfirmUpdateOpen] = useState(false);
     const generatedBranchCode = useMemo(() => buildBranchCodePreview(data.name), [data.name]);
     const generatedAdminEmail = useMemo(() => buildAdminEmailPreview(data.name), [data.name]);
 
@@ -226,6 +231,15 @@ export default function Branches({ branches, filters }) {
 
     const submit = (e) => {
         e.preventDefault();
+        if (editing && !branchIsDirty) return;
+        if (editing) {
+            setConfirmUpdateOpen(true);
+            return;
+        }
+        performSave();
+    };
+
+    const performSave = () => {
         setErrorNotification('');
 
         if (editing) {
@@ -235,8 +249,8 @@ export default function Branches({ branches, filters }) {
                 department_levels: data.department_levels,
                 address: data.address,
             }, {
-                onSuccess: () => { setSlideOpen(false); reset(); },
-                onError: (formErrors) => setErrorNotification(getFirstErrorMessage(formErrors, 'Unable to update branch.')),
+                onSuccess: () => { setSlideOpen(false); setConfirmUpdateOpen(false); reset(); },
+                onError: (formErrors) => { setErrorNotification(getFirstErrorMessage(formErrors, 'Unable to update branch.')); setConfirmUpdateOpen(false); },
             });
         } else {
             router.post(route('admin.branches'), {
@@ -519,7 +533,7 @@ export default function Branches({ branches, filters }) {
 
                     <div className="flex gap-3 pt-2">
                         <button type="button" onClick={() => setSlideOpen(false)} className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
-                        <SubmitButton processing={processing} className="flex-1">
+                        <SubmitButton processing={processing} disabled={Boolean(editing) && !branchIsDirty} className="flex-1">
                             {editing ? 'Update' : 'Create'}
                         </SubmitButton>
                     </div>
@@ -539,6 +553,17 @@ export default function Branches({ branches, filters }) {
                 onCancel={() => setUnlinkAdminTarget(null)}
                 title="Unlink Admin Account"
                 message={`Unlink admin "${unlinkAdminTarget?.name}" from this branch?`}
+            />
+
+            <AppConfirmDialog
+                open={confirmUpdateOpen}
+                title="Save changes?"
+                message={`Save changes to ${editing?.name ?? 'this branch'}?`}
+                confirmLabel="Update"
+                tone="primary"
+                loading={processing}
+                onConfirm={performSave}
+                onCancel={() => setConfirmUpdateOpen(false)}
             />
         </AdminLayout>
     );
