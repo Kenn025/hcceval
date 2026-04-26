@@ -29,8 +29,25 @@ export default function useFormDirty(data, key) {
 
 function safeStringify(value) {
     try {
-        return JSON.stringify(value, Object.keys(value ?? {}).sort());
+        return JSON.stringify(sortKeys(value));
     } catch {
         return '';
     }
+}
+
+function sortKeys(value) {
+    if (Array.isArray(value)) {
+        return value.map(sortKeys);
+    }
+
+    if (value && typeof value === 'object') {
+        return Object.keys(value)
+            .sort()
+            .reduce((sorted, key) => ({
+                ...sorted,
+                [key]: sortKeys(value[key]),
+            }), {});
+    }
+
+    return value;
 }

@@ -20,6 +20,7 @@ class EmployeeController extends Controller
         $search   = $request->input('search', '');
         $scopedId = $this->scopedBranchId();
         $branchId = $scopedId ?? $request->input('branch_id');
+        $employeeDepartmentId = $request->input('employee_department_id');
         $branches = Branch::query()
             ->select('id', 'name', 'code')
             ->where('is_deleted', 0)
@@ -32,6 +33,7 @@ class EmployeeController extends Controller
             ->with(['branch:id,name', 'department:id,name', 'employeeDepartment:id,name', 'program:id,name'])
             ->where('is_deleted', 0)
             ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
+            ->when($employeeDepartmentId, fn ($q) => $q->where('employee_department_id', $employeeDepartmentId))
             ->when($search, fn ($q) => $q->where(function ($sub) use ($search) {
                 $sub->where('firstname', 'like', "%{$search}%")
                     ->orWhere('lastname', 'like', "%{$search}%")
@@ -44,7 +46,11 @@ class EmployeeController extends Controller
 
         return Inertia::render('Admin/Employees', [
             'employees'     => $employees,
-            'filters'       => ['search' => $search, 'branch_id' => $branchId],
+            'filters'       => [
+                'search' => $search,
+                'branch_id' => $branchId,
+                'employee_department_id' => $employeeDepartmentId,
+            ],
             'branches'      => $branches,
             'departments'   => Department::select('id', 'name')->orderBy('name')->get(),
             'employeeDepartments' => EmployeeDepartment::query()

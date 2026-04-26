@@ -7,10 +7,11 @@ import StatusBadge from '@/Components/Admin/StatusBadge';
 import useFormDirty from '@/Components/Admin/useFormDirty';
 import AppIcon from '@/Components/AppIcon';
 import AppConfirmDialog from '@/Components/ConfirmDialog';
+import Modal from '@/Components/Modal';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { router, useForm } from '@inertiajs/react';
 import axios from 'axios';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 const buildEmployeeCode = (branch, nextEmployeeCodes = {}) => {
     if (!branch?.code) {
@@ -21,6 +22,65 @@ const buildEmployeeCode = (branch, nextEmployeeCodes = {}) => {
 };
 
 const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value ?? '').trim());
+
+const EMPLOYEE_CSV_TEMPLATE_COLUMNS = [
+    'First Name',
+    'Middle Name',
+    'Last Name',
+    'Branch',
+    'Employee Department',
+    'Email',
+    'Password',
+];
+
+const CSV_REQUIRED_COLUMNS = ['First Name', 'Last Name', 'Email'];
+const normalizeCsvKey = (value) => String(value ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+const normalizeCsvValue = (value) => String(value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+const parseCsvText = (text) => {
+    const rows = [];
+    let row = [];
+    let value = '';
+    let quoted = false;
+
+    for (let i = 0; i < text.length; i += 1) {
+        const char = text[i];
+        const next = text[i + 1];
+        if (char === '"') {
+            if (quoted && next === '"') {
+                value += '"';
+                i += 1;
+            } else {
+                quoted = !quoted;
+            }
+        } else if (char === ',' && !quoted) {
+            row.push(value);
+            value = '';
+        } else if ((char === '\n' || char === '\r') && !quoted) {
+            if (char === '\r' && next === '\n') i += 1;
+            row.push(value);
+            if (row.some((cell) => String(cell).trim() !== '')) rows.push(row);
+            row = [];
+            value = '';
+        } else {
+            value += char;
+        }
+    }
+
+    row.push(value);
+    if (row.some((cell) => String(cell).trim() !== '')) rows.push(row);
+    return rows;
+};
+
+const uniqueBy = (items, keyFn) => {
+    const seen = new Set();
+    return items.filter((item) => {
+        const key = keyFn(item);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+};
 
 export default function Employees({
     employees,
@@ -35,8 +95,10 @@ export default function Employees({
     selectedBranchId,
     scopedBranchId,
 }) {
+    const fileInputRef = useRef(null);
     const [slideOpen, setSlideOpen] = useState(false);
     const [detailOpen, setDetailOpen] = useState(false);
+    const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
     const [editing, setEditing] = useState(null);
     const [viewing, setViewing] = useState(null);
     const [deleteTarget, setDeleteTarget] = useState(null);
@@ -46,6 +108,8 @@ export default function Employees({
     const [createDraft, setCreateDraft] = useState(null);
     const [editDrafts, setEditDrafts] = useState({});
     const activeBranchId = String(selectedBranchId ?? scopedBranchId ?? '');
+    const selectedFilterBranchId = String(filters.branch_id ?? activeBranchId ?? '');
+    const selectedFilterEmployeeDepartmentId = String(filters.employee_department_id ?? '');
 
     const { data, setData, errors, processing, reset, clearErrors } = useForm({
         employee_no: '',
@@ -62,6 +126,8 @@ export default function Employees({
         password: '',
         role: 'Employee',
     });
+    const importForm = useForm({ file: null });
+    const [csvInspection, setCsvInspection] = useState({ status: 'idle', rows: 0, errors: [], warnings: [] });
 
     const { isDirty: employeeIsDirty } = useFormDirty(data, editing?.id ?? 'new');
     const [confirmUpdateOpen, setConfirmUpdateOpen] = useState(false);
@@ -87,6 +153,22 @@ export default function Employees({
     const selectedBranch = useMemo(
         () => branches.find((branch) => String(branch.id) === String(data.branch_id)),
         [branches, data.branch_id],
+    );
+    const csvReferenceRows = useMemo(() => uniqueBy([
+        ...branches.map((branch) => `Branch: ${branch.name}`),
+        ...employeeDepartments.map((department) => `Employee Department: ${department.name}`),
+    ].filter(Boolean), (row) => row.toLowerCase()).slice(0, 80), [branches, employeeDepartments]);
+    const existingEmployeeEmails = useMemo(
+        () => new Set((employees?.data ?? []).map((employee) => normalizeCsvValue(employee.email)).filter(Boolean)),
+        [employees],
+    );
+    const filterEmployeeDepartments = useMemo(
+        () => employeeDepartments.filter((department) => (
+            !selectedFilterBranchId
+            || !department.branch_id
+            || String(department.branch_id) === selectedFilterBranchId
+        )),
+        [employeeDepartments, selectedFilterBranchId],
     );
     const generatedEmployeeCode = editing ? data.employee_no : buildEmployeeCode(selectedBranch, nextEmployeeCodes);
 
@@ -294,10 +376,137 @@ export default function Employees({
     };
 
     const changeBranch = (branchId = '') => {
-        router.get(route('admin.employees'), { ...filters, branch_id: branchId }, {
+        router.get(route('admin.employees'), { ...filters, branch_id: branchId, employee_department_id: '' }, {
             preserveState: true,
             replace: true,
         });
+    };
+
+    const changeEmployeeDepartmentFilter = (employeeDepartmentId = '') => {
+        router.get(route('admin.employees'), { ...filters, employee_department_id: employeeDepartmentId }, {
+            preserveState: true,
+            replace: true,
+        });
+    };
+
+    const closeBulkUpload = () => {
+        setBulkUploadOpen(false);
+        importForm.reset();
+        importForm.clearErrors();
+        setCsvInspection({ status: 'idle', rows: 0, errors: [], warnings: [] });
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    const inspectCsvText = (text) => {
+        const rows = parseCsvText(text);
+        const errors = [];
+        const warnings = [];
+        if (rows.length === 0) return { status: 'error', rows: 0, errors: ['CSV is empty.'], warnings: [] };
+
+        const header = rows[0].map((cell) => normalizeCsvKey(cell));
+        const columnIndex = (names) => names.map((name) => header.indexOf(normalizeCsvKey(name))).find((index) => index >= 0);
+        const getCell = (row, names) => {
+            const index = columnIndex(Array.isArray(names) ? names : [names]);
+            return index >= 0 ? String(row[index] ?? '').trim() : '';
+        };
+        const missingHeaders = CSV_REQUIRED_COLUMNS.filter((column) => columnIndex([column]) === undefined).map((column) => `"${column}"`);
+        if (missingHeaders.length) errors.push(`Missing required column(s): ${missingHeaders.join(', ')}.`);
+
+        const findByValue = (items, value, labelFn, scopedFn = () => true) => {
+            const normalized = normalizeCsvValue(value);
+            if (!normalized) return null;
+            if (/^\d+$/.test(String(value).trim())) return items.find((item) => String(item.id) === String(value).trim()) ?? null;
+            const matches = items.filter((item) => scopedFn(item)).filter((item) => [labelFn(item), item.name, item.code].filter(Boolean).map((label) => normalizeCsvValue(label)).includes(normalized));
+            return matches.length === 1 ? matches[0] : null;
+        };
+        const seenEmails = new Map();
+
+        rows.slice(1).forEach((row, index) => {
+            const rowNum = index + 2;
+            const firstName = getCell(row, 'First Name');
+            const lastName = getCell(row, 'Last Name');
+            const email = getCell(row, 'Email');
+            const branchValue = getCell(row, ['Branch', 'Branch ID']);
+            const employeeDepartmentValue = getCell(row, ['Employee Department', 'Employee Department ID', 'Department', 'Department ID']);
+
+            if (!firstName) errors.push(`Row ${rowNum}: First Name is required.`);
+            if (!lastName) errors.push(`Row ${rowNum}: Last Name is required.`);
+            if (!email) {
+                errors.push(`Row ${rowNum}: Email is required.`);
+            } else if (!isValidEmail(email)) {
+                errors.push(`Row ${rowNum}: Email is not valid.`);
+            } else {
+                const normalizedEmail = normalizeCsvValue(email);
+                if (seenEmails.has(normalizedEmail)) errors.push(`Row ${rowNum}: Email duplicates row ${seenEmails.get(normalizedEmail)}.`);
+                if (existingEmployeeEmails.has(normalizedEmail)) warnings.push(`Row ${rowNum}: Email already appears in the current employees list; server will reject it if it already exists.`);
+                seenEmails.set(normalizedEmail, rowNum);
+            }
+
+            const branch = scopedBranchId ? branches.find((item) => String(item.id) === String(scopedBranchId)) : findByValue(branches, branchValue, (item) => item.name);
+            const employeeDepartment = findByValue(
+                employeeDepartments,
+                employeeDepartmentValue,
+                (item) => item.name,
+                (item) => !branch || !item.branch_id || String(item.branch_id) === String(branch.id),
+            );
+
+            if (!scopedBranchId && branchValue && !branch) errors.push(`Row ${rowNum}: Branch was not found.`);
+            if (!employeeDepartmentValue) errors.push(`Row ${rowNum}: Employee Department is required.`);
+            if (employeeDepartmentValue && !employeeDepartment) errors.push(`Row ${rowNum}: Employee Department was not found or does not match the branch.`);
+            if (!branchValue && !scopedBranchId) warnings.push(`Row ${rowNum}: Branch is blank, so the employee number will use the generic EMP-GEN prefix.`);
+        });
+
+        const dataRows = Math.max(rows.length - 1, 0);
+        if (dataRows === 0) errors.push('CSV has a header but no employee rows.');
+        return { status: errors.length ? 'error' : 'ready', rows: dataRows, errors, warnings };
+    };
+
+    const inspectCsvFile = (file) => {
+        setCsvInspection({ status: 'idle', rows: 0, errors: [], warnings: [] });
+        if (!file) return;
+        setCsvInspection({ status: 'checking', rows: 0, errors: [], warnings: [] });
+        const reader = new FileReader();
+        reader.onload = () => setCsvInspection(inspectCsvText(String(reader.result ?? '')));
+        reader.onerror = () => setCsvInspection({ status: 'error', rows: 0, errors: ['Unable to read the selected CSV file.'], warnings: [] });
+        reader.readAsText(file);
+    };
+
+    const handleCsvFileChange = (e) => {
+        const file = e.target.files?.[0] ?? null;
+        importForm.setData('file', file);
+        importForm.clearErrors('file');
+        inspectCsvFile(file);
+    };
+
+    const copyCsvInspectionMessages = () => {
+        const lines = [
+            csvInspection.status === 'error' ? 'CSV needs changes before upload' : `CSV ready: ${csvInspection.rows} employee row(s) found`,
+            ...csvInspection.errors.map((message) => `Error: ${message}`),
+            ...csvInspection.warnings.map((message) => `Warning: ${message}`),
+        ];
+        navigator.clipboard?.writeText(lines.join('\n'));
+    };
+
+    const submitBulkUpload = (e) => {
+        e.preventDefault();
+        if (csvInspection.status === 'error') return;
+        importForm.post(route('admin.import.employees'), { forceFormData: true, preserveScroll: true, onSuccess: closeBulkUpload });
+    };
+
+    const downloadCsvTemplate = () => {
+        const exampleBranchId = selectedFilterBranchId || activeBranchId || '1';
+        const exampleBranch = branches.find((branch) => String(branch.id) === String(exampleBranchId)) ?? branches[0];
+        const exampleDepartment = employeeDepartments.find((department) => !exampleBranch || !department.branch_id || String(department.branch_id) === String(exampleBranch.id)) ?? employeeDepartments[0];
+        const rows = [EMPLOYEE_CSV_TEMPLATE_COLUMNS, ['Pedro', 'S', 'Reyes', exampleBranch?.name ?? 'Santa Rosa', exampleDepartment?.name ?? 'Administrative Office', 'pedro.reyes@example.com', 'hcc1234']];
+        const csv = rows.map((row) => row.map((value) => `"${String(value ?? '').replaceAll('"', '""')}"`).join(',')).join('\n');
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+        link.href = url;
+        link.download = 'employee-upload-template.csv';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
     };
 
     const columns = [
@@ -316,7 +525,13 @@ export default function Employees({
                     <h2 className="text-base font-semibold text-slate-900">Employees</h2>
                     <p className="text-sm text-slate-500">Manage non-teaching staff, office assignments, and branch-scoped employee accounts.</p>
                 </div>
-                <button type="button" onClick={openCreate} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">+ New Employee</button>
+                <div className="flex flex-wrap gap-2">
+                    <button type="button" onClick={() => setBulkUploadOpen(true)} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                        <AppIcon name="upload" className="h-4 w-4" />
+                        Bulk Upload CSV
+                    </button>
+                    <button type="button" onClick={openCreate} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">+ New Employee</button>
+                </div>
             </div>
 
             {branches.length > 0 && (
@@ -341,7 +556,103 @@ export default function Employees({
                 </div>
             )}
 
-            <ResourceTable columns={columns} data={employees} filters={filters} routeName="admin.employees" searchPlaceholder="Search by name or employee no..." onRowClick={openView} onEdit={openEdit} onDelete={setDeleteTarget} />
+            <ResourceTable
+                columns={columns}
+                data={employees}
+                filters={filters}
+                routeName="admin.employees"
+                searchPlaceholder="Search by name or employee no..."
+                onRowClick={openView}
+                onEdit={openEdit}
+                onDelete={setDeleteTarget}
+                extraHeaderActions={(
+                    <div className="flex w-full flex-wrap items-center gap-2 md:w-auto">
+                        <SelectInput
+                            value={selectedFilterEmployeeDepartmentId}
+                            onChange={(e) => changeEmployeeDepartmentFilter(e.target.value)}
+                            className="w-full md:w-56"
+                        >
+                            <option value="">All employee departments</option>
+                            {filterEmployeeDepartments.map((department) => (
+                                <option key={department.id} value={department.id}>{department.name}</option>
+                            ))}
+                        </SelectInput>
+                    </div>
+                )}
+            />
+
+            <Modal show={bulkUploadOpen} maxWidth="2xl" onClose={closeBulkUpload}>
+                <form onSubmit={submitBulkUpload} className="p-6">
+                    <div className="flex items-start justify-between gap-4">
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">Bulk Upload</p>
+                            <h3 className="mt-1 text-lg font-semibold text-slate-900">Upload Employees CSV</h3>
+                            <p className="mt-1 text-sm text-slate-500">Employee numbers are generated automatically. New accounts use the default password hcc1234.</p>
+                        </div>
+                        <button type="button" onClick={closeBulkUpload} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50">Close</button>
+                    </div>
+
+                    <div className="mt-5 space-y-4">
+                        <div>
+                            <label className="mb-1 block text-sm font-medium text-slate-700">CSV File</label>
+                            <input ref={fileInputRef} type="file" accept=".csv,text/csv" onChange={handleCsvFileChange} className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-slate-900 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                            {importForm.errors.file && <p className="mt-1 text-sm text-rose-600">{importForm.errors.file}</p>}
+                        </div>
+
+                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div>
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">CSV Template</p>
+                                    <p className="mt-1 text-sm text-slate-600">Enter names for Branch and Employee Department. Old numeric ID columns still work.</p>
+                                </div>
+                                <button type="button" onClick={downloadCsvTemplate} className="rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50">Download Template</button>
+                            </div>
+                            <pre className="mt-3 overflow-x-auto rounded-md bg-white p-3 text-xs text-slate-700 ring-1 ring-slate-200">{EMPLOYEE_CSV_TEMPLATE_COLUMNS.join(',')}</pre>
+                            {csvReferenceRows.length > 0 && (
+                                <details className="mt-3 rounded-md bg-white p-3 text-xs text-slate-600 ring-1 ring-slate-200">
+                                    <summary className="cursor-pointer font-semibold text-slate-800">Name reference for CSV values</summary>
+                                    <div className="mt-2 grid max-h-48 gap-1 overflow-y-auto sm:grid-cols-2">
+                                        {csvReferenceRows.map((row) => <span key={row}>{row}</span>)}
+                                    </div>
+                                </details>
+                            )}
+                        </div>
+                    </div>
+
+                    {csvInspection.status !== 'idle' && (
+                        <div className={`mt-6 rounded-lg border px-4 py-3 text-sm ${csvInspection.status === 'error' ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
+                            <div className="flex items-start justify-between gap-3">
+                                <p className="font-semibold">{csvInspection.status === 'checking' ? 'Inspecting CSV...' : csvInspection.status === 'error' ? 'CSV needs changes before upload' : `CSV ready: ${csvInspection.rows} employee row(s) found`}</p>
+                                {csvInspection.status !== 'checking' && (
+                                    <button type="button" onClick={copyCsvInspectionMessages} title="Copy CSV inspection messages" className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white/80 text-slate-600 ring-1 ring-slate-200 hover:bg-white hover:text-slate-900">
+                                        <AppIcon name="copy" className="h-3.5 w-3.5" />
+                                    </button>
+                                )}
+                            </div>
+                            {csvInspection.errors.length > 0 && (
+                                <ul className="mt-2 max-h-36 list-disc space-y-1 overflow-y-auto pl-5 text-xs">
+                                    {csvInspection.errors.slice(0, 12).map((message) => <li key={message}>{message}</li>)}
+                                    {csvInspection.errors.length > 12 && <li>{csvInspection.errors.length - 12} more issue(s) hidden.</li>}
+                                </ul>
+                            )}
+                            {csvInspection.warnings.length > 0 && (
+                                <div className="mt-2 rounded-md bg-white/70 p-2 text-xs text-amber-700 ring-1 ring-amber-200">
+                                    <p className="font-semibold">Warnings</p>
+                                    <ul className="mt-1 list-disc space-y-1 pl-5">
+                                        {csvInspection.warnings.slice(0, 6).map((message) => <li key={message}>{message}</li>)}
+                                        {csvInspection.warnings.length > 6 && <li>{csvInspection.warnings.length - 6} more warning(s) hidden.</li>}
+                                    </ul>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    <div className="mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                        <button type="button" onClick={closeBulkUpload} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
+                        <button type="submit" disabled={importForm.processing || !importForm.data.file || ['checking', 'error'].includes(csvInspection.status)} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300">{importForm.processing ? 'Uploading...' : 'Upload CSV'}</button>
+                    </div>
+                </form>
+            </Modal>
 
             <SlideOver open={detailOpen} onClose={() => setDetailOpen(false)} title="Employee Information" width="max-w-xl">
                 {viewing && (

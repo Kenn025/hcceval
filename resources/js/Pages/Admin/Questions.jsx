@@ -26,6 +26,13 @@ export default function Questions({ questions, questionTypes, questionClasses, n
 
     const { isDirty } = useFormDirty(data, editing?.question_id ?? 'new');
     const [confirmUpdateOpen, setConfirmUpdateOpen] = useState(false);
+    const selectedQuestionClassId = String(filters.question_class_id ?? '');
+    const selectedQuestionTypeId = String(filters.question_type_id ?? '');
+    const questionRequiredFieldsComplete = Boolean(
+        String(data.question_type_id ?? '').trim()
+        && String(data.question_class_id ?? '').trim()
+        && String(data.question_text ?? '').trim()
+    );
 
     const openCreate = () => {
         reset();
@@ -66,6 +73,7 @@ export default function Questions({ questions, questionTypes, questionClasses, n
 
     const submit = (e) => {
         e.preventDefault();
+        if (!questionRequiredFieldsComplete) return;
         if (editing && !isDirty) return;
         if (editing) { setConfirmUpdateOpen(true); return; }
         performSave();
@@ -94,6 +102,45 @@ export default function Questions({ questions, questionTypes, questionClasses, n
         { key: 'question_text', label: 'Question', render: (r) => <span className="line-clamp-2">{r.question_text}</span> },
     ];
 
+    const changeQuestionClassFilter = (questionClassId) => {
+        router.get(route(routeName), { ...filters, question_class_id: questionClassId }, {
+            preserveState: true,
+            replace: true,
+        });
+    };
+
+    const changeQuestionTypeFilter = (questionTypeId) => {
+        router.get(route(routeName), { ...filters, question_type_id: questionTypeId }, {
+            preserveState: true,
+            replace: true,
+        });
+    };
+
+    const filterActions = (
+        <div className="flex flex-wrap items-center gap-2">
+            <SelectInput
+                value={selectedQuestionClassId}
+                onChange={(e) => changeQuestionClassFilter(e.target.value)}
+                className="w-full md:w-56"
+            >
+                <option value="">All question classes</option>
+                {questionClasses.map((questionClass) => (
+                    <option key={questionClass.id} value={questionClass.id}>{questionClass.name}</option>
+                ))}
+            </SelectInput>
+            <SelectInput
+                value={selectedQuestionTypeId}
+                onChange={(e) => changeQuestionTypeFilter(e.target.value)}
+                className="w-full md:w-56"
+            >
+                <option value="">All question types</option>
+                {questionTypes.map((type) => (
+                    <option key={type.id} value={type.id}>{type.name}</option>
+                ))}
+            </SelectInput>
+        </div>
+    );
+
     return (
         <AdminLayout title={title} activeRoute={routeName} breadcrumbs={['Question Bank']}>
             <div className="mb-4 flex items-center justify-between">
@@ -104,7 +151,7 @@ export default function Questions({ questions, questionTypes, questionClasses, n
                 <button onClick={openCreate} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">+ New Question</button>
             </div>
 
-            <ResourceTable columns={columns} data={questions} filters={filters} routeName={routeName} searchPlaceholder="Search questions..." onRowClick={openView} onEdit={openEdit} onDelete={setDeleteTarget} />
+            <ResourceTable columns={columns} data={questions} filters={filters} routeName={routeName} searchPlaceholder="Search questions..." onRowClick={openView} onEdit={openEdit} onDelete={setDeleteTarget} extraHeaderActions={filterActions} />
 
             <SlideOver open={detailOpen} onClose={() => setDetailOpen(false)} title="Question Information">
                 {viewing && (
@@ -166,7 +213,7 @@ export default function Questions({ questions, questionTypes, questionClasses, n
 
                     <div className="flex gap-3 pt-2">
                         <button type="button" onClick={() => setSlideOpen(false)} className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700">Cancel</button>
-                        <SubmitButton processing={processing} disabled={Boolean(editing) && !isDirty} className="flex-1">
+                        <SubmitButton processing={processing} disabled={!questionRequiredFieldsComplete || (Boolean(editing) && !isDirty)} className="flex-1">
                             {editing ? 'Update' : 'Create'}
                         </SubmitButton>
                     </div>

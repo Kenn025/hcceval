@@ -420,118 +420,70 @@ function QuestionnaireListModal({ open, scopeItem, questionnaires, assignmentTyp
                         </button>
                     </div>
 
-                    <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
-                        {/* Desktop Table View */}
-                        <div className="hidden md:block overflow-x-auto">
-                            <table className="min-w-full divide-y divide-slate-200">
-                                <thead className="bg-slate-50">
-                                    <tr>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">#</th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Code</th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Title</th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Type</th>
-                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Notes</th>
-                                        <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-200 bg-white">
-                                    {questionnaires.length > 0 ? (
-                                        questionnaires.map((questionnaire, index) => {
-                                            const isSelected = String(questionnaire.questionnaire_id) === String(selectedQuestionnaireId);
-
-                                            return (
-                                            <tr key={questionnaire.questionnaire_id} className={isSelected ? 'bg-blue-50/70' : 'hover:bg-slate-50/80'}>
-                                                <td className="px-4 py-3 text-sm text-slate-600">{index + 1}</td>
-                                                <td className="px-4 py-3 text-sm text-slate-700">{questionnaire.questionnaire_code ?? '-'}</td>
-                                                <td className="px-4 py-3 text-sm font-medium text-slate-900">{questionnaire.title ?? '-'}</td>
-                                                <td className="px-4 py-3 text-sm text-slate-700">{questionnaire.questionnaire_type_name ?? '-'}</td>
-                                                <td className="px-4 py-3 text-sm text-slate-600">{questionnaire.notes ?? '-'}</td>
-                                                <td className="px-4 py-3">
-                                                    <div className="flex justify-end gap-2">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setViewTarget(questionnaire)}
-                                                            className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                                                        >
-                                                            View
-                                                        </button>
-                                                         <button
-                                                            type="button"
-                                                            onClick={() => setSelectedQuestionnaireId(
-                                                                isSelected ? '' : String(questionnaire.questionnaire_id),
-                                                            )}
-                                                            className={isSelected
-                                                                ? 'rounded-lg bg-blue-100 px-3 py-1.5 text-sm font-medium text-blue-700 ring-1 ring-blue-200'
-                                                                : 'rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-blue-700'}
-                                                        >
-                                                            {isSelected ? 'Unselect' : 'Select'}
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                            );
-                                        })
-                                    ) : (
-                                        <tr>
-                                            <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-500">
-                                                No questionnaires available for this distribution type yet.
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {/* Mobile Card View */}
-                        <div className="md:hidden divide-y divide-slate-100">
-                            {questionnaires.length > 0 ? (
-                                questionnaires.map((questionnaire, index) => {
+                    <div className="mt-6">
+                        {questionnaires.length > 0 ? (
+                            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                                {questionnaires.map((questionnaire, index) => {
                                     const isSelected = String(questionnaire.questionnaire_id) === String(selectedQuestionnaireId);
 
                                     return (
-                                    <div key={`mobile-q-${questionnaire.questionnaire_id}`} className={`p-4 transition-colors ${isSelected ? 'bg-blue-50/70' : 'active:bg-slate-50'}`}>
-                                        <div className="flex items-start justify-between gap-4">
-                                            <div className="flex-1 space-y-3">
-                                                <div>
-                                                    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400"># {index + 1}</div>
-                                                    <div className="mt-0.5 text-sm font-semibold text-slate-900">{questionnaire.title ?? '-'}</div>
-                                                    <div className="text-xs text-slate-500">{questionnaire.questionnaire_code ?? '-'}</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Type</div>
-                                                    <div className="mt-0.5 text-xs text-slate-600">{questionnaire.questionnaire_type_name ?? '-'}</div>
-                                                </div>
-                                            </div>
-                                            <div className="flex flex-col gap-2 shrink-0">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setViewTarget(questionnaire)}
-                                                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm"
-                                                >
-                                                    View
-                                                </button>
-                                                 <button
-                                                    type="button"
-                                                    onClick={() => setSelectedQuestionnaireId(
-                                                        isSelected ? '' : String(questionnaire.questionnaire_id),
+                                        <div
+                                            key={questionnaire.questionnaire_id}
+                                            className={[
+                                                'rounded-lg border p-4 transition',
+                                                isSelected
+                                                    ? 'border-blue-300 bg-blue-50 shadow-sm ring-1 ring-blue-200'
+                                                    : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50',
+                                            ].join(' ')}
+                                        >
+                                            <div className="flex h-full flex-col gap-4">
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <div className="min-w-0">
+                                                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                            #{index + 1} · {questionnaire.questionnaire_code ?? '-'}
+                                                        </p>
+                                                        <h4 className="mt-1 text-sm font-semibold text-slate-900">{questionnaire.title ?? '-'}</h4>
+                                                        <p className="mt-1 text-xs text-slate-600">{questionnaire.questionnaire_type_name ?? '-'}</p>
+                                                    </div>
+                                                    {isSelected && (
+                                                        <span className="shrink-0 rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                                                            Selected
+                                                        </span>
                                                     )}
-                                                    className={isSelected
-                                                        ? 'rounded-lg bg-blue-100 px-3 py-1.5 text-xs font-medium text-blue-700 shadow-sm ring-1 ring-blue-200'
-                                                        : 'rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm'}
-                                                >
-                                                    {isSelected ? 'Unselect' : 'Select'}
-                                                </button>
+                                                </div>
+
+                                                <p className="text-sm text-slate-600">{questionnaire.notes ?? 'No notes provided.'}</p>
+
+                                                <div className="mt-auto flex justify-end gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setViewTarget(questionnaire)}
+                                                        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                                                    >
+                                                        View
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setSelectedQuestionnaireId(
+                                                            isSelected ? '' : String(questionnaire.questionnaire_id),
+                                                        )}
+                                                        className={isSelected
+                                                            ? 'rounded-lg bg-blue-100 px-3 py-1.5 text-sm font-medium text-blue-700 ring-1 ring-blue-200'
+                                                            : 'rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-blue-700'}
+                                                    >
+                                                        {isSelected ? 'Unselect' : 'Select'}
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
                                     );
-                                })
-                            ) : (
-                                <div className="px-4 py-8 text-center text-sm text-slate-500">
-                                    No questionnaires found.
-                                </div>
-                            )}
-                        </div>
+                                })}
+                            </div>
+                        ) : (
+                            <div className="rounded-lg border border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
+                                No questionnaires available for this distribution type yet.
+                            </div>
+                        )}
                     </div>
 
                     <div className="mt-6 flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
@@ -566,10 +518,10 @@ function QuestionnaireListModal({ open, scopeItem, questionnaires, assignmentTyp
             </div>
 
             {viewTarget ? (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-slate-950/50" onClick={() => setViewTarget(null)} />
-                    <div className="relative w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl">
-                        <div className="flex items-start justify-between gap-4">
+                    <div className="relative flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+                        <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
                             <div>
                                 <h3 className="text-lg font-semibold text-slate-900">Questionnaire Details</h3>
                                 <p className="mt-1 text-sm text-slate-500">Review this questionnaire before distributing it.</p>
@@ -583,7 +535,7 @@ function QuestionnaireListModal({ open, scopeItem, questionnaires, assignmentTyp
                             </button>
                         </div>
 
-                        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                        <div className="grid gap-4 overflow-y-auto px-6 py-5 sm:grid-cols-2">
                             <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
                                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Code</p>
                                 <p className="mt-1 text-sm font-semibold text-slate-900">{viewTarget.questionnaire_code ?? '-'}</p>
@@ -883,10 +835,10 @@ function AssignedQuestionnairesModal({
             </div>
 
             {viewTarget ? (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-slate-950/50" onClick={() => setViewTarget(null)} />
-                    <div className="relative w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl">
-                        <div className="flex items-start justify-between gap-4">
+                    <div className="relative flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+                        <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
                             <div>
                                 <h3 className="text-lg font-semibold text-slate-900">Questionnaire Details</h3>
                                 <p className="mt-1 text-sm text-slate-500">Review this assigned questionnaire.</p>
@@ -900,7 +852,7 @@ function AssignedQuestionnairesModal({
                             </button>
                         </div>
 
-                        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                        <div className="grid gap-4 overflow-y-auto px-6 py-5 sm:grid-cols-2">
                             <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
                                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Code</p>
                                 <p className="mt-1 text-sm font-semibold text-slate-900">{viewTarget.questionnaire_code ?? '-'}</p>
@@ -1353,116 +1305,67 @@ function CustomSubjectsModal({
                             </button>
                         </div>
 
-                        <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
-                            {/* Desktop Table View */}
-                            <div className="hidden md:block overflow-x-auto">
-                                <table className="min-w-full divide-y divide-slate-200">
-                                    <thead className="bg-slate-50">
-                                        <tr>
-                                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">#</th>
-                                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Code</th>
-                                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Title</th>
-                                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Type</th>
-                                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Notes</th>
-                                            <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-200 bg-white">
-                                        {questionnaires.length > 0 ? (
-                                            questionnaires.map((questionnaire, index) => (
-                                                <tr key={`picker-${questionnaire.questionnaire_id}`} className="hover:bg-slate-50/80">
-                                                    <td className="px-4 py-3 text-sm text-slate-600">{index + 1}</td>
-                                                    <td className="px-4 py-3 text-sm text-slate-700">{questionnaire.questionnaire_code ?? '-'}</td>
-                                                    <td className="px-4 py-3 text-sm font-medium text-slate-900">{questionnaire.title ?? '-'}</td>
-                                                    <td className="px-4 py-3 text-sm text-slate-700">{questionnaire.questionnaire_type_name ?? '-'}</td>
-                                                    <td className="px-4 py-3 text-sm text-slate-600">{questionnaire.notes ?? '-'}</td>
-                                                    <td className="px-4 py-3">
-                                                        <div className="flex justify-end gap-2">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setQuestionnaireViewTarget(questionnaire)}
-                                                                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                                                            >
-                                                                View
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    setGroups((current) => current.map((group) => (
-                                                                        group.localId === questionnairePickerGroupId
-                                                                            ? { ...group, questionnaire_id: String(questionnaire.questionnaire_id) }
-                                                                            : group
-                                                                    )));
-                                                                    setQuestionnairePickerGroupId(null);
-                                                                }}
-                                                                className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-blue-700"
-                                                            >
-                                                                Select
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))
-                                        ) : (
-                                            <tr>
-                                                <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-500">
-                                                    No questionnaires available for this distribution type yet.
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            {/* Mobile Card View */}
-                            <div className="md:hidden divide-y divide-slate-100">
-                                {questionnaires.length > 0 ? (
-                                    questionnaires.map((questionnaire, index) => (
-                                        <div key={`mobile-picker-${questionnaire.questionnaire_id}`} className="p-4 active:bg-slate-50 transition-colors">
-                                            <div className="flex items-start justify-between gap-4">
-                                                <div className="flex-1 space-y-3">
-                                                    <div>
-                                                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400"># {index + 1}</div>
-                                                        <div className="mt-0.5 text-sm font-semibold text-slate-900">{questionnaire.title ?? '-'}</div>
-                                                        <div className="text-xs text-slate-500">{questionnaire.questionnaire_code ?? '-'}</div>
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Type</div>
-                                                        <div className="mt-0.5 text-xs text-slate-600">{questionnaire.questionnaire_type_name ?? '-'}</div>
-                                                    </div>
-                                                </div>
-                                                <div className="flex flex-col gap-2 shrink-0">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setQuestionnaireViewTarget(questionnaire)}
-                                                        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm"
-                                                    >
-                                                        View
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setGroups((current) => current.map((group) => (
-                                                                group.localId === questionnairePickerGroupId
-                                                                    ? { ...group, questionnaire_id: String(questionnaire.questionnaire_id) }
-                                                                    : group
-                                                            )));
-                                                            setQuestionnairePickerGroupId(null);
-                                                        }}
-                                                        className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm"
-                                                    >
-                                                        Select
-                                                    </button>
+                        <div className="mt-6">
+                            {questionnaires.length > 0 ? (
+                                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                                    {questionnaires.map((questionnaire, index) => (
+                                        <div
+                                            key={`picker-${questionnaire.questionnaire_id}`}
+                                            className="flex min-h-[16rem] flex-col rounded-lg border border-blue-100 bg-white p-4 shadow-sm transition hover:border-blue-200 hover:shadow-md"
+                                        >
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                        #{index + 1} · {questionnaire.questionnaire_code ?? '-'}
+                                                    </p>
+                                                    <h4 className="mt-1.5 line-clamp-2 text-sm font-semibold text-slate-950">
+                                                        {questionnaire.title ?? '-'}
+                                                    </h4>
                                                 </div>
                                             </div>
+
+                                            <div className="mt-3 space-y-2 text-sm">
+                                                <div>
+                                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Type</p>
+                                                    <p className="mt-0.5 line-clamp-2 font-medium text-slate-800">{questionnaire.questionnaire_type_name ?? '-'}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Notes</p>
+                                                    <p className="mt-0.5 line-clamp-3 text-xs text-slate-600">{questionnaire.notes ?? 'No notes provided.'}</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="mt-auto flex justify-end gap-2 pt-4">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setQuestionnaireViewTarget(questionnaire)}
+                                                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                                                >
+                                                    View
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setGroups((current) => current.map((group) => (
+                                                            group.localId === questionnairePickerGroupId
+                                                                ? { ...group, questionnaire_id: String(questionnaire.questionnaire_id) }
+                                                                : group
+                                                        )));
+                                                        setQuestionnairePickerGroupId(null);
+                                                    }}
+                                                    className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-blue-700"
+                                                >
+                                                    Select
+                                                </button>
+                                            </div>
                                         </div>
-                                    ))
-                                ) : (
-                                    <div className="px-4 py-8 text-center text-sm text-slate-500">
-                                        No questionnaires found.
-                                    </div>
-                                )}
-                            </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="rounded-lg border border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500">
+                                    No questionnaires found.
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -1471,8 +1374,8 @@ function CustomSubjectsModal({
             {questionnaireViewTarget ? (
                 <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-slate-950/55" onClick={() => setQuestionnaireViewTarget(null)} />
-                    <div className="relative w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl">
-                        <div className="flex items-start justify-between gap-4">
+                    <div className="relative flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+                        <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
                             <div>
                                 <h3 className="text-lg font-semibold text-slate-900">Questionnaire Details</h3>
                                 <p className="mt-1 text-sm text-slate-500">Review this questionnaire before assigning it to the custom group.</p>
@@ -1486,7 +1389,7 @@ function CustomSubjectsModal({
                             </button>
                         </div>
 
-                        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                        <div className="grid gap-4 overflow-y-auto px-6 py-5 sm:grid-cols-2">
                             <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
                                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Code</p>
                                 <p className="mt-1 text-sm font-semibold text-slate-900">{questionnaireViewTarget.questionnaire_code ?? '-'}</p>

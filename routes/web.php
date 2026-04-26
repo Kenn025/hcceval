@@ -80,6 +80,7 @@ Route::middleware('auth')->group(function () {
 
     // Students
     Route::get('/admin/students', [StudentController::class, 'index'])->name('admin.students');
+    Route::get('/admin/students/email-availability', [StudentController::class, 'checkEmailAvailability'])->name('admin.students.email-availability');
     Route::post('/admin/students', [StudentController::class, 'store']);
     Route::put('/admin/students/{student}', [StudentController::class, 'update']);
     Route::delete('/admin/students/{student}', [StudentController::class, 'destroy']);
@@ -128,6 +129,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/admin/employee-ratings', [RatingsController::class, 'employeeRatings'])->name('admin.employee-ratings');
     Route::get('/admin/subject-archives', [RatingsController::class, 'subjectArchives'])->name('admin.subject-archives');
     Route::get('/admin/peer-archives', [RatingsController::class, 'peerArchives'])->name('admin.peer-archives');
+    Route::get('/admin/head-archives', [RatingsController::class, 'headArchives'])->name('admin.head-archives');
     Route::get('/admin/employee-archives', [RatingsController::class, 'employeeArchives'])->name('admin.employee-archives');
 
     // Head & Branch ratings

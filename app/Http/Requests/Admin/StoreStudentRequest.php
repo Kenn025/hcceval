@@ -30,7 +30,7 @@ class StoreStudentRequest extends FormRequest
             'middle_name'   => 'nullable|string|max:100',
             'last_name'     => 'required|string|max:100',
             'suffix_name'   => 'nullable|string|max:50',
-            'email'         => 'nullable|email|max:150|unique:student,email',
+            'email'         => 'required|email|max:150|unique:student,email',
             'password'      => 'nullable|string|min:6',
             'status'        => 'nullable|in:active,inactive',
         ];

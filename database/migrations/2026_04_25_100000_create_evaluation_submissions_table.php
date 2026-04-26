@@ -17,7 +17,6 @@ return new class extends Migration
             $table->unsignedBigInteger('subject_id')->nullable();
             $table->unsignedBigInteger('teacher_id')->nullable();
             $table->unsignedBigInteger('employee_id')->nullable();
-            $table->string('category', 64)->nullable();
             $table->boolean('is_other')->default(false);
             $table->json('answers');
             $table->json('comments')->nullable();
@@ -32,7 +31,6 @@ return new class extends Migration
             $table->index('subject_id', 'es_subject_idx');
             $table->index('teacher_id', 'es_teacher_idx');
             $table->index('employee_id', 'es_employee_idx');
-            $table->index('category', 'es_category_idx');
         });
     }
 

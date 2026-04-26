@@ -33,7 +33,7 @@ class UpdateStudentRequest extends FormRequest
             'middle_name'   => 'nullable|string|max:100',
             'last_name'     => 'required|string|max:100',
             'suffix_name'   => 'nullable|string|max:50',
-            'email'         => ['nullable', 'email', 'max:150', Rule::unique('student', 'email')->ignore($id)],
+            'email'         => ['required', 'email', 'max:150', Rule::unique('student', 'email')->ignore($id)],
             'password'      => 'nullable|string|min:6',
             'status'        => 'nullable|in:active,inactive',
         ];

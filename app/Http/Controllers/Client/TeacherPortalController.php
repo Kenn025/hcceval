@@ -295,10 +295,12 @@ class TeacherPortalController extends Controller
                 }
             }
 
+            $subjectTypeId = $this->questionnaireTypeIdByKeyword('subject');
             $query = DB::table('evaluation_submissions')
                 ->select($selects)
                 ->where('academic_year_id', (int) $cycle->id)
-                ->whereIn('subject_id', $subjects->pluck('subject_id')->all());
+                ->whereIn('subject_id', $subjects->pluck('subject_id')->all())
+                ->when($subjectTypeId, fn ($query) => $query->where('questionnaire_type_id', $subjectTypeId));
 
             $ratingsBySubject = $query
                 ->get()
@@ -464,9 +466,7 @@ class TeacherPortalController extends Controller
             $query->whereNull('employee_id');
         }
 
-        if (Schema::hasColumn('evaluation_submissions', 'category')) {
-            $query->where('category', 'peer_teacher');
-        } elseif ($peerTypeId = $this->questionnaireTypeIdByKeyword('peer')) {
+        if ($peerTypeId = $this->questionnaireTypeIdByKeyword('peer')) {
             $query->where('questionnaire_type_id', $peerTypeId);
         }
 
@@ -578,7 +578,7 @@ class TeacherPortalController extends Controller
 
         $selects = ['id', 'academic_year_id', 'questionnaire_type_id', 'questionnaire_id', 'answers', 'comments', 'created_at', 'updated_at'];
 
-        foreach (['teacher_id', 'employee_id', 'subject_id', 'category', 'overall_average', 'submitted_at', 'is_other'] as $column) {
+        foreach (['teacher_id', 'employee_id', 'subject_id', 'overall_average', 'submitted_at', 'is_other'] as $column) {
             if (Schema::hasColumn('evaluation_submissions', $column)) {
                 $selects[] = $column;
             }
@@ -614,6 +614,7 @@ class TeacherPortalController extends Controller
                 ->select($selects)
                 ->whereIn('subject_id', $subjectIds->all())
                 ->whereNotNull('academic_year_id')
+                ->when($this->questionnaireTypeIdByKeyword('subject'), fn ($query, $typeId) => $query->where('questionnaire_type_id', $typeId))
                 ->when($activeAcademicYearId, fn ($query) => $query->where('academic_year_id', '!=', $activeAcademicYearId))
                 ->orderByDesc('created_at')
                 ->get();
@@ -636,9 +637,7 @@ class TeacherPortalController extends Controller
                 $peerQuery->whereNull('employee_id');
             }
 
-            if (Schema::hasColumn('evaluation_submissions', 'category')) {
-                $peerQuery->where('category', 'peer_teacher');
-            } elseif ($peerTypeId = $this->questionnaireTypeIdByKeyword('peer')) {
+            if ($peerTypeId = $this->questionnaireTypeIdByKeyword('peer')) {
                 $peerQuery->where('questionnaire_type_id', $peerTypeId);
             }
 
@@ -755,10 +754,10 @@ class TeacherPortalController extends Controller
                 continue;
             }
 
-            $category = $row->category ?? null;
+            $category = $this->categoryFromSubmissionRow($row);
 
             if (! in_array($category, ['peer_teacher', 'head_teacher', 'employee_evaluation'], true)) {
-                $category = $this->categoryFromSubmissionRow($row);
+                continue;
             }
 
             $target = $category === 'employee_evaluation'
@@ -1014,6 +1013,14 @@ class TeacherPortalController extends Controller
 
         $typeId = (int) ($row->questionnaire_type_id ?? 0);
 
+        if ($typeId && $typeId === $this->questionnaireTypeIdByKeyword('employee')) {
+            return 'employee_evaluation';
+        }
+
+        if ($typeId && $typeId === $this->questionnaireTypeIdByKeyword('subject')) {
+            return 'subject_teacher';
+        }
+
         if ($typeId && $typeId === $this->questionnaireTypeIdByKeyword('head')) {
             return 'head_teacher';
         }
@@ -1097,12 +1104,13 @@ class TeacherPortalController extends Controller
 
         $hasLegacyEvaluatorColumns = Schema::hasColumn('evaluation_submissions', 'evaluator_id')
             && Schema::hasColumn('evaluation_submissions', 'evaluatee_id');
+        $typeId = $this->questionnaireTypeIdForCategory($category);
 
         if ($hasLegacyEvaluatorColumns) {
             $submitted = DB::table('evaluation_submissions')
                 ->where('evaluator_id', $teacher->id)
                 ->where('evaluator_type', 'teacher')
-                ->where('category', $category)
+                ->when($typeId, fn ($query) => $query->where('questionnaire_type_id', $typeId))
                 ->where('school_year', $schoolYear)
                 ->whereIn('term', $terms)
                 ->pluck('evaluatee_id')
@@ -1110,7 +1118,6 @@ class TeacherPortalController extends Controller
                 ->all();
         } else {
             $submissionIds = $this->teacherSubmissionIds($teacher);
-            $typeId = $this->questionnaireTypeIdForCategory($category);
 
             $submitted = empty($submissionIds)
                 ? []
@@ -1212,11 +1219,20 @@ class TeacherPortalController extends Controller
                 ...$this->termOptions($cycle->term ?? null),
             ])));
 
+            $typeIds = collect($targets)
+                ->pluck('category')
+                ->filter()
+                ->unique()
+                ->map(fn ($category) => $this->questionnaireTypeIdForCategory($category))
+                ->filter()
+                ->values()
+                ->all();
+
             $rows = DB::table('evaluation_submissions')
-                ->select('id', 'evaluatee_id', 'category', 'answers', 'comments', 'submitted_at', 'updated_at')
+                ->select('id', 'evaluatee_id', 'questionnaire_type_id', 'answers', 'comments', 'submitted_at', 'updated_at')
                 ->where('evaluator_id', $teacher->id)
                 ->where('evaluator_type', 'teacher')
-                ->whereIn('category', collect($targets)->pluck('category')->filter()->unique()->values()->all())
+                ->when($typeIds !== [], fn ($query) => $query->whereIn('questionnaire_type_id', $typeIds))
                 ->where('school_year', "{$cycle->from_year}-{$cycle->to_year}")
                 ->whereIn('term', $terms)
                 ->whereIn('evaluatee_id', $targetIds->merge($employeeTargetIds)->unique()->values()->all())
@@ -1272,7 +1288,7 @@ class TeacherPortalController extends Controller
         return $rows
             ->groupBy(function ($row) use ($hasLegacyEvaluatorColumns, $targetLookup) {
                 $category = $hasLegacyEvaluatorColumns
-                    ? ($row->category ?? 'peer_teacher')
+                    ? $this->categoryFromSubmissionRow($row)
                     : $this->categoryFromSubmissionRow($row);
                 $targetId = (int) ($hasLegacyEvaluatorColumns ? $row->evaluatee_id : ($row->employee_id ?? $row->teacher_id));
 
@@ -1450,7 +1466,7 @@ class TeacherPortalController extends Controller
                 $submittedEmployeeIds = DB::table('evaluation_submissions')
                     ->where('evaluator_id', $teacher->id)
                     ->where('evaluator_type', 'teacher')
-                    ->where('category', 'employee_evaluation')
+                    ->when($this->questionnaireTypeIdByKeyword('employee'), fn ($query, $typeId) => $query->where('questionnaire_type_id', $typeId))
                     ->where('school_year', "{$cycle->from_year}-{$cycle->to_year}")
                     ->whereIn('term', [$termA, $termB])
                     ->pluck('evaluatee_id')
@@ -1682,7 +1698,7 @@ class TeacherPortalController extends Controller
                 ->where('evaluatee_id', $evaluatee->id)
                 ->when($schoolYear, fn ($query) => $query->where('school_year', $schoolYear))
                 ->whereIn('term', $terms)
-                ->where('category', $data['category'])
+                ->when($this->questionnaireTypeIdForCategory($data['category']), fn ($query, $typeId) => $query->where('questionnaire_type_id', $typeId))
                 ->exists();
         } else {
             $submissionIds = $this->teacherSubmissionIds($teacher);
@@ -1727,10 +1743,6 @@ class TeacherPortalController extends Controller
             'updated_at' => now(),
         ];
 
-        if (Schema::hasColumn('evaluation_submissions', 'category')) {
-            $submissionPayload['category'] = $data['category'];
-        }
-
         if ($data['category'] === 'employee_evaluation' && Schema::hasColumn('evaluation_submissions', 'employee_id')) {
             $submissionPayload['employee_id'] = $evaluatee->id;
         } elseif (Schema::hasColumn('evaluation_submissions', 'teacher_id')) {
@@ -1757,7 +1769,6 @@ class TeacherPortalController extends Controller
                 'evaluator_type' => 'teacher',
                 'evaluatee_id' => $evaluatee->id,
                 'evaluatee_type' => $data['category'] === 'employee_evaluation' ? 'employee' : 'teacher',
-                'category' => $data['category'],
                 'subject_section_id' => null,
                 'school_year' => $schoolYear,
                 'term' => $terms[0] ?? null,

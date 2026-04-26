@@ -11,6 +11,7 @@ import { router, useForm } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
 const stripCampusSuffix = (value) => String(value ?? '').replace(/\s*-\s*(Santa Rosa|Concepcion)\s*$/i, '').trim();
+const hasValue = (value) => String(value ?? '').trim() !== '';
 
 export default function Programs({
     programs,
@@ -32,8 +33,7 @@ export default function Programs({
     const [submitError, setSubmitError] = useState('');
     const activeBranchId = String(selectedBranchId ?? scopedBranchId ?? '');
     const activeBranch = branches.find((branch) => String(branch.id) === activeBranchId);
-
-    const { data, setData, errors, processing, reset, clearErrors } = useForm({
+    const blankFormData = () => ({
         branch_id: activeBranchId,
         name: '',
         chair_teacher_id: '',
@@ -41,13 +41,22 @@ export default function Programs({
         is_activated: true,
     });
 
+    const { data, setData, errors, processing, reset, clearErrors } = useForm(blankFormData());
+
     const { isDirty } = useFormDirty(data, editing?.id ?? 'new');
     const [confirmUpdateOpen, setConfirmUpdateOpen] = useState(false);
+    const [createDraft, setCreateDraft] = useState(null);
+    const [editDrafts, setEditDrafts] = useState({});
 
     const selectedDepartment = useMemo(
         () => departments.find((department) => String(department.branch_id) === String(data.branch_id)),
         [departments, data.branch_id],
     );
+    const isFormComplete = hasValue(data.branch_id)
+        && hasValue(data.name)
+        && hasValue(data.duration_years)
+        && Number(data.duration_years) >= 1;
+    const isSubmitDisabled = !isFormComplete || (Boolean(editing) && !isDirty);
 
     const filteredChairs = chairs.filter((chair) => {
         const branchMatches = !data.branch_id || String(chair.branch_id) === String(data.branch_id);
@@ -56,18 +65,57 @@ export default function Programs({
         return branchMatches && departmentMatches;
     });
 
+    const formDataFromProgram = (row) => ({
+        branch_id: String(row.department?.branch_id ?? row.branch_id ?? activeBranchId ?? ''),
+        name: row.name,
+        chair_teacher_id: String(row.assigned_chair?.id ?? ''),
+        duration_years: row.duration_years ?? '',
+        is_activated: Boolean(row.is_activated),
+    });
+
+    const updateField = (field, value) => {
+        const nextData = { ...data, [field]: value };
+
+        setData(field, value);
+
+        if (editing) {
+            setEditDrafts((drafts) => ({
+                ...drafts,
+                [editing.id]: nextData,
+            }));
+        } else {
+            setCreateDraft(nextData);
+        }
+    };
+
+    const closeSlideOver = () => {
+        setSlideOpen(false);
+    };
+
+    const cancelSlideOver = () => {
+        if (editing) {
+            setEditDrafts((drafts) => {
+                const nextDrafts = { ...drafts };
+                delete nextDrafts[editing.id];
+
+                return nextDrafts;
+            });
+            setData(formDataFromProgram(editing));
+        } else {
+            setCreateDraft(null);
+            setData(blankFormData());
+        }
+
+        setSubmitError('');
+        clearErrors();
+        setSlideOpen(false);
+    };
+
     const openCreate = () => {
-        reset();
         setSubmitError('');
         setDetailOpen(false);
         setViewing(null);
-        setData({
-            branch_id: activeBranchId,
-            name: '',
-            chair_teacher_id: '',
-            duration_years: '',
-            is_activated: true,
-        });
+        setData(createDraft ?? blankFormData());
         clearErrors();
         setEditing(null);
         setSlideOpen(true);
@@ -82,13 +130,7 @@ export default function Programs({
         setSubmitError('');
         setDetailOpen(false);
         setViewing(null);
-        setData({
-            branch_id: String(row.department?.branch_id ?? row.branch_id ?? activeBranchId ?? ''),
-            name: row.name,
-            chair_teacher_id: String(row.assigned_chair?.id ?? ''),
-            duration_years: row.duration_years ?? '',
-            is_activated: Boolean(row.is_activated),
-        });
+        setData(editDrafts[row.id] ?? formDataFromProgram(row));
         clearErrors();
         setEditing(row);
         setSlideOpen(true);
@@ -122,7 +164,7 @@ export default function Programs({
 
     const submit = (e) => {
         e.preventDefault();
-        if (editing && !isDirty) return;
+        if (isSubmitDisabled) return;
         if (editing) { setConfirmUpdateOpen(true); return; }
         performSave();
     };
@@ -138,6 +180,16 @@ export default function Programs({
             onSuccess: () => {
                 setSlideOpen(false);
                 setConfirmUpdateOpen(false);
+                if (editing) {
+                    setEditDrafts((drafts) => {
+                        const nextDrafts = { ...drafts };
+                        delete nextDrafts[editing.id];
+
+                        return nextDrafts;
+                    });
+                } else {
+                    setCreateDraft(null);
+                }
                 reset();
             },
             onError: (formErrors) => {
@@ -253,7 +305,7 @@ export default function Programs({
                 )}
             </SlideOver>
 
-            <SlideOver open={slideOpen} onClose={() => setSlideOpen(false)} title={editing ? 'Edit Program' : 'New Program'} width="max-w-lg">
+            <SlideOver open={slideOpen} onClose={closeSlideOver} title={editing ? 'Edit Program' : 'New Program'} width="max-w-lg">
                 <form onSubmit={submit} className="space-y-4">
                     {(submitError || Object.keys(errors).length > 0) && (
                         <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
@@ -266,7 +318,7 @@ export default function Programs({
                                 {activeBranch?.name ?? 'No branch selected'}
                             </div>
                         ) : (
-                            <SelectInput value={data.branch_id} onChange={(e) => setData('branch_id', e.target.value)}>
+                            <SelectInput value={data.branch_id} onChange={(e) => updateField('branch_id', e.target.value)}>
                                 <option value="">Select branch...</option>
                                 {branches.map((branch) => (
                                     <option key={branch.id} value={branch.id}>
@@ -278,30 +330,30 @@ export default function Programs({
                     </FormField>
 
                     <FormField label="Program Name" error={errors.name} required>
-                        <SelectInput value={data.name} onChange={(e) => setData('name', e.target.value)}>
+                        <SelectInput value={data.name} onChange={(e) => updateField('name', e.target.value)}>
                             <option value="">Select college program...</option>
                             {programNameOptions.map((programName) => <option key={programName} value={programName}>{programName}</option>)}
                         </SelectInput>
                     </FormField>
 
                     <FormField label="Assigned Chair" error={errors.chair_teacher_id}>
-                        <SelectInput value={data.chair_teacher_id} onChange={(e) => setData('chair_teacher_id', e.target.value)}>
+                        <SelectInput value={data.chair_teacher_id} onChange={(e) => updateField('chair_teacher_id', e.target.value)}>
                             <option value="">Select chair...</option>
                             {filteredChairs.map((chair) => <option key={chair.id} value={chair.id}>{chair.full_name}</option>)}
                         </SelectInput>
                     </FormField>
 
                     <FormField label="Duration (years)" error={errors.duration_years} required>
-                        <TextInput type="number" min="1" value={data.duration_years} onChange={(e) => setData('duration_years', e.target.value)} />
+                        <TextInput type="number" min="1" value={data.duration_years} onChange={(e) => updateField('duration_years', e.target.value)} />
                     </FormField>
 
                     <label className="flex items-center gap-2 text-sm text-slate-700">
-                        <input type="checkbox" checked={data.is_activated} onChange={(e) => setData('is_activated', e.target.checked)} className="rounded border-slate-300" /> Active
+                        <input type="checkbox" checked={data.is_activated} onChange={(e) => updateField('is_activated', e.target.checked)} className="rounded border-slate-300" /> Active
                     </label>
 
                     <div className="flex gap-3 pt-2">
-                        <button type="button" onClick={() => setSlideOpen(false)} className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
-                        <SubmitButton processing={processing} disabled={Boolean(editing) && !isDirty} className="flex-1">
+                        <button type="button" onClick={cancelSlideOver} className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
+                        <SubmitButton processing={processing} disabled={isSubmitDisabled} className="flex-1">
                             {editing ? 'Update' : 'Create'}
                         </SubmitButton>
                     </div>

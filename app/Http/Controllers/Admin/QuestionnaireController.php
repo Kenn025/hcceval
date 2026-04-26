@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class QuestionnaireController extends Controller
@@ -14,12 +15,16 @@ class QuestionnaireController extends Controller
         $search = $request->input('search', '');
 
         $questionnaires = DB::table('questionnaires as q')
+            ->leftJoin('branch as b', 'b.id', '=', 'q.branch_id')
             ->leftJoin('questionnaire_type as qt', 'qt.id', '=', 'q.questionnaire_type_id')
             ->leftJoin('question_choices as qc', 'qc.id', '=', 'q.question_choices_id')
             ->select(
                 'q.id as questionnaire_id',
                 'q.code as questionnaire_code',
                 'q.title as questionnaire_title',
+                'q.branch_id',
+                'b.name as branch_name',
+                'b.code as branch_code',
                 'q.questionnaire_type_id',
                 'q.question_choices_id',
                 'qt.name as questionnaire_type_name',
@@ -36,10 +41,13 @@ class QuestionnaireController extends Controller
             ->when($search, fn ($query) => $query->where(function ($sub) use ($search) {
                 $sub->where('q.code', 'like', "%{$search}%")
                     ->orWhere('q.title', 'like', "%{$search}%")
+                    ->orWhere('b.name', 'like', "%{$search}%")
+                    ->orWhere('b.code', 'like', "%{$search}%")
                     ->orWhere('qt.name', 'like', "%{$search}%")
                     ->orWhere('qc.code', 'like', "%{$search}%");
             }))
-            ->orderBy('q.code')
+            ->orderByDesc('q.created_at')
+            ->orderByDesc('q.id')
             ->paginate($request->input('per_page', 15))
             ->through(function ($row) {
                 $payload = json_decode($row->items ?? '{}', true) ?: [];
@@ -86,6 +94,9 @@ class QuestionnaireController extends Controller
                     'questionnaire_id' => $row->questionnaire_id,
                     'questionnaire_code' => $row->questionnaire_code,
                     'questionnaire_title' => $row->questionnaire_title,
+                    'branch_id' => $row->branch_id,
+                    'branch_name' => $row->branch_name,
+                    'branch_code' => $row->branch_code,
                     'questionnaire_type_id' => $row->questionnaire_type_id,
                     'question_choices_id' => $row->question_choices_id,
                     'questionnaire_type_name' => $row->questionnaire_type_name,
@@ -104,6 +115,13 @@ class QuestionnaireController extends Controller
             ->withQueryString();
 
         $questionnaireTypes = DB::table('questionnaire_type')
+            ->select('id', 'code', 'name')
+            ->where('is_deleted', 0)
+            ->where('is_activated', 1)
+            ->orderBy('name')
+            ->get();
+
+        $branches = DB::table('branch')
             ->select('id', 'code', 'name')
             ->where('is_deleted', 0)
             ->where('is_activated', 1)
@@ -144,9 +162,14 @@ class QuestionnaireController extends Controller
         return Inertia::render('Admin/Questionnaires', [
             'questionnaires' => $questionnaires,
             'questionnaireTypes' => $questionnaireTypes,
+            'branches' => $branches,
             'questionChoices' => $questionChoices,
             'questionClasses' => $questionClasses,
             'questions' => $questions,
+            'questionnaireTitleChecks' => DB::table('questionnaires')
+                ->select('id', 'title')
+                ->where('is_deleted', 0)
+                ->get(),
             'filters' => ['search' => $search],
         ]);
     }
@@ -154,9 +177,15 @@ class QuestionnaireController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'questionnaire_title' => 'required|string|max:150',
+            'questionnaire_title' => [
+                'required',
+                'string',
+                'max:150',
+                Rule::unique('questionnaires', 'title')->where(fn ($query) => $query->where('is_deleted', 0)),
+            ],
             'questionnaire_type_id' => 'required|exists:questionnaire_type,id',
             'question_choices_id' => 'required|exists:question_choices,id',
+            'branch_id' => 'required|integer|exists:branch,id',
             'class_groups' => 'array',
             'class_groups.*.question_class_id' => 'nullable|integer|exists:question_class,id',
             'class_groups.*.question_class_name' => 'nullable|string|max:150',
@@ -169,7 +198,14 @@ class QuestionnaireController extends Controller
             'is_active' => 'boolean',
         ]);
 
-        $count = DB::table('questionnaires')->count() + 1;
+        $count = DB::table('questionnaires')
+            ->pluck('code')
+            ->map(function ($code) {
+                preg_match('/^QUES-(\d+)$/', (string) $code, $matches);
+
+                return (int) ($matches[1] ?? 0);
+            })
+            ->max() + 1;
         $questionClassNames = DB::table('question_class')
             ->whereIn('id', collect($validated['class_groups'] ?? [])->pluck('question_class_id')->filter()->all())
             ->pluck('name', 'id');
@@ -196,6 +232,7 @@ class QuestionnaireController extends Controller
         DB::table('questionnaires')->insert([
             'code' => 'QUES-' . str_pad((string) $count, 3, '0', STR_PAD_LEFT),
             'title' => $validated['questionnaire_title'],
+            'branch_id' => $validated['branch_id'],
             'questionnaire_type_id' => $validated['questionnaire_type_id'],
             'question_choices_id' => $validated['question_choices_id'],
             'items' => json_encode($itemsPayload),
@@ -213,9 +250,17 @@ class QuestionnaireController extends Controller
     public function update(Request $request, int $id)
     {
         $validated = $request->validate([
-            'questionnaire_title' => 'required|string|max:150',
+            'questionnaire_title' => [
+                'required',
+                'string',
+                'max:150',
+                Rule::unique('questionnaires', 'title')
+                    ->ignore($id)
+                    ->where(fn ($query) => $query->where('is_deleted', 0)),
+            ],
             'questionnaire_type_id' => 'required|exists:questionnaire_type,id',
             'question_choices_id' => 'required|exists:question_choices,id',
+            'branch_id' => 'required|integer|exists:branch,id',
             'class_groups' => 'array',
             'class_groups.*.question_class_id' => 'nullable|integer|exists:question_class,id',
             'class_groups.*.question_class_name' => 'nullable|string|max:150',
@@ -253,6 +298,7 @@ class QuestionnaireController extends Controller
 
         DB::table('questionnaires')->where('id', $id)->update([
             'title' => $validated['questionnaire_title'],
+            'branch_id' => $validated['branch_id'],
             'questionnaire_type_id' => $validated['questionnaire_type_id'],
             'question_choices_id' => $validated['question_choices_id'],
             'items' => json_encode($itemsPayload),
