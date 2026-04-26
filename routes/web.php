@@ -41,6 +41,8 @@ Route::middleware('auth')->group(function () {
 
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::post('/dashboard/start-department-evaluation', [DashboardController::class, 'startDepartmentEvaluation'])->name('dashboard.start-department-evaluation');
+    Route::post('/dashboard/close-department-evaluation', [DashboardController::class, 'closeDepartmentEvaluation'])->name('dashboard.close-department-evaluation');
 
     // College Programs
     Route::get('/admin/college/programs', [ProgramController::class, 'index'])->name('admin.college.programs');

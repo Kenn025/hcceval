@@ -323,7 +323,6 @@ const TITLE_MAP = {
 };
 
 const SUBJECT_COLUMNS = [
-    { key: 'rating_id', label: '#' },
     { key: 'teacher_name', label: 'Teacher', render: (r) => r.teacher_name ?? '-' },
     { key: 'subject_name', label: 'Subject', render: (r) => r.subject_name ?? '-' },
     { key: 'overall_rating', label: 'Rating', render: (r) => r.overall_rating ? Number(r.overall_rating).toFixed(2) : '-' },
@@ -341,7 +340,6 @@ const PEER_COLUMNS = [
 ];
 
 const EMPLOYEE_COLUMNS = [
-    { key: 'rating_id', label: '#' },
     { key: 'teacher_name', label: 'Employee', render: (r) => r.teacher_name ?? '-' },
     { key: 'department_name', label: 'Department', render: (r) => r.department_name ?? '-' },
     { key: 'overall_rating', label: 'Rating', render: (r) => r.overall_rating ? Number(r.overall_rating).toFixed(2) : '-' },
@@ -351,7 +349,6 @@ const EMPLOYEE_COLUMNS = [
 ];
 
 const HEAD_COLUMNS = [
-    { key: 'rating_id', label: '#' },
     { key: 'teacher_name', label: 'School Head', render: (r) => r.teacher_name ?? '—' },
     { key: 'overall_rating', label: 'Rating', render: (r) => r.overall_rating ? Number(r.overall_rating).toFixed(2) : '—' },
     { key: 'submission_count', label: 'Responses' },
@@ -375,18 +372,87 @@ const COLUMNS_MAP = {
     branch: BRANCH_COLUMNS,
 };
 
-function SubjectRatingsList({ subjects = [], onTeacherClick }) {
-    if (!subjects.length) {
-        return (
-            <div className="rounded-xl border border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-500 shadow-sm">
-                No subjects found.
-            </div>
-        );
-    }
+function SubjectRatingsList({ subjects = [], onTeacherClick, toolbarFilter = null }) {
+    const [search, setSearch] = useState('');
+    const [perPage, setPerPage] = useState(15);
+    const rows = subjects.flatMap((subject) => {
+        const teachers = subject.teachers?.length ? subject.teachers : [{}];
+
+        return teachers.map((teacher, index) => ({
+            ...teacher,
+            row_key: `${subject.id}-${teacher.teacher_id ?? 'teacher'}-${index}`,
+            subject_name: subject.name,
+            subject_code: subject.code,
+            program_name: subject.program_name,
+            strand_name: subject.strand_name,
+            subject_type: subject.type,
+        }));
+    });
+    const filteredRows = rows.filter((row) => {
+        const haystack = [
+            row.subject_name,
+            row.subject_code,
+            row.program_name,
+            row.strand_name,
+            row.subject_type,
+            row.teacher_name,
+            row.teacher_role,
+            row.overall_rating,
+            row.submission_count,
+        ].filter(Boolean).join(' ').toLowerCase();
+
+        return haystack.includes(search.trim().toLowerCase());
+    });
+    const visibleRows = filteredRows.slice(0, Number(perPage));
 
     return (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="hidden grid-cols-[1.4fr_1fr_1fr_0.7fr_0.7fr_0.6fr] gap-4 border-b border-slate-100 bg-slate-50 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
+            <div className="space-y-4 border-b border-slate-100 px-4 py-4 md:px-6">
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div className="relative min-w-0 flex-1 md:max-w-sm">
+                        <svg
+                            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
+                            />
+                        </svg>
+                        <input
+                            type="text"
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
+                            placeholder="Search subject ratings..."
+                            className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-4 text-sm placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-end gap-3">
+                        <div className="flex items-center gap-2">
+                            <label className="text-xs font-bold uppercase tracking-tight text-slate-500">
+                                Show
+                            </label>
+                            <select
+                                value={perPage}
+                                onChange={(event) => setPerPage(Number(event.target.value))}
+                                className="rounded-lg border border-slate-200 bg-white py-1.5 pl-2 pr-8 text-xs font-medium text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            >
+                                {[10, 15, 25, 50, 100].map((number) => (
+                                    <option key={number} value={number}>{number}</option>
+                                ))}
+                            </select>
+                        </div>
+                        {toolbarFilter}
+                    </div>
+                </div>
+            </div>
+            <div className="hidden grid-cols-[64px_1.4fr_1fr_1fr_0.7fr_0.7fr_0.6fr] gap-4 border-b border-slate-100 bg-slate-50 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
+                <span>#</span>
                 <span>Subject</span>
                 <span>Program / Strand</span>
                 <span>Teacher</span>
@@ -395,56 +461,51 @@ function SubjectRatingsList({ subjects = [], onTeacherClick }) {
                 <span className="text-right">Action</span>
             </div>
             <div className="divide-y divide-slate-100">
-                {subjects.map((subject) => {
-                    const teachers = subject.teachers?.length ? subject.teachers : [{}];
+                {visibleRows.length === 0 && (
+                    <div className="px-4 py-10 text-center text-sm text-slate-500">
+                        No subject ratings found.
+                    </div>
+                )}
+                {visibleRows.map((row, index) => {
+                    const hasRating = row.overall_rating != null;
 
-                    return teachers.map((teacher, index) => {
-                        const row = {
-                            ...teacher,
-                            subject_name: subject.name,
-                            subject_code: subject.code,
-                            program_name: subject.program_name,
-                            strand_name: subject.strand_name,
-                        };
-                        const hasRating = teacher.overall_rating != null;
-
-                        return (
-                            <div
-                                key={`${subject.id}-${teacher.teacher_id ?? 'teacher'}-${index}`}
-                                onClick={() => hasRating && onTeacherClick(row)}
-                                className={`grid w-full gap-3 px-5 py-4 text-left transition lg:grid-cols-[1.4fr_1fr_1fr_0.7fr_0.7fr_0.6fr] lg:items-center ${hasRating ? 'cursor-pointer hover:bg-slate-50' : 'cursor-default'}`}
-                            >
-                                <div>
-                                    <p className="text-sm font-semibold text-slate-900">{subject.name}</p>
-                                    <p className="mt-1 text-xs text-slate-500">{subject.code ?? 'No subject code'}</p>
-                                </div>
-                                <p className="text-sm text-slate-700">{subject.program_name ?? subject.strand_name ?? subject.type ?? '-'}</p>
-                                <div>
-                                    <p className="text-sm font-medium text-slate-800">{teacher.teacher_name ?? 'Unassigned teacher'}</p>
-                                    <p className="mt-1 text-xs text-slate-500">{teacher.teacher_role ?? 'Teacher'}</p>
-                                </div>
-                                <p className={`text-sm font-semibold ${hasRating ? 'text-blue-700' : 'text-slate-400'}`}>
-                                    {hasRating ? Number(teacher.overall_rating).toFixed(2) : 'No rating'}
-                                </p>
-                                <p className="text-sm text-slate-600">{teacher.submission_count ?? 0}</p>
-                                <div className="flex justify-start lg:justify-end">
-                                    <button
-                                        type="button"
-                                        onClick={(event) => {
-                                            event.stopPropagation();
-                                            if (hasRating) {
-                                                onTeacherClick(row);
-                                            }
-                                        }}
-                                        disabled={!hasRating}
-                                        className="rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
-                                    >
-                                        View
-                                    </button>
-                                </div>
+                    return (
+                        <div
+                            key={row.row_key}
+                            onClick={() => hasRating && onTeacherClick(row)}
+                            className={`grid w-full gap-3 px-5 py-4 text-left transition lg:grid-cols-[64px_1.4fr_1fr_1fr_0.7fr_0.7fr_0.6fr] lg:items-center ${hasRating ? 'cursor-pointer hover:bg-slate-50' : 'cursor-default'}`}
+                        >
+                            <p className="text-sm font-medium text-slate-500">{index + 1}</p>
+                            <div>
+                                <p className="text-sm font-semibold text-slate-900">{row.subject_name}</p>
+                                <p className="mt-1 text-xs text-slate-500">{row.subject_code ?? 'No subject code'}</p>
                             </div>
-                        );
-                    });
+                            <p className="text-sm text-slate-700">{row.program_name ?? row.strand_name ?? row.subject_type ?? '-'}</p>
+                            <div>
+                                <p className="text-sm font-medium text-slate-800">{row.teacher_name ?? 'Unassigned teacher'}</p>
+                                <p className="mt-1 text-xs text-slate-500">{row.teacher_role ?? 'Teacher'}</p>
+                            </div>
+                            <p className={`text-sm font-semibold ${hasRating ? 'text-blue-700' : 'text-slate-400'}`}>
+                                {hasRating ? Number(row.overall_rating).toFixed(2) : 'No rating'}
+                            </p>
+                            <p className="text-sm text-slate-600">{row.submission_count ?? 0}</p>
+                            <div className="flex justify-start lg:justify-end">
+                                <button
+                                    type="button"
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        if (hasRating) {
+                                            onTeacherClick(row);
+                                        }
+                                    }}
+                                    disabled={!hasRating}
+                                    className="rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+                                >
+                                    View
+                                </button>
+                            </div>
+                        </div>
+                    );
                 })}
             </div>
         </div>
@@ -532,6 +593,7 @@ export default function Ratings({
     const selectedDepartmentGroup = String(filters.department_group ?? '');
     const selectedProgramGroup = String(filters.program_group ?? '');
     const selectedStrandGroup = String(filters.strand_group ?? '');
+    const selectedEmployeeDepartmentId = String(filters.employee_department_id ?? '');
     const peerDepartments = useMemo(
         () => departments.filter((department) => (
             (!selectedFilterBranchId || String(department.branch_id) === selectedFilterBranchId)
@@ -566,6 +628,13 @@ export default function Ratings({
             && (!matchingDepartmentIds.length || matchingDepartmentIds.includes(String(strand.department_id)))
         ))),
         [matchingDepartmentIds, selectedDepartmentType, strands],
+    );
+    const employeeFilterDepartments = useMemo(
+        () => departments.filter((department) => (
+            (!selectedFilterBranchId || String(department.branch_id) === selectedFilterBranchId)
+            && Boolean(department.is_activated)
+        )),
+        [departments, selectedFilterBranchId],
     );
     const subjectBranches = subjectRatingContext?.branches ?? [];
     const subjectDepartments = subjectRatingContext?.departments ?? [];
@@ -750,21 +819,6 @@ export default function Ratings({
         });
     };
 
-    const handlePeerBranchChange = (branchId) => {
-        router.get(route(activeRoute), {
-            ...filters,
-            branch_id: branchId,
-            department_group: '',
-            program_group: '',
-            strand_group: '',
-            school_year: selectedYear,
-            page: 1,
-        }, {
-            preserveState: true,
-            replace: true,
-        });
-    };
-
     const handlePeerDepartmentChange = (departmentGroup) => {
         router.get(route(activeRoute), {
             ...filters,
@@ -810,6 +864,32 @@ export default function Ratings({
         });
     };
 
+    const handleRatingBranchChange = (branchId) => {
+        router.get(route(activeRoute), {
+            ...filters,
+            branch_id: branchId,
+            employee_department_id: '',
+            school_year: selectedYear,
+            page: 1,
+        }, {
+            preserveState: true,
+            replace: true,
+        });
+    };
+
+    const handleEmployeeDepartmentChange = (employeeDepartmentId) => {
+        router.get(route(activeRoute), {
+            ...filters,
+            branch_id: selectedFilterBranchId,
+            employee_department_id: employeeDepartmentId,
+            school_year: selectedYear,
+            page: 1,
+        }, {
+            preserveState: true,
+            replace: true,
+        });
+    };
+
     const openView = (row) => {
         setViewing(row);
         setDetailOpen(true);
@@ -845,6 +925,24 @@ export default function Ratings({
         confirm: 'Open Summary',
         tone:    'primary',
         run: () => { window.open(summaryUrl, '_blank', 'noopener,noreferrer'); },
+    });
+
+    const askPrintActiveTableRatings = () => setConfirmAction({
+        kind:    'print',
+        title:   'Print ratings as PDF?',
+        message: 'This opens a printable ratings report in a new tab so you can save it as PDF.',
+        confirm: 'Print PDF',
+        tone:    'primary',
+        run: () => printActiveTableRatings(),
+    });
+
+    const askPrintRatingDetail = () => setConfirmAction({
+        kind:    'print',
+        title:   'Print rating detail as PDF?',
+        message: 'This opens a printable detail report in a new tab so you can save it as PDF.',
+        confirm: 'Print PDF',
+        tone:    'primary',
+        run: () => printRatingDetail(),
     });
 
     const handleConfirm = () => {
@@ -890,6 +988,74 @@ export default function Ratings({
     const printActiveTableRatings = () => {
         printRatingsReport(activeTableRatings, ratingType, `${TITLE_MAP[ratingType] ?? 'Ratings'} - Active Table`);
     };
+    const subjectToolbarFilter = isSubjectRatings && (subjectEducationType === 'college' || subjectEducationType === 'shs') ? (
+        <>
+            {subjectEducationType === 'college' && subjectPrograms.length > 0 && (
+                <select
+                    value={selectedSubjectProgramId}
+                    onChange={(e) => handleSubjectProgramChange(e.target.value)}
+                    className="min-w-[260px] rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-9 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                    {subjectPrograms.map((program) => (
+                        <option key={program.id} value={program.id}>{program.name}</option>
+                    ))}
+                </select>
+            )}
+
+            {subjectEducationType === 'shs' && subjectStrands.length > 0 && (
+                <select
+                    value={selectedSubjectStrandId}
+                    onChange={(e) => handleSubjectStrandChange(e.target.value)}
+                    className="min-w-[260px] rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-9 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                    {subjectStrands.map((strand) => (
+                        <option key={strand.id} value={strand.id}>{strand.name}</option>
+                    ))}
+                </select>
+            )}
+        </>
+    ) : null;
+    const peerToolbarFilter = ratingType === 'peer' && !isPeerArchive && (selectedDepartmentType === 'college' || selectedDepartmentType === 'shs') ? (
+        <>
+            {selectedDepartmentType === 'college' && (
+                <select
+                    value={selectedProgramGroup}
+                    onChange={(e) => handlePeerProgramChange(e.target.value)}
+                    className="min-w-[260px] rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-9 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                    <option value="">All Programs</option>
+                    {peerFilterPrograms.map((program) => (
+                        <option key={program.name} value={program.name}>{program.name}</option>
+                    ))}
+                </select>
+            )}
+
+            {selectedDepartmentType === 'shs' && (
+                <select
+                    value={selectedStrandGroup}
+                    onChange={(e) => handlePeerStrandChange(e.target.value)}
+                    className="min-w-[260px] rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-9 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                    <option value="">All Strands</option>
+                    {peerFilterStrands.map((strand) => (
+                        <option key={strand.name} value={strand.name}>{strand.name}</option>
+                    ))}
+                </select>
+            )}
+        </>
+    ) : null;
+    const employeeToolbarFilter = ratingType === 'employee' && !isEmployeeArchive && employeeFilterDepartments.length > 0 ? (
+        <select
+            value={selectedEmployeeDepartmentId}
+            onChange={(e) => handleEmployeeDepartmentChange(e.target.value)}
+            className="min-w-[260px] rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-9 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        >
+            <option value="">All Departments</option>
+            {employeeFilterDepartments.map((department) => (
+                <option key={department.id} value={department.id}>{department.name}</option>
+            ))}
+        </select>
+    ) : null;
 
     return (
         <AdminLayout title={archiveTitle} activeRoute={activeRoute} breadcrumbs={['Ratings & Reports']}>
@@ -918,59 +1084,35 @@ export default function Ratings({
                                 : `View and monitor ${ratingType} evaluation results.`}
                     </p>
                 </div>
-                {(isSubjectArchive || isPeerArchive || isHeadArchive || isEmployeeArchive) && selectedArchiveFolder && (
-                    <button
-                        type="button"
-                        onClick={isEmployeeArchive ? backToEmployeeArchiveFolders : isHeadArchive ? backToHeadArchiveFolders : isPeerArchive ? backToPeerArchiveFolders : backToSubjectArchiveFolders}
-                        className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 shadow-sm hover:bg-slate-50"
-                    >
-                        Back to Academic Years
-                    </button>
-                )}
                 {((!isSubjectArchive && !isPeerArchive && !isHeadArchive && !isEmployeeArchive) || selectedArchiveFolder) && (
                 <div className="flex flex-wrap items-center gap-2">
-                    {!isSubjectRatings && !isPeerArchive && !isHeadArchive && !isEmployeeArchive && schoolYears?.length > 0 && (
-                        <select
-                            value={selectedYear}
-                            onChange={(e) => handleYearFilter(e.target.value)}
-                            className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                        >
-                            <option value="">All school years</option>
-                            {schoolYears.map((y, index) => <option key={`${y}-${index}`} value={y}>{y}</option>)}
-                        </select>
-                    )}
                     <button
                         type="button"
-                        onClick={printActiveTableRatings}
+                        onClick={askPrintActiveTableRatings}
                         disabled={!hasActiveTableRatings}
                         className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
                     >
                         <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9V4h12v5M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z" /></svg>
                         Print as PDF
                     </button>
-                    {!isSubjectRatings && (
-                    <>
-                    <button
-                        type="button"
-                        onClick={askExport}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                    >
-                        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12l7 7 7-7" /></svg>
-                        Export CSV
-                    </button>
-                    <button
-                        type="button"
-                        onClick={askPrint}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-                    >
-                        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9V4h12v5M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z" /></svg>
-                        Print Summary
-                    </button>
-                    </>
-                    )}
                 </div>
                 )}
             </div>
+
+            {(isSubjectArchive || isPeerArchive || isHeadArchive || isEmployeeArchive) && selectedArchiveFolder && (
+                <div className="mb-4">
+                    <button
+                        type="button"
+                        onClick={isEmployeeArchive ? backToEmployeeArchiveFolders : isHeadArchive ? backToHeadArchiveFolders : isPeerArchive ? backToPeerArchiveFolders : backToSubjectArchiveFolders}
+                        className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                    >
+                        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-blue-600" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M15 18l-6-6 6-6" />
+                        </svg>
+                        Back to Academic Years
+                    </button>
+                </div>
+            )}
 
             {isSubjectArchive && !selectedSubjectArchiveFolder ? (
                 <EvaluationArchiveFolders
@@ -1018,34 +1160,6 @@ export default function Ratings({
                                 ))}
                             </select>
                         </div>
-
-                        {(subjectEducationType === 'college' || subjectEducationType === 'shs') && (
-                            <div className="ml-auto">
-                                {subjectEducationType === 'college' && subjectPrograms.length > 0 && (
-                                    <select
-                                        value={selectedSubjectProgramId}
-                                        onChange={(e) => handleSubjectProgramChange(e.target.value)}
-                                        className="min-w-[240px] rounded-full border border-slate-200 bg-white py-1.5 pl-4 pr-9 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                    >
-                                        {subjectPrograms.map((program) => (
-                                            <option key={program.id} value={program.id}>{program.name}</option>
-                                        ))}
-                                    </select>
-                                )}
-
-                                {subjectEducationType === 'shs' && subjectStrands.length > 0 && (
-                                    <select
-                                        value={selectedSubjectStrandId}
-                                        onChange={(e) => handleSubjectStrandChange(e.target.value)}
-                                        className="min-w-[240px] rounded-full border border-slate-200 bg-white py-1.5 pl-4 pr-9 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                    >
-                                        {subjectStrands.map((strand) => (
-                                            <option key={strand.id} value={strand.id}>{strand.name}</option>
-                                        ))}
-                                    </select>
-                                )}
-                            </div>
-                        )}
                     </div>
 
                     {subjectDepartments.length > 0 && (
@@ -1067,24 +1181,6 @@ export default function Ratings({
 
             {ratingType === 'peer' && (
                 <div className="mb-4 space-y-3">
-                    <div className="flex flex-wrap items-center gap-3">
-                        <div className="min-w-[220px]">
-                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                Branch
-                            </label>
-                            <select
-                                value={selectedFilterBranchId}
-                                onChange={(e) => handlePeerBranchChange(e.target.value)}
-                                disabled={isBranchAdmin}
-                                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500"
-                            >
-                                {branches.map((branch) => (
-                                    <option key={branch.id} value={branch.id}>{branch.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                    </div>
-
                     {peerFilterDepartments.length > 0 && (
                         <div className="flex flex-wrap items-center gap-2">
                             {peerFilterDepartments.map((department) => (
@@ -1099,48 +1195,49 @@ export default function Ratings({
                             ))}
                         </div>
                     )}
+                </div>
+            )}
 
-                    {(selectedDepartmentType === 'college' || selectedDepartmentType === 'shs') && (
-                        <div className="flex justify-end">
-                            {selectedDepartmentType === 'college' && (
-                                <select
-                                    value={selectedProgramGroup}
-                                    onChange={(e) => handlePeerProgramChange(e.target.value)}
-                                    className="min-w-[220px] rounded-full border border-slate-200 bg-white py-1.5 pl-4 pr-9 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                >
-                                    <option value="">All Programs</option>
-                                    {peerFilterPrograms.map((program) => (
-                                        <option key={program.name} value={program.name}>{program.name}</option>
-                                    ))}
-                                </select>
-                            )}
-
-                            {selectedDepartmentType === 'shs' && (
-                                <select
-                                    value={selectedStrandGroup}
-                                    onChange={(e) => handlePeerStrandChange(e.target.value)}
-                                    className="min-w-[220px] rounded-full border border-slate-200 bg-white py-1.5 pl-4 pr-9 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                >
-                                    <option value="">All Strands</option>
-                                    {peerFilterStrands.map((strand) => (
-                                        <option key={strand.name} value={strand.name}>{strand.name}</option>
-                                    ))}
-                                </select>
-                            )}
+            {['employee', 'head'].includes(ratingType) && !filters.archive_mode && branches.length > 0 && (
+                <div className="mb-4 space-y-3">
+                    <div className="flex flex-wrap items-end justify-between gap-3">
+                        <div className="min-w-[240px]">
+                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Branch
+                            </label>
+                            <select
+                                value={selectedFilterBranchId}
+                                onChange={(e) => handleRatingBranchChange(e.target.value)}
+                                disabled={isBranchAdmin}
+                                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500"
+                            >
+                                {branches.map((branch) => (
+                                    <option key={branch.id} value={branch.id}>{branch.name}</option>
+                                ))}
+                            </select>
                         </div>
-                    )}
+                    </div>
+
                 </div>
             )}
 
             {(isSubjectArchive && !selectedSubjectArchiveFolder) || (isPeerArchive && !selectedPeerArchiveFolder) || (isHeadArchive && !selectedHeadArchiveFolder) || (isEmployeeArchive && !selectedEmployeeArchiveFolder) ? null : isSubjectRatings ? (
-                <SubjectRatingsList subjects={subjectSubjects} onTeacherClick={openView} />
+                <SubjectRatingsList subjects={subjectSubjects} onTeacherClick={openView} toolbarFilter={subjectToolbarFilter} />
             ) : (
                 <ResourceTable
                     columns={columns}
                     data={ratings}
                     filters={{ ...filters, school_year: selectedYear }}
                     routeName={activeRoute}
-                    searchPlaceholder={ratingType === 'peer' ? 'Search teachers...' : 'Search ratings...'}
+                    searchPlaceholder={
+                        ratingType === 'peer'
+                            ? 'Search teachers...'
+                            : ratingType === 'employee'
+                                ? 'Search employees...'
+                                : ratingType === 'head'
+                                    ? 'Search school heads...'
+                                    : 'Search ratings...'
+                    }
                     onRowClick={openView}
                     rowActions={(row) => (
                         <button
@@ -1151,7 +1248,8 @@ export default function Ratings({
                             View
                         </button>
                     )}
-                    extraHeaderActions={null}
+                    extraHeaderActions={ratingType === 'peer' ? peerToolbarFilter : ratingType === 'employee' ? employeeToolbarFilter : null}
+                    showPageIndicator={!['peer', 'employee', 'head'].includes(ratingType)}
                 />
             )}
 
@@ -1173,7 +1271,7 @@ export default function Ratings({
                             <div className="flex shrink-0 flex-wrap justify-end gap-2">
                                 <button
                                     type="button"
-                                    onClick={printRatingDetail}
+                                    onClick={askPrintRatingDetail}
                                     className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700"
                                 >
                                     Print as PDF

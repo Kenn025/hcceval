@@ -64,6 +64,10 @@ class HandleInertiaRequests extends Middleware
             ->select('id', 'from_year', 'to_year', 'term')
             ->where('is_deleted', 0)
             ->where('is_activated', 1)
+            ->where(function ($query) {
+                $query->whereNull('date_opened')
+                    ->orWhere('date_opened', '<=', now());
+            })
             ->orderByDesc('from_year')
             ->orderByDesc('id')
             ->first();

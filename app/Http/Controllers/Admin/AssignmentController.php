@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Services\DepartmentEvaluationWindow;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -617,6 +618,64 @@ class AssignmentController extends Controller
         ]);
     }
 
+    private function activeAcademicYearId(): ?int
+    {
+        return DB::table('academic_year')
+            ->where('is_deleted', 0)
+            ->where('is_activated', 1)
+            ->orderByDesc('from_year')
+            ->orderByDesc('id')
+            ->value('id');
+    }
+
+    private function departmentIdFromDistributionScope(array $scope): ?int
+    {
+        if (! empty($scope['department_id'])) {
+            return (int) $scope['department_id'];
+        }
+
+        if (! empty($scope['program_ids'])) {
+            return DB::table('program')->whereIn('id', $scope['program_ids'])->value('department_id');
+        }
+
+        if (! empty($scope['strand_ids'])) {
+            return DB::table('strand')->whereIn('id', $scope['strand_ids'])->value('department_id');
+        }
+
+        if (! empty($scope['year_level_ids'])) {
+            return DB::table('education_level')->whereIn('id', $scope['year_level_ids'])->value('department_id');
+        }
+
+        if (! empty($scope['teacher_id'])) {
+            return DB::table('teacher')->where('id', $scope['teacher_id'])->value('department_id');
+        }
+
+        return null;
+    }
+
+    private function departmentIdForScope(string $scopeType, int $scopeId, ?int $fallbackDepartmentId = null): ?int
+    {
+        return match ($scopeType) {
+            'department' => $scopeId,
+            'program' => DB::table('program')->where('id', $scopeId)->value('department_id'),
+            'strand' => DB::table('strand')->where('id', $scopeId)->value('department_id'),
+            'level' => DB::table('education_level')->where('id', $scopeId)->value('department_id'),
+            'teacher' => DB::table('teacher')->where('id', $scopeId)->value('department_id'),
+            default => $fallbackDepartmentId,
+        };
+    }
+
+    private function blockIfDepartmentEvaluationStarted(?int $departmentId, ?int $academicYearId = null): ?\Illuminate\Http\RedirectResponse
+    {
+        $academicYearId ??= $this->activeAcademicYearId();
+
+        if (DepartmentEvaluationWindow::hasStarted($departmentId, $academicYearId)) {
+            return back()->with('error', 'Questionnaire distribution is locked because evaluation has already started for this department.');
+        }
+
+        return null;
+    }
+
     private function getEquivalentYearLevelIds(int $yearLevelId): array
     {
         $yearLevel = DB::table('education_level')
@@ -1076,6 +1135,13 @@ class AssignmentController extends Controller
         ]);
         $scope = $this->validateDistributionScope($request);
 
+        if ($response = $this->blockIfDepartmentEvaluationStarted(
+            $this->departmentIdFromDistributionScope($scope),
+            $validated['academic_year_id'] ?? null,
+        )) {
+            return $response;
+        }
+
         $count = DB::table('questionnaire_distribution')->count() + 1;
 
         DB::table('questionnaire_distribution')->insert([
@@ -1096,6 +1162,14 @@ class AssignmentController extends Controller
     public function update(Request $request, int $id)
     {
         $validated = $this->validateDistributionScope($request);
+        $distribution = DB::table('questionnaire_distribution')->where('id', $id)->first();
+
+        if ($response = $this->blockIfDepartmentEvaluationStarted(
+            $this->departmentIdFromDistributionScope($validated),
+            $distribution?->academic_year_id ? (int) $distribution->academic_year_id : null,
+        )) {
+            return $response;
+        }
 
         DB::table('questionnaire_distribution')
             ->where('id', $id)
@@ -1122,6 +1196,16 @@ class AssignmentController extends Controller
 
         $typeCode = self::TYPE_CODE_MAP[$validated['assignment_type']] ?? self::TYPE_CODE_MAP['student-teacher'];
         $scopeId = (int) $validated['scope_id'];
+        $departmentId = $this->departmentIdForScope(
+            $validated['scope_type'],
+            $scopeId,
+            !empty($validated['department_id']) ? (int) $validated['department_id'] : null,
+        );
+
+        if ($response = $this->blockIfDepartmentEvaluationStarted($departmentId)) {
+            return $response;
+        }
+
         $yearLevelIds = $validated['scope_type'] === 'level'
             ? $this->getEquivalentYearLevelIds($scopeId)
             : [];
@@ -1248,6 +1332,16 @@ class AssignmentController extends Controller
 
         if ($validated['assignment_type'] === 'peer' && $validated['scope_type'] !== 'department') {
             return back()->with('error', 'Peer custom distribution is only available by department.');
+        }
+
+        $departmentId = $this->departmentIdForScope(
+            $validated['scope_type'],
+            (int) $validated['scope_id'],
+            !empty($validated['department_id']) ? (int) $validated['department_id'] : null,
+        );
+
+        if ($response = $this->blockIfDepartmentEvaluationStarted($departmentId)) {
+            return $response;
         }
 
         $selectedIds = collect($validated['subject_ids'] ?? [])
@@ -1553,6 +1647,16 @@ class AssignmentController extends Controller
 
     public function destroy(int $id)
     {
+        $distribution = DB::table('questionnaire_distribution')->where('id', $id)->first();
+        $items = json_decode($distribution?->items ?? '{}', true) ?: [];
+
+        if ($response = $this->blockIfDepartmentEvaluationStarted(
+            $this->departmentIdFromDistributionScope($items),
+            $distribution?->academic_year_id ? (int) $distribution->academic_year_id : null,
+        )) {
+            return $response;
+        }
+
         DB::table('questionnaire_distribution')->where('id', $id)->update(['is_deleted' => 1, 'updated_at' => now()]);
         return back()->with('success', 'Assignment removed.');
     }

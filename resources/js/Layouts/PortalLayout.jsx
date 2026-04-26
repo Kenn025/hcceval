@@ -60,7 +60,7 @@ const THEMES = {
 const NAV_ITEMS = {
     student: [
         { key: "evaluation-section", type: "section", label: "Evaluation" },
-        { key: "subjects", label: "My Subjects", icon: "subjects" },
+        { key: "subjects", label: "Dashboard", icon: "subjects" },
         { key: "program_chairs", label: "Program Chairs", icon: "shield" },
         { key: "employees", label: "Employee Feedback", icon: "briefcase" },
         { key: "submissions-section", type: "section", label: "Submissions" },

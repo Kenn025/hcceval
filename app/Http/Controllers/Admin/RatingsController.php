@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\Department;
+use App\Models\EmployeeDepartment;
 use App\Models\Program;
 use App\Models\Strand;
 use Illuminate\Http\RedirectResponse;
@@ -31,11 +32,26 @@ class RatingsController extends Controller
     private function activeAcademicYear(): ?object
     {
         return DB::table('academic_year')
-            ->select('id', 'from_year', 'to_year')
+            ->select('id', 'from_year', 'to_year', 'term')
             ->where('is_deleted', 0)
             ->where('is_activated', 1)
             ->orderByDesc('id')
             ->first();
+    }
+
+    private function ratingsAcademicYearId(Request $request): ?int
+    {
+        $archiveAcademicYearId = $request->integer('archive_academic_year_id');
+
+        if ($archiveAcademicYearId) {
+            return $archiveAcademicYearId;
+        }
+
+        if (trim((string) $request->input('school_year', '')) !== '') {
+            return null;
+        }
+
+        return $this->activeAcademicYear()?->id;
     }
 
     private function academicYearFromLabel(?string $label): ?object
@@ -182,16 +198,45 @@ class RatingsController extends Controller
 
     public function employeeRatings(Request $request)
     {
+        $scopedId = $this->scopedBranchId();
+        $branchId = $scopedId ?? $request->input('branch_id');
+        $employeeDepartmentId = $request->input('employee_department_id', '');
+        $perPage = $request->integer('per_page', 15);
+        $perPage = in_array($perPage, [10, 15, 25, 50, 100], true) ? $perPage : 15;
+
         $ratings = $this->employeeQuery($request)
             ->orderByDesc('re.id')
-            ->paginate(20)
+            ->paginate($perPage)
             ->withQueryString();
 
         return Inertia::render('Admin/Ratings', [
             'ratings'    => $ratings,
             'ratingType' => 'employee',
-            'filters'    => ['search' => $request->input('search', ''), 'school_year' => $request->input('school_year', '')],
+            'filters'    => [
+                'search' => $request->input('search', ''),
+                'school_year' => $request->input('school_year', ''),
+                'branch_id' => $branchId,
+                'employee_department_id' => $employeeDepartmentId,
+                'per_page' => $perPage,
+            ],
             'schoolYears' => $this->schoolYears(),
+            'branches' => Branch::query()
+                ->select('id', 'name', 'code')
+                ->where('is_deleted', 0)
+                ->where('code', '!=', 'OVERALL')
+                ->when($scopedId, fn ($query) => $query->where('id', $scopedId))
+                ->orderBy('name')
+                ->get(),
+            'departments' => EmployeeDepartment::query()
+                ->select('id', 'name', 'code', 'branch_id', 'is_activated')
+                ->where('is_deleted', 0)
+                ->where('is_activated', 1)
+                ->when($scopedId, fn ($query) => $query->where('branch_id', $scopedId))
+                ->orderBy('name')
+                ->get(),
+            'isBranchAdmin' => $this->isBranchAdmin(),
+            'selectedBranchId' => $branchId ? (int) $branchId : null,
+            'scopedBranchId' => $scopedId,
         ]);
     }
 
@@ -458,13 +503,34 @@ class RatingsController extends Controller
 
     public function headRatings(Request $request)
     {
+        $scopedId = $this->scopedBranchId();
+        $branchId = $scopedId ?? $request->input('branch_id');
+        $perPage = $request->integer('per_page', 15);
+        $perPage = in_array($perPage, [10, 15, 25, 50, 100], true) ? $perPage : 15;
+        $request->merge(['per_page' => $perPage]);
+
         $ratings = $this->schoolHeadSubmissionRatings($request);
 
         return Inertia::render('Admin/Ratings', [
             'ratings'    => $ratings,
             'ratingType' => 'head',
-            'filters'    => ['search' => $request->input('search', ''), 'school_year' => $request->input('school_year', '')],
+            'filters'    => [
+                'search' => $request->input('search', ''),
+                'school_year' => $request->input('school_year', ''),
+                'branch_id' => $branchId,
+                'per_page' => $perPage,
+            ],
             'schoolYears' => $this->schoolYears(),
+            'branches' => Branch::query()
+                ->select('id', 'name', 'code')
+                ->where('is_deleted', 0)
+                ->where('code', '!=', 'OVERALL')
+                ->when($scopedId, fn ($query) => $query->where('id', $scopedId))
+                ->orderBy('name')
+                ->get(),
+            'isBranchAdmin' => $this->isBranchAdmin(),
+            'selectedBranchId' => $branchId ? (int) $branchId : null,
+            'scopedBranchId' => $scopedId,
         ]);
     }
 
@@ -510,6 +576,7 @@ class RatingsController extends Controller
         $search     = $request->input('search', '');
         $schoolYear = $request->input('school_year', '');
         $branchId   = $this->scopedBranchId();
+        $academicYearId = $this->ratingsAcademicYearId($request);
 
         return DB::table('ratings_head as rh')
             ->leftJoin('employee as e', 'rh.employee_id', '=', 'e.id')
@@ -523,6 +590,7 @@ class RatingsController extends Controller
                 DB::raw("CONCAT(ay.from_year, '-', ay.to_year) as school_year")
             )
             ->when($branchId, fn ($q) => $q->where('e.branch_id', $branchId))
+            ->when($academicYearId, fn ($q) => $q->where('rh.academic_year_id', $academicYearId))
             ->when($search, fn ($q) => $q->where(function ($sub) use ($search) {
                 $sub->where('e.firstname', 'like', "%{$search}%")
                     ->orWhere('e.lastname', 'like', "%{$search}%");
@@ -535,7 +603,8 @@ class RatingsController extends Controller
         $search = trim((string) $request->input('search', ''));
         $schoolYear = trim((string) $request->input('school_year', ''));
         $archiveAcademicYearId = $request->integer('archive_academic_year_id');
-        $branchId = $this->scopedBranchId();
+        $academicYearId = $archiveAcademicYearId ?: $this->ratingsAcademicYearId($request);
+        $branchId = $this->scopedBranchId() ?? $request->input('branch_id');
         $questionnaireTypeId = $this->questionnaireTypeIdByCode('QTYPE-HEAD');
 
         if (
@@ -562,7 +631,7 @@ class RatingsController extends Controller
                 'ay.term as semester'
             )
             ->where('es.questionnaire_type_id', $questionnaireTypeId)
-            ->when($archiveAcademicYearId, fn ($query) => $query->where('es.academic_year_id', $archiveAcademicYearId))
+            ->when($academicYearId, fn ($query) => $query->where('es.academic_year_id', $academicYearId))
             ->when($branchId, fn ($query) => $query->where('t.branch_id', $branchId))
             ->when($schoolYear, fn ($query) => $query->whereRaw("CONCAT(ay.from_year, '-', ay.to_year) = ?", [$schoolYear]))
             ->when($search, fn ($query) => $query->where(function ($sub) use ($search) {
@@ -639,6 +708,7 @@ class RatingsController extends Controller
         $search = trim((string) $request->input('search', ''));
         $schoolYear = trim((string) $request->input('school_year', ''));
         $archiveAcademicYearId = $request->integer('archive_academic_year_id');
+        $academicYearId = $archiveAcademicYearId ?: $this->ratingsAcademicYearId($request);
         $branchId = $this->scopedBranchId();
         $questionnaireTypeId = $this->questionnaireTypeIdByCode('QTYPE-EMPLOYEE');
 
@@ -669,7 +739,7 @@ class RatingsController extends Controller
             )
             ->where('es.questionnaire_type_id', $questionnaireTypeId)
             ->whereNotNull('es.employee_id')
-            ->when($archiveAcademicYearId, fn ($query) => $query->where('es.academic_year_id', $archiveAcademicYearId))
+            ->when($academicYearId, fn ($query) => $query->where('es.academic_year_id', $academicYearId))
             ->when($branchId, fn ($query) => $query->where('e.branch_id', $branchId))
             ->when($schoolYear, fn ($query) => $query->whereRaw("CONCAT(ay.from_year, '-', ay.to_year) = ?", [$schoolYear]))
             ->when($search, fn ($query) => $query->where(function ($sub) use ($search) {
@@ -766,6 +836,7 @@ class RatingsController extends Controller
         $search     = $request->input('search', '');
         $schoolYear = $request->input('school_year', '');
         $branchId   = $this->scopedBranchId();
+        $academicYearId = $this->ratingsAcademicYearId($request);
 
         return DB::table('ratings_branch as rb')
             ->leftJoin('branch as b', 'rb.branch_id', '=', 'b.id')
@@ -778,6 +849,7 @@ class RatingsController extends Controller
                 DB::raw("CONCAT(ay.from_year, '-', ay.to_year) as school_year")
             )
             ->when($branchId, fn ($q) => $q->where('rb.branch_id', $branchId))
+            ->when($academicYearId, fn ($q) => $q->where('rb.academic_year_id', $academicYearId))
             ->when($search, fn ($q) => $q->where('b.name', 'like', "%{$search}%"))
             ->when($schoolYear, fn ($q) => $q->whereRaw("CONCAT(ay.from_year, '-', ay.to_year) = ?", [$schoolYear]));
     }
@@ -927,6 +999,7 @@ class RatingsController extends Controller
         $strandId = $request->integer('strand_id');
         $selectedBranchId = $branchId ?: $requestedBranchId;
         $archived   = $request->boolean('archived');
+        $academicYearId = $this->ratingsAcademicYearId($request);
 
         return DB::table('ratings_subject as rs')
             ->leftJoin('employee as e', 'rs.employee_id', '=', 'e.id')
@@ -942,6 +1015,7 @@ class RatingsController extends Controller
                 'ay.term as semester'
             )
             ->where('rs.is_archived', $archived ? 1 : 0)
+            ->when($academicYearId, fn ($q) => $q->where('rs.academic_year_id', $academicYearId))
             ->when($selectedBranchId, fn ($q) => $q->where('d.branch_id', $selectedBranchId))
             ->when($departmentId, fn ($q) => $q->where('s.department_id', $departmentId))
             ->when($programId, fn ($q) => $q->where('s.program_id', $programId))
@@ -1268,6 +1342,7 @@ class RatingsController extends Controller
         $schoolYear = trim((string) $request->input('school_year', ''));
         $archiveAcademicYearId = $request->integer('archive_academic_year_id');
         $archived = $request->boolean('archived');
+        $academicYearId = $archiveAcademicYearId ?: $this->ratingsAcademicYearId($request);
 
         $branches = DB::table('branch')
             ->select('id', 'name', 'code')
@@ -1348,7 +1423,7 @@ class RatingsController extends Controller
             ->orderBy('s.name')
             ->get();
 
-        $ratings = $this->subjectSubmissionRatings($subjects->pluck('id')->all(), $schoolYear, $archiveAcademicYearId ?: null)
+        $ratings = $this->subjectSubmissionRatings($subjects->pluck('id')->all(), $schoolYear, $academicYearId)
             ->groupBy('subject_id');
 
         $assignedTeacherIds = $subjects
@@ -1599,11 +1674,13 @@ class RatingsController extends Controller
         $programGroup  = strtolower(trim((string) $request->input('program_group', '')));
         $strandGroup  = strtolower(trim((string) $request->input('strand_group', '')));
         $archived   = $request->boolean('archived');
+        $academicYearId = $this->ratingsAcademicYearId($request);
 
         $baseRatingQuery = DB::table('ratings_peer as rp')
             ->leftJoin('academic_year as ay', 'rp.academic_year_id', '=', 'ay.id')
             ->whereColumn('rp.teacher_id', 't.id')
             ->where('rp.is_archived', $archived ? 1 : 0)
+            ->when($academicYearId, fn ($query) => $query->where('rp.academic_year_id', $academicYearId))
             ->when($schoolYear, fn ($query) => $query->whereRaw("CONCAT(ay.from_year, '-', ay.to_year) = ?", [$schoolYear]))
             ->orderByDesc('ay.from_year')
             ->orderByDesc('ay.to_year')
@@ -2173,25 +2250,32 @@ class RatingsController extends Controller
     {
         $search     = $request->input('search', '');
         $schoolYear = $request->input('school_year', '');
-        $branchId   = $this->scopedBranchId();
+        $branchId   = $this->scopedBranchId() ?? $request->input('branch_id');
+        $employeeDepartmentId = $request->input('employee_department_id', '');
         $archived   = $request->boolean('archived');
+        $academicYearId = $this->ratingsAcademicYearId($request);
 
         return DB::table('ratings_employee as re')
             ->where('re.is_archived', $archived ? 1 : 0)
             ->leftJoin('employee as e', 're.employee_id', '=', 'e.id')
+            ->leftJoin('employee_department as ed', 'e.employee_department_id', '=', 'ed.id')
             ->leftJoin('academic_year as ay', 're.academic_year_id', '=', 'ay.id')
             ->select(
                 're.id as rating_id',
                 DB::raw("CONCAT(e.firstname, ' ', e.lastname) as teacher_name"),
+                'ed.name as department_name',
                 DB::raw("JSON_UNQUOTE(JSON_EXTRACT(re.overall_ratings, '$.average')) as overall_rating"),
                 're.submission_count',
                 're.item_ratings',
                 DB::raw("CONCAT(ay.from_year, '-', ay.to_year) as school_year")
             )
             ->when($branchId, fn ($q) => $q->where('e.branch_id', $branchId))
+            ->when($academicYearId, fn ($q) => $q->where('re.academic_year_id', $academicYearId))
+            ->when($employeeDepartmentId, fn ($q) => $q->where('e.employee_department_id', $employeeDepartmentId))
             ->when($search, fn ($q) => $q->where(function ($sub) use ($search) {
                 $sub->where('e.firstname', 'like', "%{$search}%")
-                    ->orWhere('e.lastname', 'like', "%{$search}%");
+                    ->orWhere('e.lastname', 'like', "%{$search}%")
+                    ->orWhere('ed.name', 'like', "%{$search}%");
             }))
             ->when($schoolYear, fn ($q) => $q->whereRaw("CONCAT(ay.from_year, '-', ay.to_year) = ?", [$schoolYear]));
     }

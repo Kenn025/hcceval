@@ -1,4 +1,3 @@
-import ConfirmDialog from '@/Components/Admin/ConfirmDialog';
 import FormField, { SelectInput } from '@/Components/Admin/FormField';
 import SlideOver from '@/Components/Admin/SlideOver';
 import SubmitButton from '@/Components/Admin/SubmitButton';
@@ -33,10 +32,17 @@ function cycleRank(cycle) {
     return (Number(cycle?.year_start) || 0) * 10 + (termOrder[cycle?.semester] ?? 0);
 }
 
+function localDateTimeValue(date = new Date()) {
+    const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+
+    return offsetDate.toISOString().slice(0, 16);
+}
+
 export default function EvaluationCycle({ cycles = [], activeCycle = null }) {
     const [slideOpen, setSlideOpen] = useState(false);
-    const [confirmSave, setConfirmSave] = useState(false);
+    const [startModalOpen, setStartModalOpen] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [confirmationText, setConfirmationText] = useState('');
 
     const selectableCycles = useMemo(
         () => [...cycles]
@@ -73,7 +79,8 @@ export default function EvaluationCycle({ cycles = [], activeCycle = null }) {
 
     const closeChange = () => {
         setSlideOpen(false);
-        setConfirmSave(false);
+        setStartModalOpen(false);
+        setConfirmationText('');
     };
 
     const submit = (event) => {
@@ -84,7 +91,8 @@ export default function EvaluationCycle({ cycles = [], activeCycle = null }) {
             return;
         }
 
-        setConfirmSave(true);
+        setConfirmationText('');
+        setStartModalOpen(true);
     };
 
     const changeActiveCycle = () => {
@@ -100,6 +108,8 @@ export default function EvaluationCycle({ cycles = [], activeCycle = null }) {
                 year_end: selectedCycle.year_end,
                 semester: selectedCycle.semester,
                 status: 'active',
+                evaluation_start_mode: 'now',
+                date_opened: localDateTimeValue(),
             },
             {
                 preserveScroll: true,
@@ -108,6 +118,8 @@ export default function EvaluationCycle({ cycles = [], activeCycle = null }) {
             },
         );
     };
+
+    const confirmIsValid = confirmationText.trim().toUpperCase() === 'CONFIRM';
 
     return (
         <AdminLayout title="Academic Year" activeRoute="admin.evaluation-cycle" breadcrumbs={['System Controls']}>
@@ -252,21 +264,55 @@ export default function EvaluationCycle({ cycles = [], activeCycle = null }) {
                             processing={saving}
                             disabled={!selectedCycle || String(selectedCycle.year_id) === String(activeCycle?.year_id ?? '')}
                         >
-                            Set Active
+                            Continue
                         </SubmitButton>
                     </div>
                 </form>
             </SlideOver>
 
-            <ConfirmDialog
-                open={confirmSave}
-                title="Change active academic year?"
-                message={selectedCycle ? `Set ${selectedCycle.school_year} ${selectedCycle.semester} as the active evaluation term? Other academic years will be marked inactive.` : ''}
-                confirmLabel="Set Active"
-                danger={false}
-                onConfirm={changeActiveCycle}
-                onCancel={() => setConfirmSave(false)}
-            />
+            {startModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-slate-950/40" onClick={() => setStartModalOpen(false)} />
+                    <div className="relative w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl">
+                        <div>
+                            <p className="text-base font-semibold text-slate-900">Start evaluation</p>
+                            <p className="mt-1 text-sm text-slate-600">
+                                {selectedCycle ? `${selectedCycle.school_year} ${selectedCycle.semester} will become the active evaluation term.` : ''}
+                            </p>
+                        </div>
+
+                        <div className="mt-5 space-y-4">
+                            <FormField label='Type "CONFIRM" to verify' required>
+                                <input
+                                    type="text"
+                                    value={confirmationText}
+                                    onChange={(event) => setConfirmationText(event.target.value)}
+                                    placeholder="CONFIRM"
+                                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
+                            </FormField>
+                        </div>
+
+                        <div className="mt-6 flex justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setStartModalOpen(false)}
+                                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={changeActiveCycle}
+                                disabled={!confirmIsValid || saving}
+                                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                            >
+                                Start Evaluation
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </AdminLayout>
     );
 }

@@ -7,6 +7,7 @@ use App\Models\EducationLevel;
 use App\Models\Employee;
 use App\Models\Subject;
 use App\Models\Teacher;
+use App\Services\DepartmentEvaluationWindow;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -23,6 +24,10 @@ class TeacherPortalController extends Controller
         return DB::table('academic_year')
             ->where('is_deleted', 0)
             ->where('is_activated', 1)
+            ->where(function ($query) {
+                $query->whereNull('date_opened')
+                    ->orWhere('date_opened', '<=', now());
+            })
             ->orderByDesc('from_year')
             ->first();
     }
@@ -1106,6 +1111,7 @@ class TeacherPortalController extends Controller
         $hasLegacyEvaluatorColumns = Schema::hasColumn('evaluation_submissions', 'evaluator_id')
             && Schema::hasColumn('evaluation_submissions', 'evaluatee_id');
         $typeId = $this->questionnaireTypeIdForCategory($category);
+        $openDepartmentIds = $academicYearId ? DepartmentEvaluationWindow::openDepartmentIds($academicYearId) : [];
 
         if ($hasLegacyEvaluatorColumns) {
             $submitted = DB::table('evaluation_submissions')
@@ -1138,6 +1144,8 @@ class TeacherPortalController extends Controller
             ->where('department_id', $teacher->department_id)
             ->where('is_activated', 1)
             ->where('is_deleted', 0)
+            ->when($academicYearId && ! empty($openDepartmentIds), fn ($query) => $query->whereIn('department_id', $openDepartmentIds))
+            ->when($academicYearId && empty($openDepartmentIds), fn ($query) => $query->whereRaw('1 = 0'))
             ->when(
                 $category === 'head_teacher',
                 fn ($query) => $query->whereRaw('LOWER(COALESCE(role, "")) LIKE ?', ['%program chair%']),
@@ -1522,6 +1530,11 @@ class TeacherPortalController extends Controller
             ->where('is_activated', 1)
             ->firstOrFail();
 
+        if (! DepartmentEvaluationWindow::isOpen((int) $teacher->department_id, (int) $cycle->id)) {
+            return redirect()->route('portal.teacher.dashboard')
+                ->with('error', 'Evaluation is not open for your department.');
+        }
+
         if ($category === 'employee_evaluation') {
             $evaluatee = Employee::query()
                 ->where('id', $evaluateeId)
@@ -1625,6 +1638,11 @@ class TeacherPortalController extends Controller
             ->where('is_deleted', 0)
             ->where('is_activated', 1)
             ->firstOrFail();
+
+        if (! DepartmentEvaluationWindow::isOpen((int) $teacher->department_id, (int) $data['academic_year_id'])) {
+            return redirect()->route('portal.teacher.dashboard')
+                ->with('error', 'Evaluation is not open for your department.');
+        }
 
         if ($data['category'] === 'employee_evaluation') {
             $evaluatee = Employee::query()
@@ -1874,6 +1892,9 @@ class TeacherPortalController extends Controller
         $teacher = Teacher::with(['branch', 'department', 'program', 'strand'])->findOrFail($employeeId);
 
         $cycle = $this->activeCycle();
+        $isDepartmentOpen = $cycle
+            ? DepartmentEvaluationWindow::isOpen((int) $teacher->department_id, (int) $cycle->id)
+            : false;
         $classes = [];
         $pendingTargets = [];
         $headTargets = [];
@@ -1886,7 +1907,7 @@ class TeacherPortalController extends Controller
             'outside' => ['label' => 'Outside Faculty', 'submission_count' => 0, 'overall_rating' => null, 'overall_percentage' => null, 'questions' => []],
         ];
 
-        if ($cycle) {
+        if ($cycle && $isDepartmentOpen) {
             [$termA, $termB] = $this->termOptions($cycle->term ?? null);
             $schoolYear = trim("{$cycle->from_year}-{$cycle->to_year}");
             $semesterLabel = $this->semesterLabel($cycle->term ?? null);
@@ -1910,7 +1931,9 @@ class TeacherPortalController extends Controller
             $submittedForms = $this->submittedFormsByTarget($teacher, $allTargets, $cycle);
             $evaluationForms = $this->evaluationFormsForTargets($allTargets, $cycle, $submittedForms);
         } else {
-            $classes = $this->buildAssignedSubjectClasses($teacher, 'No active term')
+            $closedSemesterLabel = $cycle ? $this->semesterLabel($cycle->term ?? null) : 'No active term';
+            $closedSchoolYear = $cycle ? trim("{$cycle->from_year}-{$cycle->to_year}") : null;
+            $classes = $this->buildAssignedSubjectClasses($teacher, $closedSemesterLabel, $closedSchoolYear)
                 ?: $this->buildLegacyEducationLevelClasses($teacher, 'No active term');
         }
 
@@ -1933,7 +1956,7 @@ class TeacherPortalController extends Controller
             'cycle' => $cycle ? [
                 'school_year' => "{$cycle->from_year}-{$cycle->to_year}",
                 'semester' => $this->semesterLabel($cycle->term ?? null),
-                'is_open' => (bool) $cycle->is_activated,
+                'is_open' => $isDepartmentOpen,
             ] : null,
             'classes' => $classes,
             'subjectRatings' => $subjectRatings,

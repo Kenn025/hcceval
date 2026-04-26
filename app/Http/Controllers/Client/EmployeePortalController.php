@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Client;
 
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
+use App\Services\DepartmentEvaluationWindow;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +19,10 @@ class EmployeePortalController extends Controller
     {
         return DB::table('academic_year')
             ->where('is_activated', 1)
+            ->where(function ($query) {
+                $query->whereNull('date_opened')
+                    ->orWhere('date_opened', '<=', now());
+            })
             ->orderByDesc('from_year')
             ->first();
     }
@@ -195,6 +200,17 @@ class EmployeePortalController extends Controller
             return redirect()->route('portal.employee.dashboard')->with('error', 'No active evaluation cycle.');
         }
 
+        $employee = Employee::query()
+            ->where('id', $employeeId)
+            ->where('is_deleted', 0)
+            ->where('is_activated', 1)
+            ->firstOrFail();
+
+        if (! DepartmentEvaluationWindow::isOpen((int) $employee->department_id, (int) $cycle->id)) {
+            return redirect()->route('portal.employee.dashboard')
+                ->with('error', 'Evaluation is not open for your department.');
+        }
+
         $evaluatee = DB::table('employee')->where('id', $evaluateeId)->first();
         if (! $evaluatee) {
             return redirect()->route('portal.employee.dashboard')->with('error', 'Evaluatee not found.');
@@ -244,6 +260,17 @@ class EmployeePortalController extends Controller
 
         if (! Schema::hasTable('evaluation_submissions')) {
             return back()->withErrors(['message' => 'Submissions storage is not available.']);
+        }
+
+        $employee = Employee::query()
+            ->where('id', $employeeId)
+            ->where('is_deleted', 0)
+            ->where('is_activated', 1)
+            ->firstOrFail();
+
+        if (! DepartmentEvaluationWindow::isOpen((int) $employee->department_id, (int) $data['academic_year_id'])) {
+            return redirect()->route('portal.employee.dashboard')
+                ->with('error', 'Evaluation is not open for your department.');
         }
 
         $already = DB::table('evaluation_submissions')
@@ -333,6 +360,9 @@ class EmployeePortalController extends Controller
             ->findOrFail($employeeId);
 
         $cycle          = $this->activeCycle();
+        if ($cycle && ! DepartmentEvaluationWindow::isOpen((int) $employee->department_id, (int) $cycle->id)) {
+            $cycle = null;
+        }
         $currentRatings = [];
         $archiveFolders = [];
 

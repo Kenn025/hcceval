@@ -231,7 +231,13 @@ function FlowStatusRow({ flow, branchId }) {
     );
 }
 
-function DepartmentStatusModal({ department, onClose, onStartEvaluation }) {
+function localDateTimeValue(date = new Date()) {
+    const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+
+    return offsetDate.toISOString().slice(0, 16);
+}
+
+function DepartmentStatusModal({ department, onClose, onStartEvaluation, onCloseEvaluation }) {
     if (!department) {
         return null;
     }
@@ -279,11 +285,15 @@ function DepartmentStatusModal({ department, onClose, onStartEvaluation }) {
                 <div className="mt-6 flex justify-end border-t border-slate-200 pt-4">
                     <button
                         type="button"
-                        onClick={() => onStartEvaluation(department)}
+                        onClick={() => department.evaluation_window_status === 'open' || department.evaluation_window_status === 'scheduled'
+                            ? onCloseEvaluation(department)
+                            : onStartEvaluation(department)}
                         className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
                     >
                         <AppIcon name="calendar" className="h-4 w-4" />
-                        Start Evaluation
+                        {department.evaluation_window_status === 'open' || department.evaluation_window_status === 'scheduled'
+                            ? 'Close Evaluation'
+                            : 'Start Evaluation'}
                     </button>
                 </div>
             </div>
@@ -291,9 +301,10 @@ function DepartmentStatusModal({ department, onClose, onStartEvaluation }) {
     );
 }
 
-function DepartmentStatusCard({ department, onOpen, onStartEvaluation }) {
+function DepartmentStatusCard({ department, onOpen, onStartEvaluation, onCloseEvaluation }) {
     const isComplete = department.is_complete;
     const hasProgress = department.loaded > 0;
+    const isWindowActive = department.evaluation_window_status === 'open' || department.evaluation_window_status === 'scheduled';
 
     return (
         <div
@@ -315,13 +326,25 @@ function DepartmentStatusCard({ department, onOpen, onStartEvaluation }) {
                 </div>
                 <span className={[
                     'shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold',
-                    isComplete
+                    department.evaluation_window_status === 'open'
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : department.evaluation_window_status === 'scheduled'
+                        ? 'bg-blue-50 text-blue-700'
+                        : department.evaluation_window_status === 'closed'
+                        ? 'bg-rose-50 text-rose-700'
+                        : isComplete
                         ? 'bg-emerald-50 text-emerald-700'
                         : hasProgress
                         ? 'bg-amber-50 text-amber-700'
                         : 'bg-slate-100 text-slate-600',
                 ].join(' ')}>
-                    {department.status}
+                    {department.evaluation_window_status === 'open'
+                        ? 'Open'
+                        : department.evaluation_window_status === 'scheduled'
+                        ? 'Scheduled'
+                        : department.evaluation_window_status === 'closed'
+                        ? 'Closed'
+                        : department.status}
                 </span>
             </div>
 
@@ -342,18 +365,88 @@ function DepartmentStatusCard({ department, onOpen, onStartEvaluation }) {
                 type="button"
                 onClick={(event) => {
                     event.stopPropagation();
-                    onStartEvaluation(department);
+                    if (isWindowActive) {
+                        onCloseEvaluation(department);
+                    } else {
+                        onStartEvaluation(department);
+                    }
                 }}
                 className={[
                     'mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition',
-                    isComplete
+                    isWindowActive
+                        ? 'bg-rose-600 text-white hover:bg-rose-700'
+                        : isComplete
                         ? 'bg-blue-600 text-white hover:bg-blue-700'
                         : 'bg-slate-900 text-white hover:bg-slate-800',
                 ].join(' ')}
             >
                 <AppIcon name="calendar" className="h-4 w-4" />
-                Start Evaluation
+                {isWindowActive ? 'Close Evaluation' : 'Start Evaluation'}
             </button>
+        </div>
+    );
+}
+
+function StartEvaluationModal({
+    open,
+    activeAcademicYear,
+    target,
+    confirmationText,
+    saving,
+    onConfirmationTextChange,
+    onClose,
+    onConfirm,
+}) {
+    if (!open) {
+        return null;
+    }
+
+    const canConfirm = confirmationText.trim().toUpperCase() === 'CONFIRM';
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-slate-950/40" onClick={onClose} />
+            <div className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+                <div>
+                    <p className="text-lg font-semibold text-slate-900">Start evaluation</p>
+                    <p className="mt-1 text-sm text-slate-600">
+                        {target?.name ? `${target.name} evaluation will be opened for ${activeAcademicYear?.label ?? 'the active academic year'}.` : 'Set when this evaluation should open.'}
+                    </p>
+                </div>
+
+                <div className="mt-5 space-y-4">
+                    <div>
+                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Type "CONFIRM" to verify
+                        </label>
+                        <input
+                            type="text"
+                            value={confirmationText}
+                            onChange={(event) => onConfirmationTextChange(event.target.value)}
+                            placeholder="CONFIRM"
+                            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                    </div>
+                </div>
+
+                <div className="mt-6 flex justify-end gap-3">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onConfirm}
+                        disabled={!canConfirm || saving}
+                        className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                    >
+                        Start Evaluation
+                    </button>
+                </div>
+            </div>
         </div>
     );
 }
@@ -375,6 +468,10 @@ export default function Dashboard({ branchSummaries = [], departmentStatuses = [
     const visibleQuickLinks = QUICK_LINKS.filter((item) => !item.roles || item.roles.includes(role));
     const [selectedDepartmentStatus, setSelectedDepartmentStatus] = useState(null);
     const [startWarningTarget, setStartWarningTarget] = useState(null);
+    const [closeTarget, setCloseTarget] = useState(null);
+    const [startTimerTarget, setStartTimerTarget] = useState(null);
+    const [confirmationText, setConfirmationText] = useState('');
+    const [savingStart, setSavingStart] = useState(false);
     const readyDepartments = departmentStatuses.filter((department) => department.is_complete).length;
     const branchTabs = useMemo(() => {
         const tabs = [];
@@ -399,14 +496,53 @@ export default function Dashboard({ branchSummaries = [], departmentStatuses = [
     const visibleDepartmentStatuses = departmentStatuses.filter((department) => (
         String(department.branch_id ?? department.branch ?? 'all') === selectedBranchTab
     ));
-    const visitEvaluationCycle = () => router.visit(route('admin.evaluation-cycle'));
+    const openStartTimerModal = (department) => {
+        setStartTimerTarget(department);
+        setConfirmationText('');
+    };
+    const closeStartTimerModal = () => {
+        setStartTimerTarget(null);
+        setConfirmationText('');
+    };
     const handleStartEvaluation = (department) => {
         if ((department?.percent ?? 0) < 100) {
             setStartWarningTarget(department);
             return;
         }
 
-        visitEvaluationCycle();
+        openStartTimerModal(department);
+    };
+    const submitStartEvaluation = () => {
+        if (!activeAcademicYear?.id) {
+            router.visit(route('admin.evaluation-cycle'));
+            return;
+        }
+
+        setSavingStart(true);
+        router.post(route('dashboard.start-department-evaluation'), {
+            department_id: startTimerTarget?.id,
+            academic_year_id: activeAcademicYear.id,
+            evaluation_start_mode: 'now',
+            date_opened: localDateTimeValue(),
+        }, {
+            preserveScroll: true,
+            onSuccess: closeStartTimerModal,
+            onFinish: () => setSavingStart(false),
+        });
+    };
+    const submitCloseEvaluation = () => {
+        if (!activeAcademicYear?.id || !closeTarget?.id) {
+            setCloseTarget(null);
+            return;
+        }
+
+        router.post(route('dashboard.close-department-evaluation'), {
+            department_id: closeTarget.id,
+            academic_year_id: activeAcademicYear.id,
+        }, {
+            preserveScroll: true,
+            onSuccess: () => setCloseTarget(null),
+        });
     };
 
     return (
@@ -478,6 +614,7 @@ export default function Dashboard({ branchSummaries = [], departmentStatuses = [
                             department={department}
                             onOpen={setSelectedDepartmentStatus}
                             onStartEvaluation={handleStartEvaluation}
+                            onCloseEvaluation={setCloseTarget}
                         />
                     ))}
                 </div>
@@ -508,6 +645,7 @@ export default function Dashboard({ branchSummaries = [], departmentStatuses = [
                 department={selectedDepartmentStatus}
                 onClose={() => setSelectedDepartmentStatus(null)}
                 onStartEvaluation={handleStartEvaluation}
+                onCloseEvaluation={setCloseTarget}
             />
 
             <ConfirmDialog
@@ -520,9 +658,31 @@ export default function Dashboard({ branchSummaries = [], departmentStatuses = [
                 confirmLabel="Continue"
                 onCancel={() => setStartWarningTarget(null)}
                 onConfirm={() => {
+                    const target = startWarningTarget;
                     setStartWarningTarget(null);
-                    visitEvaluationCycle();
+                    openStartTimerModal(target);
                 }}
+            />
+
+            <StartEvaluationModal
+                open={Boolean(startTimerTarget)}
+                activeAcademicYear={activeAcademicYear}
+                target={startTimerTarget}
+                confirmationText={confirmationText}
+                saving={savingStart}
+                onConfirmationTextChange={setConfirmationText}
+                onClose={closeStartTimerModal}
+                onConfirm={submitStartEvaluation}
+            />
+
+            <ConfirmDialog
+                open={Boolean(closeTarget)}
+                danger
+                title="Close department evaluation?"
+                message={closeTarget ? `Close evaluation for ${closeTarget.name}? Users in this department will no longer be able to submit evaluations.` : ''}
+                confirmLabel="Close Evaluation"
+                onCancel={() => setCloseTarget(null)}
+                onConfirm={submitCloseEvaluation}
             />
         </AdminLayout>
     );

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\EvaluationCycleRequest;
 use App\Services\AuditLogger;
 use App\Services\EvaluationNotifier;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
@@ -124,13 +125,17 @@ class EvaluationCycleController extends Controller
             DB::table('academic_year')->where('id', '!=', $id)->update(['is_activated' => 0]);
         }
 
+        $openedAt = $validated['status'] === 'active'
+            ? Carbon::parse($validated['date_opened'] ?? now())
+            : ($previous?->date_opened ?? now());
+
         DB::table('academic_year')->where('id', $id)->update([
             'from_year'    => $validated['year_start'],
             'to_year'      => $validated['year_end'],
             'term'         => $validated['semester'],
             'is_activated' => $validated['status'] === 'active' ? 1 : 0,
             'is_deleted'   => $validated['status'] === 'closed' ? 1 : 0,
-            'date_opened'  => $previous?->date_opened ?? now(),
+            'date_opened'  => $openedAt,
             'date_closed'  => $validated['status'] === 'closed' ? now() : null,
             'updated_at'   => now(),
         ]);
