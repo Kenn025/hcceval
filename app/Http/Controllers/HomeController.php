@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\LandingPageFeature;
 use App\Models\LandingPageFeatureSection;
+use App\Models\LandingPageFaq;
+use App\Models\LandingPageFaqSection;
 use App\Models\LandingPageHeader;
 use App\Models\LandingPageHomeSection;
 use App\Models\LandingPageHowItWorksSection;
@@ -31,6 +33,7 @@ class HomeController extends Controller
             'rolesSection' => $this->rolesSection(),
             'howItWorksSection' => $this->howItWorksSection(),
             'testimonialsSection' => $this->testimonialsSection(),
+            'faqSection' => $this->faqSection(),
         ]);
     }
 
@@ -364,6 +367,66 @@ class HomeController extends Controller
             'badge_text' => $section?->badge_text ?: $defaultSection['badge_text'],
             'title_text' => $section?->title_text ?: $defaultSection['title_text'],
             'testimonials' => count($testimonials) > 0 ? $testimonials : $defaultTestimonials,
+        ];
+    }
+
+    private function faqSection(): array
+    {
+        $defaultFaqs = [
+            [
+                'question' => 'How does multi-campus evaluation work?',
+                'answer' => 'Our system connects all campuses under one unified platform. Each campus maintains its own criteria while administrators can view aggregated data for comprehensive analysis across all locations.',
+                'sort_order' => 1,
+            ],
+            [
+                'question' => 'Are student evaluations truly anonymous?',
+                'answer' => 'Yes, we use advanced encryption and anonymization techniques. Student and peer evaluations are completely confidential, ensuring honest and unbiased feedback.',
+                'sort_order' => 2,
+            ],
+            [
+                'question' => 'Can we customize evaluation forms?',
+                'answer' => 'Absolutely! Administrators can create custom evaluation forms, set specific criteria for different roles, and adjust weighting based on institutional requirements.',
+                'sort_order' => 3,
+            ],
+            [
+                'question' => 'What security measures are in place?',
+                'answer' => 'We implement enterprise-grade security with SSL encryption, role-based access control, regular security audits, and compliance with data protection regulations.',
+                'sort_order' => 4,
+            ],
+            [
+                'question' => 'Is training provided?',
+                'answer' => 'Yes, we provide comprehensive training materials, video tutorials, and dedicated support to ensure smooth adoption across all user roles.',
+                'sort_order' => 5,
+            ],
+        ];
+        $defaultSection = [
+            'badge_text' => 'FAQ',
+            'title_text' => 'Frequently Asked Questions',
+            'faqs' => $defaultFaqs,
+        ];
+
+        if (! Schema::hasTable('landing_page_faq_sections') || ! Schema::hasTable('landing_page_faqs')) {
+            return $defaultSection;
+        }
+
+        $section = LandingPageFaqSection::query()->first();
+        $faqs = LandingPageFaq::query()
+            ->where('is_active', 1)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get(['question', 'answer', 'sort_order'])
+            ->map(fn(LandingPageFaq $faq) => [
+                'question' => $faq->question,
+                'answer' => $faq->answer,
+                'sort_order' => $faq->sort_order,
+            ])
+            ->values()
+            ->all();
+
+        return [
+            'badge_text' => $section?->badge_text ?: $defaultSection['badge_text'],
+            'title_text' => $section?->title_text ?: $defaultSection['title_text'],
+            'faqs' => count($faqs) > 0 ? $faqs : $defaultFaqs,
         ];
     }
 }

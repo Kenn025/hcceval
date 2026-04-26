@@ -112,6 +112,19 @@ function normalizeTestimonialsSection(testimonialsSection = {}) {
     };
 }
 
+function normalizeFaqSection(faqSection = {}) {
+    return {
+        badge_text: String(faqSection.badge_text ?? "").trim(),
+        title_text: String(faqSection.title_text ?? "").trim(),
+        faqs: (faqSection.faqs ?? []).map((row) => ({
+            id: row.id ?? null,
+            question: String(row.question ?? "").trim(),
+            answer: String(row.answer ?? "").trim(),
+            sort_order: Number(row.sort_order ?? 0),
+        })),
+    };
+}
+
 function normalizeStatKey(value) {
     return String(value ?? "")
         .trim()
@@ -188,6 +201,11 @@ export default function LandingPage({
         title_text: "",
         testimonials: [],
     },
+    faqSection = {
+        badge_text: "",
+        title_text: "",
+        faqs: [],
+    },
 }) {
     const canEditStats =
         (statsSection ?? []).length > 0 &&
@@ -211,6 +229,9 @@ export default function LandingPage({
     const [pendingHowItWorksScrollToIndex, setPendingHowItWorksScrollToIndex] =
         useState(null);
     const [testimonialsModalOpen, setTestimonialsModalOpen] = useState(false);
+    const [faqModalOpen, setFaqModalOpen] = useState(false);
+    const [pendingFaqScrollToIndex, setPendingFaqScrollToIndex] =
+        useState(null);
     const [testimonialAction, setTestimonialAction] = useState({
         id: null,
         status: null,
@@ -220,6 +241,7 @@ export default function LandingPage({
     const featureContainerRefs = useRef([]);
     const roleContainerRefs = useRef([]);
     const howItWorksContainerRefs = useRef([]);
+    const faqContainerRefs = useRef([]);
     const initialHeadersSnapshotRef = useRef("[]");
     const initialHomeSectionSnapshotRef = useRef("{}");
     const initialStatsSnapshotRef = useRef("[]");
@@ -227,6 +249,7 @@ export default function LandingPage({
     const initialRolesSnapshotRef = useRef("{}");
     const initialHowItWorksSnapshotRef = useRef("{}");
     const initialTestimonialsSnapshotRef = useRef("{}");
+    const initialFaqSnapshotRef = useRef("{}");
 
     const { data, setData, errors, processing, reset, clearErrors } = useForm({
         headers: [],
@@ -314,6 +337,19 @@ export default function LandingPage({
     } = useForm({
         badge_text: "",
         title_text: "",
+    });
+    const {
+        data: faqData,
+        setData: setFaqData,
+        errors: faqErrors,
+        processing: faqProcessing,
+        reset: resetFaq,
+        clearErrors: clearFaqErrors,
+    } = useForm({
+        badge_text: "",
+        title_text: "",
+        faqs: [],
+        delete_ids: [],
     });
 
     const openEdit = () => {
@@ -500,6 +536,26 @@ export default function LandingPage({
         );
         setTestimonialsModalOpen(true);
     };
+    const openFaqEdit = () => {
+        clearFaqErrors();
+        const nextFaqs = (faqSection?.faqs ?? []).map((row) => ({
+            id: row.id ?? null,
+            question: row.question ?? "",
+            answer: row.answer ?? "",
+            sort_order: row.sort_order ?? 0,
+        }));
+        const nextFaqData = {
+            badge_text: faqSection?.badge_text ?? "",
+            title_text: faqSection?.title_text ?? "",
+            faqs: nextFaqs,
+            delete_ids: [],
+        };
+        setFaqData(nextFaqData);
+        initialFaqSnapshotRef.current = JSON.stringify(
+            normalizeFaqSection(nextFaqData),
+        );
+        setFaqModalOpen(true);
+    };
     const closeHowItWorksModal = () => {
         resetHowItWorks();
         setHowItWorksModalOpen(false);
@@ -511,6 +567,13 @@ export default function LandingPage({
         resetTestimonials();
         setTestimonialsModalOpen(false);
         clearTestimonialsErrors();
+    };
+    const closeFaqModal = () => {
+        resetFaq();
+        setFaqModalOpen(false);
+        clearFaqErrors();
+        setPendingFaqScrollToIndex(null);
+        faqContainerRefs.current = [];
     };
 
     const updateRow = (index, key, value) => {
@@ -630,6 +693,17 @@ export default function LandingPage({
         howItWorksModalOpen,
         pendingHowItWorksScrollToIndex,
     ]);
+    useEffect(() => {
+        if (!faqModalOpen || pendingFaqScrollToIndex === null) {
+            return;
+        }
+
+        const target = faqContainerRefs.current[pendingFaqScrollToIndex];
+        if (target) {
+            target.scrollIntoView({ behavior: "smooth", block: "start" });
+            setPendingFaqScrollToIndex(null);
+        }
+    }, [faqData.faqs?.length, faqModalOpen, pendingFaqScrollToIndex]);
 
     const hasEmptyRequiredFields = useMemo(
         () =>
@@ -976,6 +1050,56 @@ export default function LandingPage({
         rows[targetIndex] = temp;
         setHowItWorksData("steps", withHowItWorksSortOrder(rows));
     };
+    const withFaqSortOrder = (rows = []) =>
+        rows.map((item, idx) => ({ ...item, sort_order: idx + 1 }));
+    const updateFaqField = (key, value) => {
+        setFaqData(key, value);
+    };
+    const updateFaqRow = (index, key, value) => {
+        const next = [...(faqData.faqs ?? [])];
+        next[index] = {
+            ...next[index],
+            [key]: value,
+        };
+        setFaqData("faqs", next);
+    };
+    const addFaqRow = () => {
+        const nextRows = withFaqSortOrder([
+            ...(faqData.faqs ?? []),
+            {
+                id: null,
+                question: "",
+                answer: "",
+                sort_order: 0,
+            },
+        ]);
+        setFaqData("faqs", nextRows);
+        setPendingFaqScrollToIndex(nextRows.length - 1);
+    };
+    const removeFaqRow = (index) => {
+        const row = (faqData.faqs ?? [])[index];
+        const nextRows = withFaqSortOrder(
+            (faqData.faqs ?? []).filter((_, i) => i !== index),
+        );
+        setFaqData("faqs", nextRows);
+        if (row?.id) {
+            const nextDeleteIds = Array.from(
+                new Set([...(faqData.delete_ids ?? []), row.id]),
+            );
+            setFaqData("delete_ids", nextDeleteIds);
+        }
+    };
+    const moveFaqRow = (index, direction) => {
+        const rows = [...(faqData.faqs ?? [])];
+        const targetIndex = direction === "up" ? index - 1 : index + 1;
+        if (targetIndex < 0 || targetIndex >= rows.length) {
+            return;
+        }
+        const temp = rows[index];
+        rows[index] = rows[targetIndex];
+        rows[targetIndex] = temp;
+        setFaqData("faqs", withFaqSortOrder(rows));
+    };
 
     const moveFeatureRow = (index, direction) => {
         const rows = [...(featuresData.features ?? [])];
@@ -1115,6 +1239,37 @@ export default function LandingPage({
             route("admin.landing-page.testimonials-section.update"),
             testimonialsData,
             { onSuccess: closeTestimonialsModal },
+        );
+    };
+    const hasEmptyFaqRequiredFields = useMemo(() => {
+        const sectionFields = [faqData.badge_text, faqData.title_text];
+        const sectionHasEmpty = sectionFields.some(
+            (value) => String(value ?? "").trim() === "",
+        );
+        const rowHasEmpty = (faqData.faqs ?? []).some(
+            (row) =>
+                String(row.question ?? "").trim() === "" ||
+                String(row.answer ?? "").trim() === "",
+        );
+        return sectionHasEmpty || rowHasEmpty;
+    }, [faqData]);
+    const hasFaqSectionChanges = useMemo(() => {
+        const currentSnapshot = JSON.stringify(normalizeFaqSection(faqData));
+        return currentSnapshot !== initialFaqSnapshotRef.current;
+    }, [faqData]);
+    const submitFaqSection = (event) => {
+        event.preventDefault();
+        if (hasEmptyFaqRequiredFields || !hasFaqSectionChanges) {
+            return;
+        }
+
+        router.post(
+            route("admin.landing-page.faq-section.update"),
+            {
+                _method: "put",
+                ...faqData,
+            },
+            { onSuccess: closeFaqModal },
         );
     };
     const updateTestimonialStatus = (testimonialId, status) => {
@@ -1676,6 +1831,77 @@ export default function LandingPage({
                                                     </p>
                                                 </div>
                                             ))}
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section className="mb-4 rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-5">
+                    <h2 className="text-base font-semibold text-slate-900">
+                        FAQ
+                    </h2>
+                    <button
+                        type="button"
+                        onClick={openFaqEdit}
+                        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                    >
+                        Edit
+                    </button>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="min-w-full">
+                        <thead>
+                            <tr className="border-b border-slate-100 bg-slate-50/70 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                <th className="px-4 py-3 sm:px-5">Field</th>
+                                <th className="px-4 py-3 sm:px-5">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody className="text-sm text-slate-700">
+                            <tr className="border-b border-slate-100">
+                                <td className="px-4 py-3 font-medium sm:px-5">
+                                    Badge
+                                </td>
+                                <td className="px-4 py-3 sm:px-5">
+                                    {faqSection?.badge_text || "-"}
+                                </td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                                <td className="px-4 py-3 font-medium sm:px-5">
+                                    Title
+                                </td>
+                                <td className="px-4 py-3 sm:px-5">
+                                    {faqSection?.title_text || "-"}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td className="px-4 py-3 align-top font-medium sm:px-5">
+                                    FAQ Cards
+                                </td>
+                                <td className="px-4 py-3 sm:px-5">
+                                    <div className="space-y-2">
+                                        {(faqSection?.faqs ?? []).map(
+                                            (row, index) => (
+                                                <div
+                                                    key={
+                                                        row.id ??
+                                                        `faq-summary-${index}`
+                                                    }
+                                                    className="rounded-lg border border-slate-200 bg-slate-50 p-3"
+                                                >
+                                                    <p className="font-medium text-slate-900">
+                                                        {row.question ||
+                                                            `FAQ ${index + 1}`}
+                                                    </p>
+                                                    <p className="mt-1 text-sm text-slate-700">
+                                                        {row.answer || "-"}
+                                                    </p>
+                                                </div>
+                                            ),
+                                        )}
                                     </div>
                                 </td>
                             </tr>
@@ -3323,6 +3549,224 @@ export default function LandingPage({
                                         type="button"
                                         onClick={closeRolesModal}
                                         className="w-full md:w-[180px] rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {faqModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div
+                        className="absolute inset-0 bg-slate-950/40"
+                        onClick={closeFaqModal}
+                    />
+                    <div
+                        className="relative w-full max-w-4xl rounded-xl bg-white p-6 shadow-2xl"
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div className="mb-4 flex items-center justify-between">
+                            <h3 className="text-base font-semibold text-slate-900">
+                                Edit FAQ Section
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={closeFaqModal}
+                                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                                aria-label="Close modal"
+                            >
+                                <svg
+                                    className="h-5 w-5"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={2}
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M6 18L18 6M6 6l12 12"
+                                    />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <form onSubmit={submitFaqSection} className="space-y-4">
+                            <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
+                                <div className="grid gap-3 md:grid-cols-2">
+                                    <FormField
+                                        label="Badge"
+                                        error={faqErrors.badge_text}
+                                        required
+                                    >
+                                        <TextInput
+                                            value={faqData.badge_text}
+                                            onChange={(event) =>
+                                                updateFaqField(
+                                                    "badge_text",
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                    </FormField>
+                                    <FormField
+                                        label="Title"
+                                        error={faqErrors.title_text}
+                                        required
+                                    >
+                                        <TextInput
+                                            value={faqData.title_text}
+                                            onChange={(event) =>
+                                                updateFaqField(
+                                                    "title_text",
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                    </FormField>
+                                </div>
+
+                                <div className="flex justify-end">
+                                    <button
+                                        type="button"
+                                        onClick={addFaqRow}
+                                        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                                    >
+                                        + Add FAQ Card
+                                    </button>
+                                </div>
+
+                                {(faqData.faqs ?? []).map((row, index) => (
+                                    <div
+                                        key={row.id ?? `faq-edit-${index}`}
+                                        ref={(el) => {
+                                            faqContainerRefs.current[index] = el;
+                                        }}
+                                        className="rounded-lg border border-slate-200 bg-slate-50 p-4"
+                                    >
+                                        <div className="mb-3 flex items-center justify-between gap-2">
+                                            <p className="text-sm font-semibold text-slate-900">
+                                                FAQ #{index + 1}
+                                            </p>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        moveFaqRow(index, "up")
+                                                    }
+                                                    disabled={index === 0}
+                                                    aria-label={`Move FAQ #${index + 1} up`}
+                                                    className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                                                >
+                                                    <AppIcon
+                                                        name="arrow-up"
+                                                        className="h-4 w-4"
+                                                    />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        moveFaqRow(
+                                                            index,
+                                                            "down",
+                                                        )
+                                                    }
+                                                    disabled={
+                                                        index ===
+                                                        (faqData.faqs ?? [])
+                                                            .length -
+                                                            1
+                                                    }
+                                                    aria-label={`Move FAQ #${index + 1} down`}
+                                                    className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                                                >
+                                                    <AppIcon
+                                                        name="arrow-down"
+                                                        className="h-4 w-4"
+                                                    />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        removeFaqRow(index)
+                                                    }
+                                                    aria-label={`Delete FAQ #${index + 1}`}
+                                                    className="rounded-lg border border-rose-200 bg-white p-1.5 text-rose-600 hover:bg-rose-50"
+                                                >
+                                                    <AppIcon
+                                                        name="trash"
+                                                        className="h-4 w-4"
+                                                    />
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-3">
+                                            <FormField
+                                                label="Question"
+                                                error={
+                                                    faqErrors[
+                                                        `faqs.${index}.question`
+                                                    ]
+                                                }
+                                                required
+                                            >
+                                                <TextInput
+                                                    value={row.question ?? ""}
+                                                    onChange={(event) =>
+                                                        updateFaqRow(
+                                                            index,
+                                                            "question",
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                />
+                                            </FormField>
+                                            <FormField
+                                                label="Answer"
+                                                error={
+                                                    faqErrors[
+                                                        `faqs.${index}.answer`
+                                                    ]
+                                                }
+                                                required
+                                            >
+                                                <TextareaInput
+                                                    value={row.answer ?? ""}
+                                                    onChange={(event) =>
+                                                        updateFaqRow(
+                                                            index,
+                                                            "answer",
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                    rows={4}
+                                                />
+                                            </FormField>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="pt-2">
+                                <div className="flex w-full flex-col gap-3 md:flex-row-reverse md:justify-start">
+                                    <SubmitButton
+                                        processing={faqProcessing}
+                                        disabled={
+                                            hasEmptyFaqRequiredFields ||
+                                            !hasFaqSectionChanges
+                                        }
+                                        className="w-full md:w-[180px]"
+                                    >
+                                        Save Changes
+                                    </SubmitButton>
+                                    <button
+                                        type="button"
+                                        onClick={closeFaqModal}
+                                        className="w-full rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700 md:w-[180px]"
                                     >
                                         Cancel
                                     </button>

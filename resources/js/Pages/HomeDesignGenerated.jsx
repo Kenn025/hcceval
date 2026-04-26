@@ -159,6 +159,7 @@ function App({
     rolesSection: customRolesSection = null,
     howItWorksSection: customHowItWorksSection = null,
     testimonialsSection: customTestimonialsSection = null,
+    faqSection: customFaqSection = null,
 }) {
     const [isDarkMode, setIsDarkMode] = useState(() => {
         if (typeof window === "undefined") return false;
@@ -520,28 +521,52 @@ function App({
         if (label.includes("satisfaction")) return Star;
         return BarChart3;
     };
-    const faqs = [
-        {
-            q: "How does multi-campus evaluation work?",
-            a: "Our system connects all campuses under one unified platform. Each campus maintains its own criteria while administrators can view aggregated data for comprehensive analysis across all locations.",
-        },
-        {
-            q: "Are student evaluations truly anonymous?",
-            a: "Yes, we use advanced encryption and anonymization techniques. Student and peer evaluations are completely confidential, ensuring honest and unbiased feedback.",
-        },
-        {
-            q: "Can we customize evaluation forms?",
-            a: "Absolutely! Administrators can create custom evaluation forms, set specific criteria for different roles, and adjust weighting based on institutional requirements.",
-        },
-        {
-            q: "What security measures are in place?",
-            a: "We implement enterprise-grade security with SSL encryption, role-based access control, regular security audits, and compliance with data protection regulations.",
-        },
-        {
-            q: "Is training provided?",
-            a: "Yes, we provide comprehensive training materials, video tutorials, and dedicated support to ensure smooth adoption across all user roles.",
-        },
-    ];
+    const defaultFaqSection = {
+        badge_text: "FAQ",
+        title_text: "Frequently Asked Questions",
+        faqs: [
+            {
+                question: "How does multi-campus evaluation work?",
+                answer: "Our system connects all campuses under one unified platform. Each campus maintains its own criteria while administrators can view aggregated data for comprehensive analysis across all locations.",
+            },
+            {
+                question: "Are student evaluations truly anonymous?",
+                answer: "Yes, we use advanced encryption and anonymization techniques. Student and peer evaluations are completely confidential, ensuring honest and unbiased feedback.",
+            },
+            {
+                question: "Can we customize evaluation forms?",
+                answer: "Absolutely! Administrators can create custom evaluation forms, set specific criteria for different roles, and adjust weighting based on institutional requirements.",
+            },
+            {
+                question: "What security measures are in place?",
+                answer: "We implement enterprise-grade security with SSL encryption, role-based access control, regular security audits, and compliance with data protection regulations.",
+            },
+            {
+                question: "Is training provided?",
+                answer: "Yes, we provide comprehensive training materials, video tutorials, and dedicated support to ensure smooth adoption across all user roles.",
+            },
+        ],
+    };
+    const faqSection =
+        customFaqSection && typeof customFaqSection === "object"
+            ? {
+                  ...defaultFaqSection,
+                  ...customFaqSection,
+                  faqs:
+                      Array.isArray(customFaqSection.faqs) &&
+                      customFaqSection.faqs.length > 0
+                          ? customFaqSection.faqs
+                          : defaultFaqSection.faqs,
+              }
+            : defaultFaqSection;
+    const faqs = (
+        Array.isArray(faqSection.faqs) && faqSection.faqs.length > 0
+            ? faqSection.faqs
+            : defaultFaqSection.faqs
+    ).map((faq) => ({
+        q: String(faq?.question ?? faq?.q ?? "").trim(),
+        a: String(faq?.answer ?? faq?.a ?? "").trim(),
+    }));
     const defaultTestimonialsSection = {
         badge_text: "Testimonials",
         title_text: "What Users Say",
@@ -2488,12 +2513,14 @@ function App({
                                     className:
                                         "neumorphic-flat px-4 py-2 inline-block text-sm font-bold mb-4",
                                     style: { color: "var(--accent)" },
-                                    children: "FAQ",
+                                    children: faqSection.badge_text || "FAQ",
                                 }),
                                 /* @__PURE__ */ jsx("h2", {
                                     className: "text-3xl md:text-4xl font-bold",
                                     style: { color: "var(--text-primary)" },
-                                    children: "Frequently Asked Questions",
+                                    children:
+                                        faqSection.title_text ||
+                                        "Frequently Asked Questions",
                                 }),
                             ],
                         }),

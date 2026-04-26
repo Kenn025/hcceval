@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\LandingPageFeature;
 use App\Models\LandingPageFeatureSection;
+use App\Models\LandingPageFaq;
+use App\Models\LandingPageFaqSection;
 use App\Models\LandingPageHeader;
 use App\Models\LandingPageHomeSection;
 use App\Models\LandingPageHowItWorksSection;
@@ -53,6 +55,10 @@ class LandingPageHeaderController extends Controller
     private const DEFAULT_TESTIMONIAL_SECTION = [
         'badge_text' => 'Testimonials',
         'title_text' => 'What Users Say',
+    ];
+    private const DEFAULT_FAQ_SECTION = [
+        'badge_text' => 'FAQ',
+        'title_text' => 'Frequently Asked Questions',
     ];
     private const DEFAULT_ROLES = [
         [
@@ -146,6 +152,33 @@ class LandingPageHeaderController extends Controller
             'sort_order' => 4,
         ],
     ];
+    private const DEFAULT_FAQS = [
+        [
+            'question' => 'How does multi-campus evaluation work?',
+            'answer' => 'Our system connects all campuses under one unified platform. Each campus maintains its own criteria while administrators can view aggregated data for comprehensive analysis across all locations.',
+            'sort_order' => 1,
+        ],
+        [
+            'question' => 'Are student evaluations truly anonymous?',
+            'answer' => 'Yes, we use advanced encryption and anonymization techniques. Student and peer evaluations are completely confidential, ensuring honest and unbiased feedback.',
+            'sort_order' => 2,
+        ],
+        [
+            'question' => 'Can we customize evaluation forms?',
+            'answer' => 'Absolutely! Administrators can create custom evaluation forms, set specific criteria for different roles, and adjust weighting based on institutional requirements.',
+            'sort_order' => 3,
+        ],
+        [
+            'question' => 'What security measures are in place?',
+            'answer' => 'We implement enterprise-grade security with SSL encryption, role-based access control, regular security audits, and compliance with data protection regulations.',
+            'sort_order' => 4,
+        ],
+        [
+            'question' => 'Is training provided?',
+            'answer' => 'Yes, we provide comprehensive training materials, video tutorials, and dedicated support to ensure smooth adoption across all user roles.',
+            'sort_order' => 5,
+        ],
+    ];
     private const DEFAULT_STATS = [
         'students' => [
             'label' => 'Active Students',
@@ -201,6 +234,7 @@ class LandingPageHeaderController extends Controller
             'rolesSection' => $this->rolesSectionData(),
             'howItWorksSection' => $this->howItWorksSectionData(),
             'testimonialsSection' => $this->testimonialsSectionData(),
+            'faqSection' => $this->faqSectionData(),
             'filters' => [
                 'search' => $search,
                 'per_page' => $perPage,
@@ -933,6 +967,101 @@ class LandingPageHeaderController extends Controller
         return back()->with('success', 'Testimonial status updated successfully.');
     }
 
+    public function updateFaqSection(Request $request)
+    {
+        if (! Schema::hasTable('landing_page_faq_sections') || ! Schema::hasTable('landing_page_faqs')) {
+            return back()->withErrors([
+                'faq_section' => 'FAQ section table is not available yet. Please run migrations first.',
+            ]);
+        }
+
+        $validated = $request->validate([
+            'badge_text' => 'required|string|max:120',
+            'title_text' => 'required|string|max:255',
+            'faqs' => 'nullable|array',
+            'faqs.*.id' => 'nullable|integer|exists:landing_page_faqs,id',
+            'faqs.*.question' => 'required|string|max:255',
+            'faqs.*.answer' => 'required|string|max:2000',
+            'faqs.*.sort_order' => 'nullable|integer|min:0|max:9999',
+            'delete_ids' => 'nullable|array',
+            'delete_ids.*' => 'integer|exists:landing_page_faqs,id',
+        ]);
+
+        $faqPayload = collect($validated['faqs'] ?? [])
+            ->map(fn(array $row, int $index) => [
+                'id' => $row['id'] ?? null,
+                'question' => trim((string) ($row['question'] ?? '')),
+                'answer' => trim((string) ($row['answer'] ?? '')),
+                'sort_order' => $row['sort_order'] ?? ($index + 1),
+            ])
+            ->values();
+        $deleteIds = collect($validated['delete_ids'] ?? [])->filter()->values();
+        $ids = $faqPayload->pluck('id')->filter()->values();
+        $faqsById = LandingPageFaq::query()
+            ->whereIn('id', $ids)
+            ->get()
+            ->keyBy('id');
+
+        DB::transaction(function () use ($validated, $faqPayload, $deleteIds, $faqsById) {
+            $section = LandingPageFaqSection::query()->first();
+            if (! $section) {
+                $section = LandingPageFaqSection::query()->create(self::DEFAULT_FAQ_SECTION);
+            }
+
+            $section->update([
+                'badge_text' => $validated['badge_text'],
+                'title_text' => $validated['title_text'],
+            ]);
+
+            if ($deleteIds->isNotEmpty()) {
+                LandingPageFaq::query()
+                    ->whereIn('id', $deleteIds)
+                    ->delete();
+            }
+
+            foreach ($faqPayload as $index => $row) {
+                if (isset($row['id']) && $deleteIds->contains($row['id'])) {
+                    continue;
+                }
+
+                if (! empty($row['id'])) {
+                    $faq = $faqsById->get($row['id']);
+                    if (! $faq) {
+                        continue;
+                    }
+
+                    $faq->update([
+                        'question' => $row['question'],
+                        'answer' => $row['answer'],
+                        'sort_order' => $row['sort_order'] ?? ($index + 1),
+                    ]);
+                    continue;
+                }
+
+                LandingPageFaq::create([
+                    'question' => $row['question'],
+                    'answer' => $row['answer'],
+                    'sort_order' => $row['sort_order'] ?? ($index + 1),
+                    'is_active' => true,
+                ]);
+            }
+
+            $orderedIds = LandingPageFaq::query()
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->pluck('id')
+                ->values();
+
+            foreach ($orderedIds as $position => $id) {
+                LandingPageFaq::query()
+                    ->where('id', $id)
+                    ->update(['sort_order' => $position + 1]);
+            }
+        });
+
+        return back()->with('success', 'FAQ section updated successfully.');
+    }
+
     private function rolesSectionData(): array
     {
         $defaultRoles = collect(self::DEFAULT_ROLES)
@@ -1091,6 +1220,47 @@ class LandingPageHeaderController extends Controller
             'badge_text' => $section?->badge_text ?: self::DEFAULT_TESTIMONIAL_SECTION['badge_text'],
             'title_text' => $section?->title_text ?: self::DEFAULT_TESTIMONIAL_SECTION['title_text'],
             'testimonials' => count($testimonials) > 0 ? $testimonials : $defaultTestimonials,
+        ];
+    }
+
+    private function faqSectionData(): array
+    {
+        $defaultFaqs = collect(self::DEFAULT_FAQS)
+            ->map(fn(array $faq) => [
+                'id' => null,
+                'question' => $faq['question'],
+                'answer' => $faq['answer'],
+                'sort_order' => $faq['sort_order'],
+            ])
+            ->values()
+            ->all();
+
+        if (! Schema::hasTable('landing_page_faq_sections') || ! Schema::hasTable('landing_page_faqs')) {
+            return [
+                ...self::DEFAULT_FAQ_SECTION,
+                'faqs' => $defaultFaqs,
+            ];
+        }
+
+        $section = LandingPageFaqSection::query()->first();
+        $faqs = LandingPageFaq::query()
+            ->where('is_active', 1)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get(['id', 'question', 'answer', 'sort_order'])
+            ->map(fn(LandingPageFaq $faq) => [
+                'id' => $faq->id,
+                'question' => $faq->question,
+                'answer' => $faq->answer,
+                'sort_order' => $faq->sort_order,
+            ])
+            ->values()
+            ->all();
+
+        return [
+            'badge_text' => $section?->badge_text ?: self::DEFAULT_FAQ_SECTION['badge_text'],
+            'title_text' => $section?->title_text ?: self::DEFAULT_FAQ_SECTION['title_text'],
+            'faqs' => count($faqs) > 0 ? $faqs : $defaultFaqs,
         ];
     }
 
