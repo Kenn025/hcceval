@@ -9,6 +9,7 @@ import AppIcon from '@/Components/AppIcon';
 import AppConfirmDialog from '@/Components/ConfirmDialog';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { router, useForm } from '@inertiajs/react';
+import axios from 'axios';
 import { useEffect, useMemo, useState } from 'react';
 
 const buildEmployeeCode = (branch, nextEmployeeCodes = {}) => {
@@ -18,6 +19,8 @@ const buildEmployeeCode = (branch, nextEmployeeCodes = {}) => {
 
     return nextEmployeeCodes[String(branch.id)] ?? `EMP-${String(branch.code).replace(/[^A-Za-z0-9]/g, '').toUpperCase()}-00001`;
 };
+
+const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value ?? '').trim());
 
 export default function Employees({
     employees,
@@ -39,6 +42,9 @@ export default function Employees({
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [showPassword, setShowPassword] = useState(false);
     const [submitError, setSubmitError] = useState('');
+    const [emailCheck, setEmailCheck] = useState({ status: 'idle', message: '' });
+    const [createDraft, setCreateDraft] = useState(null);
+    const [editDrafts, setEditDrafts] = useState({});
     const activeBranchId = String(selectedBranchId ?? scopedBranchId ?? '');
 
     const { data, setData, errors, processing, reset, clearErrors } = useForm({
@@ -59,6 +65,24 @@ export default function Employees({
 
     const { isDirty: employeeIsDirty } = useFormDirty(data, editing?.id ?? 'new');
     const [confirmUpdateOpen, setConfirmUpdateOpen] = useState(false);
+    const emailError = emailCheck.status === 'taken' ? emailCheck.message : errors.email;
+    const emailIsUnavailable = emailCheck.status === 'checking' || emailCheck.status === 'taken';
+    const createFormIsComplete = useMemo(() => {
+        if (editing) {
+            return true;
+        }
+
+        const email = String(data.email ?? '').trim();
+
+        return Boolean(
+            String(data.branch_id ?? '').trim()
+            && String(data.employee_department_id ?? '').trim()
+            && String(data.first_name ?? '').trim()
+            && String(data.last_name ?? '').trim()
+            && (!email || isValidEmail(email))
+            && !emailIsUnavailable
+        );
+    }, [data.branch_id, data.email, data.employee_department_id, data.first_name, data.last_name, editing, emailIsUnavailable]);
 
     const selectedBranch = useMemo(
         () => branches.find((branch) => String(branch.id) === String(data.branch_id)),
@@ -73,14 +97,75 @@ export default function Employees({
     }, [activeBranchId, data.branch_id, setData]);
 
     const openCreate = () => {
+        const draft = createDraft ?? {};
+
         reset();
         setSubmitError('');
+        setEmailCheck({ status: 'idle', message: '' });
         setDetailOpen(false);
         setViewing(null);
         setShowPassword(false);
         clearErrors();
         setEditing(null);
+        setData({
+            employee_no: draft.employee_no ?? '',
+            branch_id: draft.branch_id ?? activeBranchId,
+            department_id: draft.department_id ?? '',
+            employee_department_id: draft.employee_department_id ?? '',
+            program_id: draft.program_id ?? '',
+            strand_id: draft.strand_id ?? '',
+            first_name: draft.first_name ?? '',
+            middle_name: draft.middle_name ?? '',
+            last_name: draft.last_name ?? '',
+            suffix_name: draft.suffix_name ?? '',
+            email: draft.email ?? '',
+            password: draft.password ?? '',
+            role: draft.role ?? 'Employee',
+        });
         setSlideOpen(true);
+    };
+
+    const closeSlideOver = () => {
+        const draft = {
+            employee_no: data.employee_no,
+            branch_id: data.branch_id,
+            department_id: data.department_id,
+            employee_department_id: data.employee_department_id,
+            program_id: data.program_id,
+            strand_id: data.strand_id,
+            first_name: data.first_name,
+            middle_name: data.middle_name,
+            last_name: data.last_name,
+            suffix_name: data.suffix_name,
+            email: data.email,
+            password: data.password,
+            role: data.role,
+        };
+
+        if (editing) {
+            setEditDrafts((drafts) => ({
+                ...drafts,
+                [editing.id]: draft,
+            }));
+        } else {
+            setCreateDraft(draft);
+        }
+
+        setSlideOpen(false);
+    };
+    const cancelSlideOver = () => {
+        if (editing) {
+            setEditDrafts((drafts) => {
+                const nextDrafts = { ...drafts };
+                delete nextDrafts[editing.id];
+                return nextDrafts;
+            });
+        } else {
+            setCreateDraft(null);
+        }
+
+        setSlideOpen(false);
+        reset();
     };
 
     const openView = (row) => {
@@ -89,22 +174,25 @@ export default function Employees({
     };
 
     const openEdit = (row) => {
+        const draft = editDrafts[row.id] ?? {};
+
         setData({
-            employee_no: row.employee_no,
-            branch_id: String(row.branch_id ?? ''),
-            department_id: row.department_id ?? '',
-            employee_department_id: row.employee_department_id ?? '',
-            program_id: row.program_id ?? '',
-            strand_id: row.strand_id ?? '',
-            first_name: row.first_name,
-            middle_name: row.middle_name ?? '',
-            last_name: row.last_name,
-            suffix_name: row.suffix_name ?? '',
-            email: row.email ?? '',
-            password: '',
-            role: row.role ?? 'Employee',
+            employee_no: draft.employee_no ?? row.employee_no,
+            branch_id: draft.branch_id ?? String(row.branch_id ?? ''),
+            department_id: draft.department_id ?? row.department_id ?? '',
+            employee_department_id: draft.employee_department_id ?? row.employee_department_id ?? '',
+            program_id: draft.program_id ?? row.program_id ?? '',
+            strand_id: draft.strand_id ?? row.strand_id ?? '',
+            first_name: draft.first_name ?? row.first_name,
+            middle_name: draft.middle_name ?? row.middle_name ?? '',
+            last_name: draft.last_name ?? row.last_name,
+            suffix_name: draft.suffix_name ?? row.suffix_name ?? '',
+            email: draft.email ?? row.email ?? '',
+            password: draft.password ?? '',
+            role: draft.role ?? row.role ?? 'Employee',
         });
         setSubmitError('');
+        setEmailCheck({ status: 'idle', message: '' });
         setDetailOpen(false);
         setViewing(null);
         setShowPassword(false);
@@ -120,6 +208,7 @@ export default function Employees({
 
     const submit = (e) => {
         e.preventDefault();
+        if (emailIsUnavailable) return;
         if (editing && !employeeIsDirty) return;
         if (editing) {
             setConfirmUpdateOpen(true);
@@ -128,17 +217,72 @@ export default function Employees({
         performSave();
     };
 
+    useEffect(() => {
+        const email = String(data.email ?? '').trim();
+
+        if (!slideOpen || !email || !isValidEmail(email)) {
+            setEmailCheck({ status: 'idle', message: '' });
+            return;
+        }
+
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => {
+            setEmailCheck({ status: 'checking', message: 'Checking email...' });
+            axios
+                .get(route('admin.employees.email-availability'), {
+                    params: {
+                        email,
+                        employee_id: editing?.id ?? '',
+                    },
+                    signal: controller.signal,
+                })
+                .then((response) => {
+                    setEmailCheck({
+                        status: response.data.available ? 'available' : 'taken',
+                        message: response.data.message ?? '',
+                    });
+                })
+                .catch((error) => {
+                    if (axios.isCancel(error) || error.name === 'CanceledError') {
+                        return;
+                    }
+
+                    setEmailCheck({ status: 'idle', message: '' });
+                });
+        }, 350);
+
+        return () => {
+            window.clearTimeout(timeoutId);
+            controller.abort();
+        };
+    }, [data.email, editing?.id, slideOpen]);
+
     const performSave = () => {
         setSubmitError('');
         const url = editing ? route('admin.employees') + '/' + editing.id : route('admin.employees');
+        const payload = {
+            ...data,
+            employee_no: generatedEmployeeCode,
+        };
         const request = editing
             ? (targetUrl, payload, options) => router.put(targetUrl, payload, options)
             : (targetUrl, payload, options) => router.post(targetUrl, payload, options);
 
-        request(url, data, {
+        request(url, payload, {
             onSuccess: () => {
+                const savedEditingId = editing?.id;
+
                 setSlideOpen(false);
                 setConfirmUpdateOpen(false);
+                if (savedEditingId) {
+                    setEditDrafts((drafts) => {
+                        const nextDrafts = { ...drafts };
+                        delete nextDrafts[savedEditingId];
+                        return nextDrafts;
+                    });
+                } else {
+                    setCreateDraft(null);
+                }
                 reset();
             },
             onError: (formErrors) => {
@@ -263,7 +407,7 @@ export default function Employees({
                 )}
             </SlideOver>
 
-            <SlideOver open={slideOpen} onClose={() => setSlideOpen(false)} title={editing ? 'Edit Employee' : 'New Employee'} width="max-w-xl">
+            <SlideOver open={slideOpen} onClose={closeSlideOver} title={editing ? 'Edit Employee' : 'New Employee'} width="max-w-xl">
                 <form onSubmit={submit} className="space-y-4">
                     {(submitError || Object.keys(errors).length > 0) && (
                         <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
@@ -299,22 +443,38 @@ export default function Employees({
                             </SelectInput>
                         )}
                     </FormField>
-                    <FormField label="Department" error={errors.department_id}>
-                        <SelectInput value={data.employee_department_id} onChange={(e) => setData('employee_department_id', e.target.value)}>
-                            <option value="">Not assigned</option>
+                    <FormField label="Department" error={errors.employee_department_id} required>
+                        <SelectInput value={data.employee_department_id} onChange={(e) => {
+                            setData('employee_department_id', e.target.value);
+                            clearErrors('employee_department_id');
+                        }}>
+                            <option value="">Select department...</option>
                             {employeeDepartments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
                         </SelectInput>
                     </FormField>
-                    <FormField label="Role" error={errors.role}>
-                        <TextInput value={data.role} onChange={(e) => setData('role', e.target.value)} placeholder="Registrar, Cashier, Guidance Staff" />
-                    </FormField>
-                    <FormField label="Email" error={errors.email}>
-                        <TextInput type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} />
+                    <FormField label="Email" error={emailError}>
+                        <TextInput
+                            type="email"
+                            value={data.email}
+                            onChange={(e) => {
+                                setData('email', e.target.value);
+                                clearErrors('email');
+                            }}
+                        />
+                        {emailCheck.status === 'checking' && (
+                            <p className="mt-1 text-xs text-slate-500">Checking email...</p>
+                        )}
+                        {emailCheck.status === 'available' && (
+                            <p className="mt-1 text-xs text-emerald-600">Email is available.</p>
+                        )}
                     </FormField>
                     <FormField label={editing ? 'New Password (leave blank to keep)' : 'Password'} error={errors.password}>
                         <div className="relative">
                             <TextInput
                                 type={showPassword ? 'text' : 'password'}
+                                autoComplete="new-password"
+                                data-lpignore="true"
+                                data-1p-ignore="true"
                                 value={data.password}
                                 onChange={(e) => setData('password', e.target.value)}
                                 placeholder={editing ? '••••••••' : 'Defaults to hcc1234'}
@@ -331,8 +491,8 @@ export default function Employees({
                         </div>
                     </FormField>
                     <div className="flex gap-3 pt-2">
-                        <button type="button" onClick={() => setSlideOpen(false)} className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700">Cancel</button>
-                        <SubmitButton processing={processing} disabled={Boolean(editing) && !employeeIsDirty} className="flex-1">
+                        <button type="button" onClick={cancelSlideOver} className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700">Cancel</button>
+                        <SubmitButton processing={processing} disabled={editing ? emailIsUnavailable || !employeeIsDirty : !createFormIsComplete} className="flex-1">
                             {editing ? 'Update' : 'Create'}
                         </SubmitButton>
                     </div>

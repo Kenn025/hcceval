@@ -7,6 +7,7 @@ import StatusBadge from '@/Components/Admin/StatusBadge';
 import useFormDirty from '@/Components/Admin/useFormDirty';
 import AppIcon from '@/Components/AppIcon';
 import AppConfirmDialog from '@/Components/ConfirmDialog';
+import Modal from '@/Components/Modal';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { router, useForm } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
@@ -93,10 +94,13 @@ export default function Students({
     const [editing, setEditing] = useState(null);
     const [viewing, setViewing] = useState(null);
     const [deleteTarget, setDeleteTarget] = useState(null);
+    const [studentPortalOpen, setStudentPortalOpen] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [submitError, setSubmitError] = useState('');
     const [subjectListOpen, setSubjectListOpen] = useState(false);
     const [subjectListMode, setSubjectListMode] = useState('year-level');
+    const [createDraft, setCreateDraft] = useState(null);
+    const [editDrafts, setEditDrafts] = useState({});
     const activeBranchId = String(selectedBranchId ?? scopedBranchId ?? '');
     const selectedFilterBranchId = String(filters.branch_id ?? activeBranchId ?? '');
     const selectedFilterDepartmentId = String(filters.department_id ?? '');
@@ -431,28 +435,79 @@ export default function Students({
         setSubjectListOpen(true);
     };
 
+    const closeSlideOver = () => {
+        const draft = {
+            student_no: data.student_no,
+            branch_id: data.branch_id,
+            department_id: data.department_id,
+            program_id: data.program_id,
+            strand_id: data.strand_id,
+            year_level_id: data.year_level_id,
+            removed_subject_ids: data.removed_subject_ids,
+            is_irreg: data.is_irreg,
+            irreg_subject_ids: data.irreg_subject_ids,
+            irreg_subject_teacher_ids: data.irreg_subject_teacher_ids,
+            first_name: data.first_name,
+            middle_name: data.middle_name,
+            last_name: data.last_name,
+            suffix_name: data.suffix_name,
+            email: data.email,
+            password: data.password,
+            status: data.status,
+        };
+
+        if (editing) {
+            setEditDrafts((drafts) => ({
+                ...drafts,
+                [editing.id]: draft,
+            }));
+        } else {
+            setCreateDraft(draft);
+        }
+
+        setSubjectListOpen(false);
+        setSlideOpen(false);
+    };
+    const cancelSlideOver = () => {
+        if (editing) {
+            setEditDrafts((drafts) => {
+                const nextDrafts = { ...drafts };
+                delete nextDrafts[editing.id];
+                return nextDrafts;
+            });
+        } else {
+            setCreateDraft(null);
+        }
+
+        setSubjectListOpen(false);
+        setSlideOpen(false);
+        reset();
+    };
+
     const openCreate = () => {
+        const draft = createDraft ?? {};
+
         reset();
         setDetailOpen(false);
         setViewing(null);
         setData({
-            student_no: '',
-            branch_id: activeBranchId,
-            department_id: '',
-            program_id: '',
-            strand_id: '',
-            year_level_id: '',
-            removed_subject_ids: [],
-            is_irreg: false,
-            irreg_subject_ids: [],
-            irreg_subject_teacher_ids: {},
-            first_name: '',
-            middle_name: '',
-            last_name: '',
-            suffix_name: '',
-            email: '',
-            password: '',
-            status: 'active',
+            student_no: draft.student_no ?? '',
+            branch_id: draft.branch_id ?? activeBranchId,
+            department_id: draft.department_id ?? '',
+            program_id: draft.program_id ?? '',
+            strand_id: draft.strand_id ?? '',
+            year_level_id: draft.year_level_id ?? '',
+            removed_subject_ids: draft.removed_subject_ids ?? [],
+            is_irreg: draft.is_irreg ?? false,
+            irreg_subject_ids: draft.irreg_subject_ids ?? [],
+            irreg_subject_teacher_ids: draft.irreg_subject_teacher_ids ?? {},
+            first_name: draft.first_name ?? '',
+            middle_name: draft.middle_name ?? '',
+            last_name: draft.last_name ?? '',
+            suffix_name: draft.suffix_name ?? '',
+            email: draft.email ?? '',
+            password: draft.password ?? '',
+            status: draft.status ?? 'active',
         });
         setShowPassword(false);
         setSubjectListOpen(false);
@@ -467,28 +522,30 @@ export default function Students({
     };
 
     const openEdit = (row) => {
+        const draft = editDrafts[row.id] ?? {};
+
         setDetailOpen(false);
         setViewing(null);
         setData({
-            student_no: row.student_no,
-            branch_id: String(row.branch_id ?? ''),
-            department_id: String(row.department_id ?? ''),
-            program_id: String(row.program_id ?? ''),
-            strand_id: String(row.strand_id ?? ''),
-            year_level_id: String(row.year_level_id ?? ''),
-            removed_subject_ids: Object.keys(parseTeacherMap(row.removed_subject_map)),
-            is_irreg: Boolean(row.is_irreg),
-            irreg_subject_ids: Object.keys(parseTeacherMap(row.irreg_subject_map)),
-            irreg_subject_teacher_ids: Object.fromEntries(
+            student_no: draft.student_no ?? row.student_no,
+            branch_id: draft.branch_id ?? String(row.branch_id ?? ''),
+            department_id: draft.department_id ?? String(row.department_id ?? ''),
+            program_id: draft.program_id ?? String(row.program_id ?? ''),
+            strand_id: draft.strand_id ?? String(row.strand_id ?? ''),
+            year_level_id: draft.year_level_id ?? String(row.year_level_id ?? ''),
+            removed_subject_ids: draft.removed_subject_ids ?? Object.keys(parseTeacherMap(row.removed_subject_map)),
+            is_irreg: draft.is_irreg ?? Boolean(row.is_irreg),
+            irreg_subject_ids: draft.irreg_subject_ids ?? Object.keys(parseTeacherMap(row.irreg_subject_map)),
+            irreg_subject_teacher_ids: draft.irreg_subject_teacher_ids ?? Object.fromEntries(
                 Object.entries(parseTeacherMap(row.irreg_subject_map)).map(([subjectId, teacherId]) => [String(subjectId), String(teacherId ?? '')])
             ),
-            first_name: row.first_name,
-            middle_name: row.middle_name ?? '',
-            last_name: row.last_name,
-            suffix_name: row.suffix_name ?? '',
-            email: row.email ?? '',
-            password: '',
-            status: row.is_active ? 'active' : 'inactive',
+            first_name: draft.first_name ?? row.first_name,
+            middle_name: draft.middle_name ?? row.middle_name ?? '',
+            last_name: draft.last_name ?? row.last_name,
+            suffix_name: draft.suffix_name ?? row.suffix_name ?? '',
+            email: draft.email ?? row.email ?? '',
+            password: draft.password ?? '',
+            status: draft.status ?? (row.is_active ? 'active' : 'inactive'),
         });
         setShowPassword(false);
         setSubjectListOpen(false);
@@ -516,8 +573,19 @@ export default function Students({
 
         request(url, data, {
             onSuccess: () => {
+                const savedEditingId = editing?.id;
+
                 setSlideOpen(false);
                 setConfirmUpdateOpen(false);
+                if (savedEditingId) {
+                    setEditDrafts((drafts) => {
+                        const nextDrafts = { ...drafts };
+                        delete nextDrafts[savedEditingId];
+                        return nextDrafts;
+                    });
+                } else {
+                    setCreateDraft(null);
+                }
                 reset();
             },
             onError: (formErrors) => {
@@ -594,12 +662,22 @@ export default function Students({
 
     return (
         <AdminLayout title="Students" activeRoute="admin.students" breadcrumbs={['User Management']}>
-            <div className="mb-4 flex items-center justify-between">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h2 className="text-base font-semibold text-slate-900">Students</h2>
                     <p className="text-sm text-slate-500">Student directory, section membership, and evaluation eligibility.</p>
                 </div>
-                <button type="button" onClick={openCreate} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">+ New Student</button>
+                <div className="flex flex-wrap items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setStudentPortalOpen(true)}
+                        className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                    >
+                        <AppIcon name="graduation" className="h-4 w-4" />
+                        Student Portal
+                    </button>
+                    <button type="button" onClick={openCreate} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">+ New Student</button>
+                </div>
             </div>
 
             {!isBranchAdmin && branches.length > 0 && (
@@ -739,7 +817,7 @@ export default function Students({
                 )}
             </SlideOver>
 
-            <SlideOver open={slideOpen} onClose={() => setSlideOpen(false)} title={editing ? 'Edit Student' : 'New Student'} width="max-w-xl">
+            <SlideOver open={slideOpen} onClose={closeSlideOver} title={editing ? 'Edit Student' : 'New Student'} width="max-w-xl">
                 <form onSubmit={submit} className="space-y-4">
                     {(submitError || Object.keys(errors).length > 0) && (
                         <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
@@ -916,6 +994,9 @@ export default function Students({
                         <div className="relative">
                             <TextInput
                                 type={showPassword ? 'text' : 'password'}
+                                autoComplete="new-password"
+                                data-lpignore="true"
+                                data-1p-ignore="true"
                                 value={data.password}
                                 onChange={(e) => setData('password', e.target.value)}
                                 placeholder={editing ? '••••••••' : 'Defaults to hcc1234'}
@@ -933,7 +1014,7 @@ export default function Students({
                     </FormField>
 
                     <div className="flex gap-3 pt-2">
-                        <button type="button" onClick={() => setSlideOpen(false)} className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700">Cancel</button>
+                        <button type="button" onClick={cancelSlideOver} className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700">Cancel</button>
                         <SubmitButton
                             processing={processing}
                             disabled={Boolean(editing) && !studentIsDirty}
@@ -945,8 +1026,28 @@ export default function Students({
                 </form>
             </SlideOver>
 
-            <SlideOver open={subjectListOpen} onClose={() => setSubjectListOpen(false)} title={activeSubjectScopeLabel} width="max-w-lg">
-                <div className="space-y-4">
+            <Modal show={subjectListOpen} maxWidth="lg" onClose={() => setSubjectListOpen(false)}>
+                <div className="max-h-[85vh] overflow-y-auto p-6">
+                    <div className="mb-5 flex items-center justify-between gap-4 border-b border-slate-200 pb-4">
+                        <div>
+                            <h3 className="text-base font-semibold text-slate-900">{activeSubjectScopeLabel}</h3>
+                            <p className="mt-1 text-sm text-slate-500">
+                                {subjectListMode === 'irregular'
+                                    ? 'Select the irregular subjects and assigned teacher for this student.'
+                                    : 'Review and manage the active subjects for the selected year level.'}
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setSubjectListOpen(false)}
+                            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                            aria-label="Close subject list"
+                        >
+                            <AppIcon name="close" className="h-5 w-5" />
+                        </button>
+                    </div>
+
+                    <div className="space-y-4">
                     <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                             {subjectListMode === 'irregular' ? 'Program' : 'Year Level'}
@@ -1038,9 +1139,59 @@ export default function Students({
                         Close
                     </button>
                 </div>
-            </SlideOver>
+                </div>
+            </Modal>
 
             <ConfirmDialog open={Boolean(deleteTarget)} onConfirm={() => { router.delete(route('admin.students') + '/' + deleteTarget.id, { onSuccess: () => setDeleteTarget(null) }); }} onCancel={() => setDeleteTarget(null)} title="Delete Student" message={`Delete student "${deleteTarget?.first_name} ${deleteTarget?.last_name}"?`} />
+
+            <Modal show={studentPortalOpen} maxWidth="md" onClose={() => setStudentPortalOpen(false)}>
+                <div className="p-6">
+                    <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white">
+                            <AppIcon name="graduation" className="h-5 w-5" />
+                        </div>
+                        <div>
+                            <h3 className="text-base font-semibold text-slate-900">Student Portal</h3>
+                            <p className="mt-1 text-sm text-slate-500">Share these access details with newly created student accounts.</p>
+                        </div>
+                    </div>
+
+                    <div className="mt-5 space-y-3">
+                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Portal URL</p>
+                            <p className="mt-1 break-all text-sm font-medium text-slate-900">{route('portal.login')}</p>
+                        </div>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div className="rounded-lg border border-slate-200 px-4 py-3">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Username</p>
+                                <p className="mt-1 text-sm font-medium text-slate-900">Student email</p>
+                            </div>
+                            <div className="rounded-lg border border-slate-200 px-4 py-3">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Default Password</p>
+                                <p className="mt-1 text-sm font-medium text-slate-900">hcc1234</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mt-6 flex gap-3">
+                        <button
+                            type="button"
+                            onClick={() => setStudentPortalOpen(false)}
+                            className="flex-1 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                        >
+                            Close
+                        </button>
+                        <a
+                            href={route('portal.login')}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex-1 rounded-lg bg-slate-900 px-4 py-2 text-center text-sm font-medium text-white hover:bg-slate-800"
+                        >
+                            Open Portal
+                        </a>
+                    </div>
+                </div>
+            </Modal>
 
             <AppConfirmDialog
                 open={confirmUpdateOpen}

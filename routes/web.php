@@ -85,12 +85,14 @@ Route::middleware('auth')->group(function () {
 
     // Teachers
     Route::get('/admin/teachers', [TeacherController::class, 'index'])->name('admin.teachers');
+    Route::get('/admin/teachers/email-availability', [TeacherController::class, 'checkEmailAvailability'])->name('admin.teachers.email-availability');
     Route::post('/admin/teachers', [TeacherController::class, 'store']);
     Route::put('/admin/teachers/{teacher}', [TeacherController::class, 'update']);
     Route::delete('/admin/teachers/{teacher}', [TeacherController::class, 'destroy']);
 
     // Employees
     Route::get('/admin/employees', [EmployeeController::class, 'index'])->name('admin.employees');
+    Route::get('/admin/employees/email-availability', [EmployeeController::class, 'checkEmailAvailability'])->name('admin.employees.email-availability');
     Route::post('/admin/employees', [EmployeeController::class, 'store']);
     Route::put('/admin/employees/{employee}', [EmployeeController::class, 'update']);
     Route::delete('/admin/employees/{employee}', [EmployeeController::class, 'destroy']);
@@ -171,6 +173,7 @@ Route::middleware('auth')->group(function () {
         Route::delete('/admin/evaluation-cycle/{id}', [EvaluationCycleController::class, 'destroy']);
 
         Route::get('/admin/admin-users', [AdminUserController::class, 'index'])->name('admin.admin-users');
+        Route::get('/admin/admin-users/email-availability', [AdminUserController::class, 'checkEmailAvailability'])->name('admin.admin-users.email-availability');
         Route::post('/admin/admin-users', [AdminUserController::class, 'store']);
         Route::put('/admin/admin-users/{admin}', [AdminUserController::class, 'update']);
         Route::delete('/admin/admin-users/{admin}', [AdminUserController::class, 'destroy']);

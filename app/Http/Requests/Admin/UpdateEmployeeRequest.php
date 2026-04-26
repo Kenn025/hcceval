@@ -20,7 +20,7 @@ class UpdateEmployeeRequest extends FormRequest
             'employee_no'   => ['required', 'string', 'max:50', Rule::unique('employee', 'code')->ignore($id)],
             'branch_id'     => 'required|exists:branch,id',
             'department_id' => 'nullable|exists:department,id',
-            'employee_department_id' => 'nullable|exists:employee_department,id',
+            'employee_department_id' => 'required|exists:employee_department,id',
             'program_id'    => 'nullable|exists:program,id',
             'strand_id'     => 'nullable|exists:strand,id',
             'first_name'    => 'required|string|max:100',
@@ -29,7 +29,6 @@ class UpdateEmployeeRequest extends FormRequest
             'suffix_name'   => 'nullable|string|max:50',
             'email'         => ['nullable', 'email', 'max:150', Rule::unique('employee', 'email')->ignore($id)],
             'password'      => 'nullable|string|min:6',
-            'role'          => 'nullable|string|max:100',
         ];
     }
 }

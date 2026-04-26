@@ -1,5 +1,5 @@
 import ConfirmDialog from '@/Components/Admin/ConfirmDialog';
-import FormField, { SelectInput, TextInput } from '@/Components/Admin/FormField';
+import FormField, { TextInput } from '@/Components/Admin/FormField';
 import ResourceTable from '@/Components/Admin/ResourceTable';
 import SlideOver from '@/Components/Admin/SlideOver';
 import SubmitButton from '@/Components/Admin/SubmitButton';
@@ -9,13 +9,14 @@ import AppIcon from '@/Components/AppIcon';
 import AppConfirmDialog from '@/Components/ConfirmDialog';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { router, useForm, usePage } from '@inertiajs/react';
+import axios from 'axios';
 import { useEffect, useMemo, useState } from 'react';
 
 const DEPARTMENT_OPTIONS = [
-    { value: 'elementary', label: 'Elementary' },
-    { value: 'junior_high', label: 'Junior High' },
-    { value: 'senior_high', label: 'Senior High' },
     { value: 'college', label: 'College' },
+    { value: 'senior_high', label: 'Senior High' },
+    { value: 'junior_high', label: 'Junior High' },
+    { value: 'elementary', label: 'Elementary' },
 ];
 
 const buildBranchCodePreview = (name) => {
@@ -46,6 +47,8 @@ const buildAdminEmailPreview = (name) => {
 };
 
 const buildPasswordPreview = () => `HCC${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
+
+const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value ?? '').trim());
 
 const getFirstErrorMessage = (formErrors, fallback) => {
     const firstValue = Object.values(formErrors ?? {})[0];
@@ -109,7 +112,12 @@ export default function Branches({ branches, filters }) {
     const [successNotification, setSuccessNotification] = useState(props.flash?.success ?? '');
     const [errorNotification, setErrorNotification] = useState('');
     const [adminEmailTouched, setAdminEmailTouched] = useState(false);
+    const [adminEmailError, setAdminEmailError] = useState('');
+    const [adminEmailCheck, setAdminEmailCheck] = useState({ status: 'idle', message: '' });
+    const [showAdminPassword, setShowAdminPassword] = useState(false);
     const [unlinkAdminTarget, setUnlinkAdminTarget] = useState(null);
+    const [createDraft, setCreateDraft] = useState(null);
+    const [editDrafts, setEditDrafts] = useState({});
 
     const { data, setData, errors, processing, reset, clearErrors } = useForm({
         code: '',
@@ -127,26 +135,88 @@ export default function Branches({ branches, filters }) {
     const [confirmUpdateOpen, setConfirmUpdateOpen] = useState(false);
     const generatedBranchCode = useMemo(() => buildBranchCodePreview(data.name), [data.name]);
     const generatedAdminEmail = useMemo(() => buildAdminEmailPreview(data.name), [data.name]);
+    const adminEmailTakenError = adminEmailCheck.status === 'taken' ? adminEmailCheck.message : '';
+    const adminEmailIsUnavailable = adminEmailCheck.status === 'checking' || adminEmailCheck.status === 'taken';
+    const createFormIsComplete = useMemo(() => {
+        if (editing) {
+            return true;
+        }
+
+        return Boolean(
+            String(data.name ?? '').trim()
+            && (data.department_levels ?? []).length > 0
+            && isValidEmail(data.admin_email)
+            && String(data.admin_password ?? '').trim().length >= 6
+            && !adminEmailError
+            && !adminEmailIsUnavailable
+            && !errors.admin_email
+        );
+    }, [adminEmailError, adminEmailIsUnavailable, data.admin_email, data.admin_password, data.department_levels, data.name, editing, errors.admin_email]);
 
     const openCreate = () => {
+        const draft = createDraft ?? {};
+
         reset();
         clearErrors();
         setDetailOpen(false);
         setViewing(null);
         setEditing(null);
-        setAdminEmailTouched(false);
+        setAdminEmailTouched(draft.adminEmailTouched ?? false);
+        setAdminEmailError('');
+        setAdminEmailCheck({ status: 'idle', message: '' });
+        setShowAdminPassword(false);
         setData({
-            code: '',
-            name: '',
-            highest_department: 'college',
-            department_levels: DEPARTMENT_OPTIONS.map((option) => option.value),
-            admin_email: '',
-            admin_password: buildPasswordPreview(),
-            address: '',
-            is_main: false,
-            is_active: true,
+            code: draft.code ?? '',
+            name: draft.name ?? '',
+            highest_department: draft.highest_department ?? 'college',
+            department_levels: draft.department_levels ?? DEPARTMENT_OPTIONS.map((option) => option.value),
+            admin_email: draft.admin_email ?? '',
+            admin_password: draft.admin_password ?? buildPasswordPreview(),
+            address: draft.address ?? '',
+            is_main: draft.is_main ?? false,
+            is_active: draft.is_active ?? true,
         });
         setSlideOpen(true);
+    };
+
+    const closeSlideOver = () => {
+        const draft = {
+            code: data.code,
+            name: data.name,
+            highest_department: data.highest_department,
+            department_levels: data.department_levels,
+            admin_email: data.admin_email,
+            admin_password: data.admin_password,
+            address: data.address,
+            is_main: data.is_main,
+            is_active: data.is_active,
+            adminEmailTouched,
+        };
+
+        if (editing) {
+            setEditDrafts((drafts) => ({
+                ...drafts,
+                [editing.id]: draft,
+            }));
+        } else {
+            setCreateDraft(draft);
+        }
+
+        setSlideOpen(false);
+    };
+    const cancelSlideOver = () => {
+        if (editing) {
+            setEditDrafts((drafts) => {
+                const nextDrafts = { ...drafts };
+                delete nextDrafts[editing.id];
+                return nextDrafts;
+            });
+        } else {
+            setCreateDraft(null);
+        }
+
+        setSlideOpen(false);
+        reset();
     };
 
     const openView = (row) => {
@@ -155,12 +225,14 @@ export default function Branches({ branches, filters }) {
     };
 
     const openEdit = (row) => {
+        const draft = editDrafts[row.id] ?? {};
+
         setDetailOpen(false); setViewing(null);
         setData({
-            code: row.code,
-            name: row.name,
-            highest_department: row.highest_department ?? 'college',
-            department_levels: (row.departments ?? [])
+            code: draft.code ?? row.code,
+            name: draft.name ?? row.name,
+            highest_department: draft.highest_department ?? row.highest_department ?? 'college',
+            department_levels: draft.department_levels ?? (row.departments ?? [])
                 .filter((department) => Boolean(department.is_activated))
                 .map((department) => {
                     const departmentName = String(department.name ?? '').toLowerCase();
@@ -180,13 +252,16 @@ export default function Branches({ branches, filters }) {
 
                     return 'college';
                 }),
-            admin_email: '',
-            admin_password: '',
-            address: row.address ?? '',
-            is_main: Boolean(row.is_main),
-            is_active: Boolean(row.is_active),
+            admin_email: draft.admin_email ?? '',
+            admin_password: draft.admin_password ?? '',
+            address: draft.address ?? row.address ?? '',
+            is_main: draft.is_main ?? Boolean(row.is_main),
+            is_active: draft.is_active ?? Boolean(row.is_active),
         });
-        setAdminEmailTouched(false);
+        setAdminEmailTouched(draft.adminEmailTouched ?? false);
+        setAdminEmailError('');
+        setAdminEmailCheck({ status: 'idle', message: '' });
+        setShowAdminPassword(false);
         clearErrors(); setEditing(row); setSlideOpen(true);
     };
 
@@ -206,6 +281,48 @@ export default function Branches({ branches, filters }) {
     useEffect(() => {
         setSuccessNotification(props.flash?.success ?? '');
     }, [props.flash?.success]);
+
+    useEffect(() => {
+        if (editing) {
+            setAdminEmailCheck({ status: 'idle', message: '' });
+            return;
+        }
+
+        const email = String(data.admin_email ?? '').trim();
+
+        if (!slideOpen || !email || !isValidEmail(email)) {
+            setAdminEmailCheck({ status: 'idle', message: '' });
+            return;
+        }
+
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => {
+            setAdminEmailCheck({ status: 'checking', message: 'Checking email...' });
+            axios
+                .get(route('admin.admin-users.email-availability'), {
+                    params: { email },
+                    signal: controller.signal,
+                })
+                .then((response) => {
+                    setAdminEmailCheck({
+                        status: response.data.available ? 'available' : 'taken',
+                        message: response.data.message ?? '',
+                    });
+                })
+                .catch((error) => {
+                    if (axios.isCancel(error) || error.name === 'CanceledError') {
+                        return;
+                    }
+
+                    setAdminEmailCheck({ status: 'idle', message: '' });
+                });
+        }, 350);
+
+        return () => {
+            window.clearTimeout(timeoutId);
+            controller.abort();
+        };
+    }, [data.admin_email, editing, slideOpen]);
 
     useEffect(() => {
         if (!successNotification && !errorNotification) {
@@ -236,11 +353,22 @@ export default function Branches({ branches, filters }) {
             setConfirmUpdateOpen(true);
             return;
         }
+
+        if (!isValidEmail(data.admin_email)) {
+            setAdminEmailError('Enter a valid email address.');
+            return;
+        }
+
+        if (adminEmailIsUnavailable) {
+            return;
+        }
+
         performSave();
     };
 
     const performSave = () => {
         setErrorNotification('');
+        setAdminEmailError('');
 
         if (editing) {
             router.put(route('admin.branches') + '/' + editing.id, {
@@ -249,7 +377,18 @@ export default function Branches({ branches, filters }) {
                 department_levels: data.department_levels,
                 address: data.address,
             }, {
-                onSuccess: () => { setSlideOpen(false); setConfirmUpdateOpen(false); reset(); },
+                onSuccess: () => {
+                    const savedEditingId = editing.id;
+
+                    setSlideOpen(false);
+                    setConfirmUpdateOpen(false);
+                    setEditDrafts((drafts) => {
+                        const nextDrafts = { ...drafts };
+                        delete nextDrafts[savedEditingId];
+                        return nextDrafts;
+                    });
+                    reset();
+                },
                 onError: (formErrors) => { setErrorNotification(getFirstErrorMessage(formErrors, 'Unable to update branch.')); setConfirmUpdateOpen(false); },
             });
         } else {
@@ -259,10 +398,8 @@ export default function Branches({ branches, filters }) {
                 admin_email: data.admin_email,
                 admin_password: data.admin_password,
                 address: data.address,
-                is_main: data.is_main,
-                is_active: data.is_active,
             }, {
-                onSuccess: () => { setSlideOpen(false); reset(); },
+                onSuccess: () => { setSlideOpen(false); setCreateDraft(null); reset(); },
                 onError: (formErrors) => setErrorNotification(getFirstErrorMessage(formErrors, 'Unable to create branch.')),
             });
         }
@@ -347,15 +484,8 @@ export default function Branches({ branches, filters }) {
                 )}
             </SlideOver>
 
-            <SlideOver open={slideOpen} onClose={() => setSlideOpen(false)} title={editing ? 'Edit Branch' : 'New Branch'}>
+            <SlideOver open={slideOpen} onClose={closeSlideOver} title={editing ? 'Edit Branch' : 'New Branch'}>
                 <form onSubmit={submit} className="space-y-4">
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Branch Setup</p>
-                        <p className="mt-1 text-sm text-slate-600">
-                            {editing ? 'Update the campus branch details and status.' : 'Create a campus branch and prepare its admin access details.'}
-                        </p>
-                    </div>
-
                     <FormField label="Branch Code" error={errors.code} required>
                         <TextInput
                             value={data.code}
@@ -429,22 +559,70 @@ export default function Branches({ branches, filters }) {
                     )}
 
                     {!editing && (
-                        <FormField label="Highest Department" error={errors.highest_department}>
-                            <SelectInput value={data.highest_department} onChange={(e) => setData('highest_department', e.target.value)}>
-                                {DEPARTMENT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                            </SelectInput>
-                        </FormField>
+                        <>
+                            <FormField label="Admin Email" error={adminEmailError || adminEmailTakenError || errors.admin_email} required>
+                                <TextInput
+                                    type="email"
+                                    value={data.admin_email}
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+
+                                        setAdminEmailTouched(true);
+                                        setData('admin_email', value);
+                                        clearErrors('admin_email');
+                                        if (adminEmailError && isValidEmail(value)) {
+                                            setAdminEmailError('');
+                                        }
+                                    }}
+                                    placeholder="Auto-generated"
+                                />
+                                {adminEmailCheck.status === 'checking' && (
+                                    <p className="mt-1 text-xs text-slate-500">Checking email...</p>
+                                )}
+                                {adminEmailCheck.status === 'available' && (
+                                    <p className="mt-1 text-xs text-emerald-600">Email is available.</p>
+                                )}
+                            </FormField>
+                            <FormField label="Admin Password" error={errors.admin_password} required>
+                                <div className="relative">
+                                    <TextInput
+                                        type={showAdminPassword ? 'text' : 'password'}
+                                        autoComplete="new-password"
+                                        data-lpignore="true"
+                                        data-1p-ignore="true"
+                                        value={data.admin_password}
+                                        onChange={(e) => setData('admin_password', e.target.value)}
+                                        placeholder="Auto-generated"
+                                        className="pr-10"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAdminPassword((value) => !value)}
+                                        className="absolute inset-y-0 right-2 flex items-center rounded-md px-2 text-slate-400 hover:text-slate-600"
+                                        aria-label={showAdminPassword ? 'Hide password' : 'Show password'}
+                                    >
+                                        <AppIcon name={showAdminPassword ? 'eyeOff' : 'eye'} className="h-4 w-4" />
+                                    </button>
+                                </div>
+                            </FormField>
+                        </>
                     )}
 
-                    <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-4">
-                        <div>
-                            <p className="text-sm font-medium text-slate-900">{editing ? 'Linked Admin Accounts' : 'Branch Admin Access'}</p>
-                            <p className="text-xs text-slate-500">
-                                {editing ? 'Manage the admin accounts currently linked to this branch.' : 'These details will be used for the branch admin account.'}
-                            </p>
-                        </div>
-
-                        {editing ? (
+                    {editing && (
+                        <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-4">
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <p className="text-sm font-medium text-slate-900">Linked Admin Accounts</p>
+                                    <p className="text-xs text-slate-500">Manage the admin accounts currently linked to this branch.</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => router.get(route('admin.admin-users'), { create_branch_id: editing.id })}
+                                    className="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                                >
+                                    Add Admin Account
+                                </button>
+                            </div>
                             <div className="space-y-3">
                                 {(editing.admins ?? []).length > 0 ? (
                                     editing.admins.map((admin) => (
@@ -485,55 +663,12 @@ export default function Branches({ branches, filters }) {
                                     </div>
                                 )}
                             </div>
-                        ) : (
-                            <>
-                                <FormField label="Admin Email" error={errors.admin_email} required={!editing}>
-                                    <TextInput
-                                        value={data.admin_email}
-                                        onChange={(e) => {
-                                            if (editing) {
-                                                return;
-                                            }
-
-                                            setAdminEmailTouched(true);
-                                            setData('admin_email', e.target.value);
-                                        }}
-                                        placeholder="Auto-generated"
-                                        readOnly={editing}
-                                        className={editing ? 'cursor-not-allowed bg-slate-50 text-slate-600' : ''}
-                                    />
-                                </FormField>
-                                <FormField label="Admin Password" error={errors.admin_password} required={!editing}>
-                                    <TextInput
-                                        value={data.admin_password}
-                                        onChange={(e) => !editing && setData('admin_password', e.target.value)}
-                                        placeholder={editing ? 'Hidden for existing branch admin' : 'Auto-generated'}
-                                        readOnly={editing}
-                                        className={editing ? 'cursor-not-allowed bg-slate-50 text-slate-600' : ''}
-                                    />
-                                </FormField>
-                            </>
-                        )}
-                    </div>
-
-                    {!editing && (
-                        <div className="rounded-xl border border-slate-200 bg-white p-4">
-                            <div className="flex items-center gap-6">
-                                <label className="flex items-center gap-2 text-sm text-slate-700">
-                                    <input type="checkbox" checked={data.is_main} onChange={(e) => setData('is_main', e.target.checked)} className="rounded border-slate-300" />
-                                    Main Campus
-                                </label>
-                                <label className="flex items-center gap-2 text-sm text-slate-700">
-                                    <input type="checkbox" checked={data.is_active} onChange={(e) => setData('is_active', e.target.checked)} className="rounded border-slate-300" />
-                                    Active
-                                </label>
-                            </div>
                         </div>
                     )}
 
                     <div className="flex gap-3 pt-2">
-                        <button type="button" onClick={() => setSlideOpen(false)} className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
-                        <SubmitButton processing={processing} disabled={Boolean(editing) && !branchIsDirty} className="flex-1">
+                        <button type="button" onClick={cancelSlideOver} className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
+                        <SubmitButton processing={processing} disabled={editing ? !branchIsDirty : !createFormIsComplete} className="flex-1">
                             {editing ? 'Update' : 'Create'}
                         </SubmitButton>
                     </div>

@@ -19,7 +19,7 @@ class UpdateTeacherRequest extends FormRequest
         return [
             'employee_no'   => ['required', 'string', 'max:50', Rule::unique('teacher', 'code')->ignore($id)],
             'branch_id'     => 'required|exists:branch,id',
-            'department_id' => 'nullable|exists:department,id',
+            'department_id' => 'required|exists:department,id',
             'program_id'    => 'nullable|exists:program,id',
             'strand_id'     => 'nullable|exists:strand,id',
             'first_name'    => 'required|string|max:100',
@@ -28,7 +28,7 @@ class UpdateTeacherRequest extends FormRequest
             'suffix_name'   => 'nullable|string|max:50',
             'email'         => ['nullable', 'email', 'max:150', Rule::unique('teacher', 'email')->ignore($id)],
             'password'      => 'nullable|string|min:6',
-            'role'          => 'nullable|string|max:100',
+            'role'          => 'required|string|max:100',
         ];
     }
 }

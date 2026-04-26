@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Admin;
 use App\Models\Branch;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 
@@ -15,6 +16,7 @@ class AdminUserController extends Controller
     {
         $search = $request->input('search', '');
         $editId = $request->input('edit_id');
+        $createBranchId = $request->input('create_branch_id');
 
         $perPage = $request->integer('per_page', 15);
         $perPage = in_array($perPage, [10, 15, 25, 50, 100]) ? $perPage : 15;
@@ -34,14 +36,43 @@ class AdminUserController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
+        $branches = Branch::query()
+            ->select('id', 'name', 'code')
+            ->where('is_deleted', 0)
+            ->orderBy('name')
+            ->get()
+            ->map(fn (Branch $branch) => [
+                'id' => $branch->id,
+                'name' => $branch->name,
+                'code' => $branch->code,
+                'next_admin_code' => $this->generateAdminCode('admin', $branch->id),
+            ]);
+
         return Inertia::render('Admin/AdminUsers', [
             'admins'   => $admins,
-            'filters'  => ['search' => $search, 'edit_id' => $editId, 'per_page' => $perPage],
-            'branches' => Branch::query()
-                ->select('id', 'name', 'code')
-                ->where('is_deleted', 0)
-                ->orderBy('name')
-                ->get(),
+            'filters'  => [
+                'search' => $search,
+                'edit_id' => $editId,
+                'create_branch_id' => $createBranchId,
+                'per_page' => $perPage,
+            ],
+            'branches' => $branches,
+            'nextOverallAdminCode' => $this->generateAdminCode('overalladmin', 1),
+        ]);
+    }
+
+    public function checkEmailAvailability(Request $request)
+    {
+        $validated = $request->validate([
+            'email' => 'required|email|max:150',
+            'admin_id' => 'nullable|integer',
+        ]);
+
+        $message = $this->emailInUseMessage($validated['email'], $validated['admin_id'] ?? null);
+
+        return response()->json([
+            'available' => $message === null,
+            'message' => $message,
         ]);
     }
 
@@ -55,6 +86,10 @@ class AdminUserController extends Controller
             'branch_id' => 'nullable|exists:branch,id',
             'is_activated' => 'boolean',
         ]);
+
+        if ($message = $this->emailInUseMessage($validated['email'])) {
+            return back()->withErrors(['email' => $message])->withInput();
+        }
 
         if ($validated['role'] === 'admin' && empty($validated['branch_id'])) {
             return back()->withErrors(['branch_id' => 'Branch is required for a branch admin.']);
@@ -90,6 +125,10 @@ class AdminUserController extends Controller
             'branch_id' => 'nullable|exists:branch,id',
             'is_activated' => 'boolean',
         ]);
+
+        if ($message = $this->emailInUseMessage($validated['email'], $admin->id)) {
+            return back()->withErrors(['email' => $message])->withInput();
+        }
 
         if ($validated['role'] === 'admin' && empty($validated['branch_id'])) {
             return back()->withErrors(['branch_id' => 'Branch is required for a branch admin.']);
@@ -156,5 +195,29 @@ class AdminUserController extends Controller
         }
 
         return Str::substr($candidate, 0, 50);
+    }
+
+    private function emailInUseMessage(string $email, ?int $ignoreAdminId = null): ?string
+    {
+        $normalizedEmail = strtolower(trim($email));
+        $checks = [
+            ['table' => 'admin', 'label' => 'an admin account', 'ignore_id' => $ignoreAdminId],
+            ['table' => 'teacher', 'label' => 'a teacher account', 'ignore_id' => null],
+            ['table' => 'student', 'label' => 'a student account', 'ignore_id' => null],
+            ['table' => 'employee', 'label' => 'an employee account', 'ignore_id' => null],
+        ];
+
+        foreach ($checks as $check) {
+            $exists = DB::table($check['table'])
+                ->whereRaw('LOWER(email) = ?', [$normalizedEmail])
+                ->when($check['ignore_id'], fn ($query, $id) => $query->where('id', '!=', $id))
+                ->exists();
+
+            if ($exists) {
+                return "This email is already used by {$check['label']}.";
+            }
+        }
+
+        return null;
     }
 }
