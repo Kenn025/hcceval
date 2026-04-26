@@ -1,11 +1,64 @@
 import { Head, Link } from '@inertiajs/react';
+import { useEffect, useRef, useState } from 'react';
+import SecretTeamCard from '@/Components/SecretTeamCard';
 
 export default function Welcome({ auth }) {
+    const [showSecretTeamCard, setShowSecretTeamCard] = useState(false);
+    const secretSequence = ['h','e','s','o','y','a','m'];
+    const sequenceRef = useRef([]);
+    const audioRef = useRef(null);
+
+    useEffect(() => {
+        if (!audioRef.current) {
+            audioRef.current = new Audio('/assets/audio/pota-pota-dance.mp3');
+            audioRef.current.loop = true;
+        }
+        const audio = audioRef.current;
+        if (showSecretTeamCard) {
+            audio.currentTime = 0;
+            audio.play().catch(() => {});
+        } else {
+            audio.pause();
+            audio.currentTime = 0;
+        }
+        return () => {
+            audio.pause();
+        };
+    }, [showSecretTeamCard]);
+
+    useEffect(() => {
+        const handler = (e) => {
+            if (e.ctrlKey || e.altKey || e.metaKey) return;
+            const key = e.key.length === 1 ? e.key.toLowerCase() : '';
+            if (!key) return;
+            sequenceRef.current.push(key);
+            if (sequenceRef.current.length > secretSequence.length) {
+                sequenceRef.current.shift();
+            }
+            // Debug: log current sequence
+            console.log('Secret sequence progress:', sequenceRef.current.join(''));
+            if (sequenceRef.current.join('') === secretSequence.join('')) {
+                setShowSecretTeamCard(true);
+                sequenceRef.current = [];
+            }
+        };
+        window.addEventListener('keydown', handler, true);
+        return () => window.removeEventListener('keydown', handler, true);
+    }, []);
+
     return (
         <>
             <Head title="HCC Evaluation Platform" />
 
             <div className="min-h-screen bg-slate-100 px-6 py-10 text-slate-900">
+                            {/* Secret Team Card Modal */}
+                            {showSecretTeamCard && (
+                                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowSecretTeamCard(false)}>
+                                    <div onClick={e => e.stopPropagation()} className="relative">
+                                        <SecretTeamCard />
+                                    </div>
+                                </div>
+                            )}
                 <div className="mx-auto max-w-6xl">
                     <div className="flex items-center justify-between gap-3">
                         <div>
