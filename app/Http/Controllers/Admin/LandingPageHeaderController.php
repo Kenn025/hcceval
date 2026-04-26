@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\LandingPageHeader;
 use App\Models\LandingPageHomeSection;
+use App\Models\LandingPageStat;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +26,32 @@ class LandingPageHeaderController extends Controller
         'secondary_cta_label' => 'Learn More',
         'secondary_cta_target' => 'how-it-works',
         'background_video_path' => '/videos/hero-loop.mp4',
+    ];
+    private const DEFAULT_STATS = [
+        'students' => [
+            'label' => 'Active Students',
+            'icon' => 'students',
+            'sort_order' => 1,
+            'source' => 'student',
+        ],
+        'faculty' => [
+            'label' => 'Active Faculty',
+            'icon' => 'teachers',
+            'sort_order' => 2,
+            'source' => 'teacher',
+        ],
+        'campuses' => [
+            'label' => 'Active Campuses',
+            'icon' => 'branches',
+            'sort_order' => 3,
+            'source' => 'branch',
+        ],
+        'evaluations' => [
+            'label' => 'Evaluations Submitted',
+            'icon' => 'assignments',
+            'sort_order' => 4,
+            'source' => 'evaluation_submissions',
+        ],
     ];
 
     public function index(Request $request)
@@ -50,6 +77,7 @@ class LandingPageHeaderController extends Controller
         return Inertia::render('Admin/LandingPage', [
             'headers' => $headers,
             'homeSection' => $this->homeSectionData(),
+            'statsSection' => $this->statsSectionData(),
             'filters' => [
                 'search' => $search,
                 'per_page' => $perPage,
@@ -294,6 +322,137 @@ class LandingPageHeaderController extends Controller
         return back()->with('success', 'Home section updated successfully.');
     }
 
+    public function updateStatsSection(Request $request)
+    {
+        if (! Schema::hasTable('landing_page_stats')) {
+            return back()->withErrors([
+                'stats_section' => 'Stats section table is not available yet. Please run migrations first.',
+            ]);
+        }
+
+        $validated = $request->validate([
+            'stats' => 'nullable|array',
+            'stats.*.id' => 'nullable|integer|exists:landing_page_stats,id',
+            'stats.*.stat_key' => 'required|string|max:50',
+            'stats.*.label' => 'required|string|max:120',
+            'stats.*.sort_order' => 'nullable|integer|min:0|max:9999',
+            'delete_ids' => 'nullable|array',
+            'delete_ids.*' => 'integer|exists:landing_page_stats,id',
+        ]);
+
+        $statsPayload = collect($validated['stats'] ?? [])
+            ->map(function (array $row, int $index) {
+                $normalizedKey = Str::of((string) ($row['stat_key'] ?? ''))
+                    ->lower()
+                    ->replace(' ', '_')
+                    ->replaceMatches('/[^a-z0-9_]/', '')
+                    ->value();
+
+                return [
+                    'id' => $row['id'] ?? null,
+                    'stat_key' => $normalizedKey,
+                    'label' => $row['label'],
+                    'sort_order' => $row['sort_order'] ?? ($index + 1),
+                ];
+            })
+            ->values();
+        $deleteIds = collect($validated['delete_ids'] ?? [])
+            ->filter()
+            ->values();
+
+        foreach ($statsPayload as $index => $row) {
+            if (blank($row['stat_key'])) {
+                return back()
+                    ->withErrors(["stats.{$index}.stat_key" => 'Metric is required.'])
+                    ->withInput();
+            }
+        }
+
+        $duplicateKeys = $statsPayload
+            ->pluck('stat_key')
+            ->duplicates()
+            ->values();
+        if ($duplicateKeys->isNotEmpty()) {
+            return back()
+                ->withErrors([
+                    'stats' => 'Duplicate metric keys are not allowed.',
+                ])
+                ->withInput();
+        }
+
+        $ids = $statsPayload->pluck('id')->filter()->values();
+        $statsById = LandingPageStat::query()
+            ->whereIn('id', $ids)
+            ->get()
+            ->keyBy('id');
+
+        DB::transaction(function () use ($statsPayload, $statsById, $deleteIds) {
+            if ($deleteIds->isNotEmpty()) {
+                LandingPageStat::query()
+                    ->whereIn('id', $deleteIds)
+                    ->delete();
+            }
+
+            foreach ($statsPayload as $index => $row) {
+                if (isset($row['id']) && $deleteIds->contains($row['id'])) {
+                    continue;
+                }
+
+                if (! empty($row['id'])) {
+                    $stat = $statsById->get($row['id']);
+                    if (! $stat) {
+                        continue;
+                    }
+
+                    // Guard stat_key uniqueness excluding current record.
+                    $exists = LandingPageStat::query()
+                        ->where('stat_key', $row['stat_key'])
+                        ->where('id', '!=', $stat->id)
+                        ->exists();
+                    if ($exists) {
+                        continue;
+                    }
+
+                    $stat->update([
+                        'stat_key' => $row['stat_key'],
+                        'label' => $row['label'],
+                        'sort_order' => $row['sort_order'] ?? ($index + 1),
+                    ]);
+                    continue;
+                }
+
+                $uniqueKey = $row['stat_key'];
+                $counter = 1;
+                while (LandingPageStat::query()->where('stat_key', $uniqueKey)->exists()) {
+                    $counter++;
+                    $uniqueKey = "{$row['stat_key']}_{$counter}";
+                }
+
+                LandingPageStat::create([
+                    'stat_key' => $uniqueKey,
+                    'label' => $row['label'],
+                    'sort_order' => $row['sort_order'] ?? ($index + 1),
+                    'is_active' => true,
+                ]);
+            }
+
+            // Keep ordering dense after deletions/edits so UI and DB stay aligned.
+            $orderedIds = LandingPageStat::query()
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->pluck('id')
+                ->values();
+
+            foreach ($orderedIds as $position => $id) {
+                LandingPageStat::query()
+                    ->where('id', $id)
+                    ->update(['sort_order' => $position + 1]);
+            }
+        });
+
+        return back()->with('success', 'Stats section updated successfully.');
+    }
+
     private function storeLogoFile(UploadedFile $file): string
     {
         $path = $file->store('landing-page/logos', 'public');
@@ -328,6 +487,73 @@ class LandingPageHeaderController extends Controller
             'secondary_cta_target' => $homeSection->secondary_cta_target,
             'background_video_path' => $homeSection->background_video_path,
         ];
+    }
+
+    private function statsSectionData(): array
+    {
+        $defaults = $this->defaultStatsWithValues();
+
+        if (! Schema::hasTable('landing_page_stats')) {
+            return array_values($defaults);
+        }
+
+        $rows = LandingPageStat::query()
+            ->where('is_active', 1)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get(['id', 'stat_key', 'label', 'sort_order'])
+            ->map(function (LandingPageStat $stat) use ($defaults) {
+                $base = $defaults[$stat->stat_key] ?? null;
+
+                return [
+                    'id' => $stat->id,
+                    'stat_key' => $stat->stat_key,
+                    'label' => $stat->label ?: ($base['label'] ?? Str::headline($stat->stat_key)),
+                    'value' => $base['value'] ?? 0,
+                    'icon' => $base['icon'] ?? 'dashboard',
+                    'sort_order' => $stat->sort_order,
+                ];
+            })
+            ->values()
+            ->all();
+
+        return count($rows) > 0 ? $rows : array_values($defaults);
+    }
+
+    private function defaultStatsWithValues(): array
+    {
+        $evaluations = Schema::hasTable('evaluation_submissions')
+            ? DB::table('evaluation_submissions')->count()
+            : 0;
+
+        return collect(self::DEFAULT_STATS)
+            ->map(function (array $config, string $statKey) use ($evaluations) {
+                $value = $statKey === 'evaluations'
+                    ? $evaluations
+                    : $this->activeCount((string) $config['source']);
+
+                return [
+                    'id' => null,
+                    'stat_key' => $statKey,
+                    'label' => $config['label'],
+                    'value' => $value,
+                    'icon' => $config['icon'],
+                    'sort_order' => $config['sort_order'],
+                ];
+            })
+            ->all();
+    }
+
+    private function activeCount(string $table): int
+    {
+        if (! Schema::hasTable($table)) {
+            return 0;
+        }
+
+        return DB::table($table)
+            ->where('is_deleted', 0)
+            ->where('is_activated', 1)
+            ->count();
     }
 
     private function deleteManagedLogoIfExists(?string $target): void

@@ -48,6 +48,25 @@ function normalizeHomeSection(homeSection = {}) {
     };
 }
 
+function normalizeStatsSection(stats = []) {
+    return stats.map((row) => ({
+        id: row.id ?? null,
+        stat_key: String(row.stat_key ?? "").trim(),
+        label: String(row.label ?? "").trim(),
+        value: Number(row.value ?? 0),
+        icon: String(row.icon ?? "").trim(),
+        sort_order: Number(row.sort_order ?? 0),
+    }));
+}
+
+function normalizeStatKey(value) {
+    return String(value ?? "")
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, "_")
+        .replace(/[^a-z0-9_]/g, "");
+}
+
 const ITEM_TYPE_OPTIONS = [
     { value: "link", label: "Link" },
     { value: "logo", label: "Logo" },
@@ -71,13 +90,29 @@ function isImageTarget(value) {
     );
 }
 
-export default function LandingPage({ headers, filters, homeSection }) {
+export default function LandingPage({
+    headers,
+    filters,
+    homeSection,
+    statsSection = [],
+}) {
+    const canEditStats =
+        (statsSection ?? []).length > 0 &&
+        (statsSection ?? []).every(
+            (row) => row.id !== null && row.id !== undefined,
+        );
+
     const [modalOpen, setModalOpen] = useState(false);
     const [homeModalOpen, setHomeModalOpen] = useState(false);
+    const [statsModalOpen, setStatsModalOpen] = useState(false);
     const [pendingScrollToIndex, setPendingScrollToIndex] = useState(null);
+    const [pendingStatsScrollToIndex, setPendingStatsScrollToIndex] =
+        useState(null);
     const linkContainerRefs = useRef([]);
+    const statContainerRefs = useRef([]);
     const initialHeadersSnapshotRef = useRef("[]");
     const initialHomeSectionSnapshotRef = useRef("{}");
+    const initialStatsSnapshotRef = useRef("[]");
 
     const { data, setData, errors, processing, reset, clearErrors } = useForm({
         headers: [],
@@ -102,15 +137,26 @@ export default function LandingPage({ headers, filters, homeSection }) {
         background_video_path: "",
         background_video_file: null,
     });
+    const {
+        data: statsData,
+        setData: setStatsData,
+        errors: statsErrors,
+        processing: statsProcessing,
+        reset: resetStats,
+        clearErrors: clearStatsErrors,
+    } = useForm({
+        stats: [],
+        delete_ids: [],
+    });
 
     const openEdit = () => {
         clearErrors();
-        const mappedHeaders = (headers?.data ?? []).map((row) => ({
+        const mappedHeaders = (headers?.data ?? []).map((row, index) => ({
             id: row.id,
             label: row.label ?? "",
             target: row.target ?? "",
             item_type: row.item_type ?? "link",
-            sort_order: row.sort_order ?? 0,
+            sort_order: index + 1,
             is_active: Boolean(row.is_active),
             logo_file: null,
         }));
@@ -144,6 +190,25 @@ export default function LandingPage({ headers, filters, homeSection }) {
         );
         setHomeModalOpen(true);
     };
+    const openStatsEdit = () => {
+        clearStatsErrors();
+
+        const nextStats = (statsSection ?? []).map((row) => ({
+            id: row.id ?? null,
+            stat_key: row.stat_key ?? "",
+            label: row.label ?? "",
+            value: row.value ?? 0,
+            icon: row.icon ?? "",
+            sort_order: row.sort_order ?? 0,
+        }));
+
+        setStatsData("stats", nextStats);
+        setStatsData("delete_ids", []);
+        initialStatsSnapshotRef.current = JSON.stringify(
+            normalizeStatsSection(nextStats),
+        );
+        setStatsModalOpen(true);
+    };
 
     const closeModal = () => {
         reset();
@@ -157,6 +222,13 @@ export default function LandingPage({ headers, filters, homeSection }) {
         setHomeModalOpen(false);
         clearHomeErrors();
     };
+    const closeStatsModal = () => {
+        resetStats();
+        setStatsModalOpen(false);
+        clearStatsErrors();
+        setPendingStatsScrollToIndex(null);
+        statContainerRefs.current = [];
+    };
 
     const updateRow = (index, key, value) => {
         const next = [...data.headers];
@@ -166,26 +238,34 @@ export default function LandingPage({ headers, filters, homeSection }) {
         };
         setData("headers", next);
     };
+    const withHeaderSortOrder = (rows = []) =>
+        rows.map((item, idx) => ({
+            ...item,
+            sort_order: idx + 1,
+        }));
     const addLink = () => {
-        const nextIndex = data.headers.length;
-        setData("headers", [
+        const nextHeaders = withHeaderSortOrder([
             ...data.headers,
             {
                 id: null,
                 label: "",
                 target: "",
                 item_type: "link",
-                sort_order: nextIndex + 1,
+                sort_order: 0,
                 is_active: true,
                 logo_file: null,
             },
         ]);
+        setData("headers", nextHeaders);
+        const nextIndex = nextHeaders.length - 1;
         setPendingScrollToIndex(nextIndex);
     };
 
     const removeLink = (index) => {
         const row = data.headers[index];
-        const nextHeaders = data.headers.filter((_, i) => i !== index);
+        const nextHeaders = withHeaderSortOrder(
+            data.headers.filter((_, i) => i !== index),
+        );
 
         setData("headers", nextHeaders);
 
@@ -195,6 +275,19 @@ export default function LandingPage({ headers, filters, homeSection }) {
             );
             setData("delete_ids", nextDeleteIds);
         }
+    };
+    const moveLinkRow = (index, direction) => {
+        const rows = [...data.headers];
+        const targetIndex = direction === "up" ? index - 1 : index + 1;
+        if (targetIndex < 0 || targetIndex >= rows.length) {
+            return;
+        }
+
+        const temp = rows[index];
+        rows[index] = rows[targetIndex];
+        rows[targetIndex] = temp;
+
+        setData("headers", withHeaderSortOrder(rows));
     };
 
     useEffect(() => {
@@ -206,6 +299,15 @@ export default function LandingPage({ headers, filters, homeSection }) {
             setPendingScrollToIndex(null);
         }
     }, [data.headers.length, modalOpen, pendingScrollToIndex]);
+    useEffect(() => {
+        if (!statsModalOpen || pendingStatsScrollToIndex === null) return;
+
+        const target = statContainerRefs.current[pendingStatsScrollToIndex];
+        if (target) {
+            target.scrollIntoView({ behavior: "smooth", block: "start" });
+            setPendingStatsScrollToIndex(null);
+        }
+    }, [statsData.stats?.length, statsModalOpen, pendingStatsScrollToIndex]);
 
     const hasEmptyRequiredFields = useMemo(
         () =>
@@ -288,6 +390,115 @@ export default function LandingPage({ headers, filters, homeSection }) {
             },
         );
     };
+    const updateStatRow = (index, key, value) => {
+        const next = [...(statsData.stats ?? [])];
+        const knownValuesByKey = (statsSection ?? []).reduce((acc, row) => {
+            const metricKey = normalizeStatKey(row.stat_key);
+            if (metricKey) {
+                acc[metricKey] = Number(row.value ?? 0);
+            }
+            return acc;
+        }, {});
+
+        next[index] = {
+            ...next[index],
+            [key]: value,
+            ...(key === "stat_key"
+                ? {
+                      value:
+                          knownValuesByKey[
+                              normalizeStatKey(String(value ?? ""))
+                          ] ??
+                          next[index]?.value ??
+                          0,
+                  }
+                : {}),
+        };
+        setStatsData("stats", next);
+    };
+    const addStatRow = () => {
+        const nextIndex = (statsData.stats ?? []).length;
+        setStatsData("stats", [
+            ...(statsData.stats ?? []),
+            {
+                id: null,
+                stat_key: "",
+                label: "",
+                value: 0,
+                icon: "dashboard",
+                sort_order: nextIndex + 1,
+            },
+        ]);
+        setPendingStatsScrollToIndex(nextIndex);
+    };
+    const removeStatRow = (index) => {
+        const row = (statsData.stats ?? [])[index];
+        const nextStats = (statsData.stats ?? [])
+            .filter((_, i) => i !== index)
+            .map((item, idx) => ({
+                ...item,
+                sort_order: idx + 1,
+            }));
+        setStatsData("stats", nextStats);
+
+        if (row?.id) {
+            const nextDeleteIds = Array.from(
+                new Set([...(statsData.delete_ids ?? []), row.id]),
+            );
+            setStatsData("delete_ids", nextDeleteIds);
+        }
+    };
+    const moveStatRow = (index, direction) => {
+        const rows = [...(statsData.stats ?? [])];
+        const targetIndex = direction === "up" ? index - 1 : index + 1;
+        if (targetIndex < 0 || targetIndex >= rows.length) {
+            return;
+        }
+
+        const temp = rows[index];
+        rows[index] = rows[targetIndex];
+        rows[targetIndex] = temp;
+
+        const withSortOrder = rows.map((row, idx) => ({
+            ...row,
+            sort_order: idx + 1,
+        }));
+        setStatsData("stats", withSortOrder);
+    };
+    const hasEmptyStatsLabels = useMemo(
+        () =>
+            (statsData.stats ?? []).some(
+                (row) =>
+                    String(row.label ?? "").trim() === "" ||
+                    String(row.stat_key ?? "").trim() === "",
+            ),
+        [statsData.stats],
+    );
+    const hasStatsSectionChanges = useMemo(() => {
+        const currentSnapshot = JSON.stringify(
+            normalizeStatsSection(statsData.stats ?? []),
+        );
+        return currentSnapshot !== initialStatsSnapshotRef.current;
+    }, [statsData.stats]);
+    const submitStatsSection = (event) => {
+        event.preventDefault();
+
+        if (hasEmptyStatsLabels || !hasStatsSectionChanges) {
+            return;
+        }
+
+        router.post(
+            route("admin.landing-page.stats-section.update"),
+            {
+                _method: "put",
+                ...statsData,
+            },
+            {
+                forceFormData: true,
+                onSuccess: closeStatsModal,
+            },
+        );
+    };
 
     const columns = [
         { key: "label", label: "Label" },
@@ -305,7 +516,6 @@ export default function LandingPage({ headers, filters, homeSection }) {
                     (option) => option.value === row.item_type,
                 )?.label ?? row.item_type,
         },
-        { key: "sort_order", label: "Order" },
         {
             key: "is_active",
             label: "Is Active",
@@ -429,6 +639,63 @@ export default function LandingPage({ headers, filters, homeSection }) {
                                     {homeSection?.secondary_cta_target || "-"})
                                 </td>
                             </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section className="mb-4 rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-5">
+                    <h2 className="text-base font-semibold text-slate-900">
+                        Stats
+                    </h2>
+                    <button
+                        type="button"
+                        onClick={openStatsEdit}
+                        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                        disabled={!canEditStats}
+                    >
+                        Edit
+                    </button>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="min-w-full">
+                        <thead>
+                            <tr className="border-b border-slate-100 bg-slate-50/70 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                <th className="px-4 py-3 sm:px-5">#</th>
+                                <th className="px-4 py-3 sm:px-5">Metric</th>
+                                <th className="px-4 py-3 sm:px-5">
+                                    Value (Read Only)
+                                </th>
+                                <th className="px-4 py-3 sm:px-5">
+                                    Text Label
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody className="text-sm text-slate-700">
+                            {(statsSection ?? []).map((row, index) => (
+                                <tr
+                                    key={row.id ?? `stat-${index}`}
+                                    className="border-b border-slate-100 last:border-b-0"
+                                >
+                                    <td className="px-4 py-3 sm:px-5">
+                                        {index + 1}
+                                    </td>
+                                    <td className="px-4 py-3 sm:px-5">
+                                        {String(row.stat_key ?? "").replace(
+                                            /_/g,
+                                            " ",
+                                        )}
+                                    </td>
+                                    <td className="px-4 py-3 sm:px-5 font-semibold text-slate-900">
+                                        {row.value ?? 0}
+                                    </td>
+                                    <td className="px-4 py-3 sm:px-5">
+                                        {row.label ?? "-"}
+                                    </td>
+                                </tr>
+                            ))}
                         </tbody>
                     </table>
                 </div>
@@ -659,6 +926,202 @@ export default function LandingPage({ headers, filters, homeSection }) {
                 </div>
             )}
 
+            {statsModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div
+                        className="absolute inset-0 bg-slate-950/40"
+                        onClick={closeStatsModal}
+                    />
+                    <div
+                        className="relative w-full max-w-3xl rounded-xl bg-white p-6 shadow-2xl"
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div className="mb-4 flex items-center justify-between">
+                            <h3 className="text-base font-semibold text-slate-900">
+                                Edit Stats Labels
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={closeStatsModal}
+                                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                                aria-label="Close modal"
+                            >
+                                <svg
+                                    className="h-5 w-5"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={2}
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M6 18L18 6M6 6l12 12"
+                                    />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <form
+                            onSubmit={submitStatsSection}
+                            className="space-y-4"
+                        >
+                            <div className="max-h-[60vh] overflow-y-auto space-y-3 pr-1">
+                                <div className="flex justify-end">
+                                    <button
+                                        type="button"
+                                        onClick={addStatRow}
+                                        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                                    >
+                                        + Add Stat
+                                    </button>
+                                </div>
+                                {(statsData.stats ?? []).map((row, index) => (
+                                    <div
+                                        key={row.id ?? `edit-stat-${index}`}
+                                        ref={(el) => {
+                                            statContainerRefs.current[index] =
+                                                el;
+                                        }}
+                                        className="rounded-lg border border-slate-200 bg-slate-50 p-4"
+                                    >
+                                        <div className="mb-3 flex items-center justify-between gap-2">
+                                            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                Stat #{index + 1}
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        moveStatRow(index, "up")
+                                                    }
+                                                    aria-label={`Move Stat #${index + 1} up`}
+                                                    disabled={index === 0}
+                                                    className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                                >
+                                                    <AppIcon
+                                                        name="arrow-up"
+                                                        className="h-4 w-4"
+                                                    />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        moveStatRow(
+                                                            index,
+                                                            "down",
+                                                        )
+                                                    }
+                                                    aria-label={`Move Stat #${index + 1} down`}
+                                                    disabled={
+                                                        index ===
+                                                        (statsData.stats ?? [])
+                                                            .length -
+                                                            1
+                                                    }
+                                                    className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                                >
+                                                    <AppIcon
+                                                        name="arrow-down"
+                                                        className="h-4 w-4"
+                                                    />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        removeStatRow(index)
+                                                    }
+                                                    aria-label={`Delete Stat #${index + 1}`}
+                                                    className="rounded-lg border border-rose-200 bg-white p-1.5 text-rose-600 hover:bg-rose-50"
+                                                >
+                                                    <AppIcon
+                                                        name="trash"
+                                                        className="h-4 w-4"
+                                                    />
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="grid gap-3 md:grid-cols-3">
+                                            <FormField
+                                                label="Metric"
+                                                error={
+                                                    statsErrors[
+                                                        `stats.${index}.stat_key`
+                                                    ]
+                                                }
+                                                required
+                                            >
+                                                <TextInput
+                                                    value={String(
+                                                        row.stat_key ?? "",
+                                                    )}
+                                                    onChange={(event) =>
+                                                        updateStatRow(
+                                                            index,
+                                                            "stat_key",
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                    placeholder="students"
+                                                />
+                                            </FormField>
+                                            <FormField label="Value (Read Only)">
+                                                <TextInput
+                                                    value={row.value ?? 0}
+                                                    disabled
+                                                />
+                                            </FormField>
+                                            <FormField
+                                                label="Text Label"
+                                                error={
+                                                    statsErrors[
+                                                        `stats.${index}.label`
+                                                    ]
+                                                }
+                                                required
+                                            >
+                                                <TextInput
+                                                    value={row.label}
+                                                    onChange={(event) =>
+                                                        updateStatRow(
+                                                            index,
+                                                            "label",
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                />
+                                            </FormField>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="pt-2">
+                                <div className="flex flex-col md:flex-row-reverse gap-3 md:justify-start w-full">
+                                    <SubmitButton
+                                        processing={statsProcessing}
+                                        disabled={
+                                            hasEmptyStatsLabels ||
+                                            !hasStatsSectionChanges
+                                        }
+                                        className="w-full md:w-[180px]"
+                                    >
+                                        Save Changes
+                                    </SubmitButton>
+                                    <button
+                                        type="button"
+                                        onClick={closeStatsModal}
+                                        className="w-full md:w-[180px] rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
             {modalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div
@@ -724,21 +1187,76 @@ export default function LandingPage({ headers, filters, homeSection }) {
                                                 )?.label ?? "Item"}{" "}
                                                 #{index + 1}
                                             </div>
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    removeLink(index)
-                                                }
-                                                aria-label={`Delete Link #${index + 1}`}
-                                                className="rounded-lg border border-rose-200 bg-white p-1.5 text-rose-600 hover:bg-rose-50"
-                                            >
-                                                <AppIcon
-                                                    name="trash"
-                                                    className="h-4 w-4"
-                                                />
-                                            </button>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        moveLinkRow(index, "up")
+                                                    }
+                                                    aria-label={`Move Link #${index + 1} up`}
+                                                    disabled={index === 0}
+                                                    className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                                >
+                                                    <AppIcon
+                                                        name="arrow-up"
+                                                        className="h-4 w-4"
+                                                    />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        moveLinkRow(
+                                                            index,
+                                                            "down",
+                                                        )
+                                                    }
+                                                    aria-label={`Move Link #${index + 1} down`}
+                                                    disabled={
+                                                        index ===
+                                                        data.headers.length - 1
+                                                    }
+                                                    className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                                >
+                                                    <AppIcon
+                                                        name="arrow-down"
+                                                        className="h-4 w-4"
+                                                    />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        removeLink(index)
+                                                    }
+                                                    aria-label={`Delete Link #${index + 1}`}
+                                                    className="rounded-lg border border-rose-200 bg-white p-1.5 text-rose-600 hover:bg-rose-50"
+                                                >
+                                                    <AppIcon
+                                                        name="trash"
+                                                        className="h-4 w-4"
+                                                    />
+                                                </button>
+                                            </div>
                                         </div>
-                                        <div className="grid gap-3 md:grid-cols-[160px_1fr_1fr_120px_auto] md:items-end">
+                                        {row.item_type === "logo" && (
+                                            <div className="mb-3 h-20 rounded-lg border border-slate-200 bg-white px-3 pt-2">
+                                                <div className="flex h-full items-center justify-center">
+                                                    {isImageTarget(
+                                                        row.target,
+                                                    ) ? (
+                                                        <img
+                                                            src={row.target}
+                                                            alt={`${row.label || "Logo"} preview`}
+                                                            className="h-10 w-10 rounded-full object-cover"
+                                                        />
+                                                    ) : (
+                                                        <span className="text-xs text-slate-400">
+                                                            Logo preview
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                        <div className="grid gap-3 md:grid-cols-[145px_minmax(170px,0.8fr)_minmax(235px,1fr)_auto] md:items-end">
                                             <FormField
                                                 label="Type"
                                                 error={
@@ -804,35 +1322,20 @@ export default function LandingPage({ headers, filters, homeSection }) {
                                                 required
                                             >
                                                 {row.item_type === "logo" ? (
-                                                    <div className="space-y-2">
-                                                        <input
-                                                            type="file"
-                                                            accept="image/*"
-                                                            onChange={(event) =>
-                                                                updateRow(
-                                                                    index,
-                                                                    "logo_file",
-                                                                    event.target
-                                                                        .files?.[0] ??
-                                                                        null,
-                                                                )
-                                                            }
-                                                            className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-slate-900 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white hover:file:bg-slate-800"
-                                                        />
-                                                        {isImageTarget(
-                                                            row.target,
-                                                        ) && (
-                                                            <div className="rounded-lg border border-slate-200 bg-white p-2">
-                                                                <img
-                                                                    src={
-                                                                        row.target
-                                                                    }
-                                                                    alt={`${row.label || "Logo"} preview`}
-                                                                    className="h-10 w-10 rounded-full object-cover"
-                                                                />
-                                                            </div>
-                                                        )}
-                                                    </div>
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*"
+                                                        onChange={(event) =>
+                                                            updateRow(
+                                                                index,
+                                                                "logo_file",
+                                                                event.target
+                                                                    .files?.[0] ??
+                                                                    null,
+                                                            )
+                                                        }
+                                                        className="block h-8 w-full rounded-lg border border-slate-200 bg-white px-2 text-xs leading-8 text-slate-700 sm:h-9 sm:text-sm sm:leading-9 file:my-1 file:mr-2 sm:file:mr-3 file:h-6 sm:file:h-7 file:w-[5.5rem] sm:file:w-24 file:rounded-md file:border-0 file:bg-slate-900 file:px-2 file:py-0 file:text-center file:text-xs sm:file:text-sm file:font-medium file:leading-6 sm:file:leading-7 file:text-white hover:file:bg-slate-800"
+                                                    />
                                                 ) : (
                                                     <TextInput
                                                         value={row.target}
@@ -847,29 +1350,6 @@ export default function LandingPage({ headers, filters, homeSection }) {
                                                     />
                                                 )}
                                             </FormField>
-
-                                            <FormField
-                                                label="Order"
-                                                error={
-                                                    errors[
-                                                        `headers.${index}.sort_order`
-                                                    ]
-                                                }
-                                            >
-                                                <TextInput
-                                                    type="number"
-                                                    min="0"
-                                                    value={row.sort_order}
-                                                    onChange={(event) =>
-                                                        updateRow(
-                                                            index,
-                                                            "sort_order",
-                                                            event.target.value,
-                                                        )
-                                                    }
-                                                />
-                                            </FormField>
-
                                             <label className="flex items-center gap-2 text-sm text-slate-700 md:pb-2">
                                                 <input
                                                     type="checkbox"

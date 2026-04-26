@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\LandingPageHeader;
 use App\Models\LandingPageHomeSection;
+use App\Models\LandingPageStat;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -26,28 +28,56 @@ class HomeController extends Controller
             ? DB::table('evaluation_submissions')->count()
             : 0;
 
-        return [
-            [
+        $defaultStats = [
+            'students' => [
                 'value' => $this->activeCount('student'),
                 'label' => 'Active Students',
                 'icon' => 'students',
+                'sort_order' => 1,
             ],
-            [
+            'faculty' => [
                 'value' => $this->activeCount('teacher'),
                 'label' => 'Active Faculty',
                 'icon' => 'teachers',
+                'sort_order' => 2,
             ],
-            [
+            'campuses' => [
                 'value' => $this->activeCount('branch'),
                 'label' => 'Active Campuses',
                 'icon' => 'branches',
+                'sort_order' => 3,
             ],
-            [
+            'evaluations' => [
                 'value' => $evaluations,
                 'label' => 'Evaluations Submitted',
                 'icon' => 'assignments',
+                'sort_order' => 4,
             ],
         ];
+
+        if (! Schema::hasTable('landing_page_stats')) {
+            return array_values($defaultStats);
+        }
+
+        $configuredStats = LandingPageStat::query()
+            ->where('is_active', 1)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get(['stat_key', 'label', 'sort_order'])
+            ->map(function (LandingPageStat $stat) use ($defaultStats) {
+                $base = $defaultStats[$stat->stat_key] ?? null;
+
+                return [
+                    'value' => $base['value'] ?? 0,
+                    'label' => $stat->label ?: ($base['label'] ?? Str::headline($stat->stat_key)),
+                    'icon' => $base['icon'] ?? 'dashboard',
+                    'sort_order' => $stat->sort_order,
+                ];
+            })
+            ->values()
+            ->all();
+
+        return count($configuredStats) > 0 ? $configuredStats : array_values($defaultStats);
     }
 
     private function activeCount(string $table): int
