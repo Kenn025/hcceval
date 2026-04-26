@@ -349,7 +349,7 @@ export default function LandingPage({
             title: row.title ?? "",
             desc_text: row.desc_text ?? "",
             features: row.features ?? [],
-            progress: row.progress ?? 0,
+            progress: String(row.progress ?? 0),
             icon_type: row.icon_type ?? "faculty",
             sort_order: row.sort_order ?? 0,
         }));
@@ -722,23 +722,7 @@ export default function LandingPage({
         next[index] = { ...next[index], [key]: value };
         setRolesData("roles", next);
     };
-    const addRoleRow = () => {
-        const nextRoles = withRoleSortOrder([
-            ...(rolesData.roles ?? []),
-            {
-                id: null,
-                title: "",
-                desc_text: "",
-                features: [],
-                progress: 0,
-                icon_type: "faculty",
-                sort_order: 0,
-            },
-        ]);
-        setRolesData("roles", nextRoles);
-        setPendingRolesScrollToIndex(nextRoles.length - 1);
-    };
-    const removeRoleRow = (index) => {
+const removeRoleRow = (index) => {
         const row = (rolesData.roles ?? [])[index];
         const nextRows = withRoleSortOrder(
             (rolesData.roles ?? []).filter((_, i) => i !== index),
@@ -1036,7 +1020,7 @@ export default function LandingPage({
                                 <th className="px-4 py-3 sm:px-5">#</th>
                                 <th className="px-4 py-3 sm:px-5">Metric</th>
                                 <th className="px-4 py-3 sm:px-5">
-                                    Value (Read Only)
+                                    Value
                                 </th>
                                 <th className="px-4 py-3 sm:px-5">
                                     Text Label
@@ -1571,10 +1555,11 @@ export default function LandingPage({
                                                     placeholder="students"
                                                 />
                                             </FormField>
-                                            <FormField label="Value (Read Only)">
+                                            <FormField label="Value">
                                                 <TextInput
                                                     value={row.value ?? 0}
                                                     disabled
+                                                    className="bg-slate-100 text-slate-500 cursor-not-allowed"
                                                 />
                                             </FormField>
                                             <FormField
@@ -2229,16 +2214,6 @@ export default function LandingPage({
                                     </FormField>
                                 </div>
 
-                                <div className="flex justify-end">
-                                    <button
-                                        type="button"
-                                        onClick={addRoleRow}
-                                        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                                    >
-                                        + Add Role
-                                    </button>
-                                </div>
-
                                 {(rolesData.roles ?? []).map((row, index) => (
                                     <div
                                         key={row.id ?? `role-${index}`}
@@ -2326,15 +2301,42 @@ export default function LandingPage({
                                                 label="Progress (%)"
                                                 error={rolesErrors[`roles.${index}.progress`]}
                                             >
-                                                <TextInput
-                                                    type="number"
-                                                    min={0}
-                                                    max={100}
-                                                    value={row.progress ?? 0}
-                                                    onChange={(event) =>
-                                                        updateRoleRow(index, "progress", Number(event.target.value))
-                                                    }
-                                                />
+                                                <div className="flex items-center gap-3">
+                                                    <TextInput
+                                                        type="text"
+                                                        inputMode="numeric"
+                                                        value={String(row.progress ?? "")}
+                                                        placeholder="0–100"
+                                                        className="flex-1"
+                                                        onChange={(event) => {
+                                                            const raw = event.target.value.replace(/[^0-9]/g, "");
+                                                            const clamped = raw === "" ? "" : String(Math.min(100, parseInt(raw, 10)));
+                                                            updateRoleRow(index, "progress", clamped);
+                                                        }}
+                                                    />
+                                                    {(() => {
+                                                        const pct = Math.min(100, Math.max(0, Number(row.progress) || 0));
+                                                        const r = 24;
+                                                        const circ = 2 * Math.PI * r;
+                                                        const offset = circ * (1 - pct / 100);
+                                                        return (
+                                                            <svg viewBox="0 0 60 60" className="w-14 h-14 shrink-0">
+                                                                <circle cx="30" cy="30" r={r} fill="none" stroke="#e2e8f0" strokeWidth="5" />
+                                                                <circle
+                                                                    cx="30" cy="30" r={r}
+                                                                    fill="none" stroke="#3b82f6" strokeWidth="5"
+                                                                    strokeDasharray={circ}
+                                                                    strokeDashoffset={offset}
+                                                                    strokeLinecap="round"
+                                                                    transform="rotate(-90 30 30)"
+                                                                />
+                                                                <text x="30" y="34" textAnchor="middle" fontSize="10" fontWeight="700" fill="#3b82f6">
+                                                                    {pct}%
+                                                                </text>
+                                                            </svg>
+                                                        );
+                                                    })()}
+                                                </div>
                                             </FormField>
                                         </div>
 

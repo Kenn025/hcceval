@@ -137,6 +137,7 @@ function App({
     headerLinks: customHeaderLinks = [],
     homeSection: customHomeSection = null,
     featuresSection: customFeaturesSection = null,
+    rolesSection: customRolesSection = null,
 }) {
     const [isDarkMode, setIsDarkMode] = useState(() => {
         if (typeof window === "undefined") return false;
@@ -215,104 +216,40 @@ function App({
             );
         }
     }, [isDarkMode]);
-    const roles = [
-        {
-            icon: /* @__PURE__ */ jsx("svg", {
-                className: "w-10 h-10",
-                fill: "none",
-                stroke: "currentColor",
-                viewBox: "0 0 24 24",
-                children: /* @__PURE__ */ jsx("path", {
-                    strokeLinecap: "round",
-                    strokeLinejoin: "round",
-                    strokeWidth: 1.5,
-                    d: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253",
-                }),
+    const ROLE_ICON_PATHS = {
+        faculty: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253",
+        peer: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z",
+        student: "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z",
+        admin: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z",
+    };
+    const makeRoleIcon = (iconType) =>
+        jsx("svg", {
+            className: "w-10 h-10",
+            fill: "none",
+            stroke: "currentColor",
+            viewBox: "0 0 24 24",
+            children: jsx("path", {
+                strokeLinecap: "round",
+                strokeLinejoin: "round",
+                strokeWidth: 1.5,
+                d: ROLE_ICON_PATHS[iconType] ?? ROLE_ICON_PATHS.faculty,
             }),
-            title: "Faculty",
-            desc: "Comprehensive evaluation tools for academic professionals",
-            features: [
-                "Self-Assessment Portal",
-                "Peer Review Access",
-                "Student Feedback View",
-                "Performance History",
-                "Development Reports",
-            ],
-            progress: 85,
-        },
-        {
-            icon: /* @__PURE__ */ jsx("svg", {
-                className: "w-10 h-10",
-                fill: "none",
-                stroke: "currentColor",
-                viewBox: "0 0 24 24",
-                children: /* @__PURE__ */ jsx("path", {
-                    strokeLinecap: "round",
-                    strokeLinejoin: "round",
-                    strokeWidth: 1.5,
-                    d: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z",
-                }),
-            }),
-            title: "Peer",
-            desc: "Collaborative evaluation between colleagues",
-            features: [
-                "Anonymous Reviews",
-                "360\xB0 Assessment",
-                "Teaching Observation",
-                "Collaborative Goals",
-                "Best Practices Share",
-            ],
-            progress: 78,
-        },
-        {
-            icon: /* @__PURE__ */ jsx("svg", {
-                className: "w-10 h-10",
-                fill: "none",
-                stroke: "currentColor",
-                viewBox: "0 0 24 24",
-                children: /* @__PURE__ */ jsx("path", {
-                    strokeLinecap: "round",
-                    strokeLinejoin: "round",
-                    strokeWidth: 1.5,
-                    d: "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z",
-                }),
-            }),
-            title: "Student",
-            desc: "Student-centered faculty evaluation system",
-            features: [
-                "Course Feedback",
-                "Anonymous Surveys",
-                "Learning Outcomes",
-                "Suggestion Portal",
-                "Progress Tracking",
-            ],
-            progress: 92,
-        },
-        {
-            icon: /* @__PURE__ */ jsx("svg", {
-                className: "w-10 h-10",
-                fill: "none",
-                stroke: "currentColor",
-                viewBox: "0 0 24 24",
-                children: /* @__PURE__ */ jsx("path", {
-                    strokeLinecap: "round",
-                    strokeLinejoin: "round",
-                    strokeWidth: 1.5,
-                    d: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z",
-                }),
-            }),
-            title: "Administrator",
-            desc: "Complete system oversight and management",
-            features: [
-                "Analytics Dashboard",
-                "User Management",
-                "Report Generation",
-                "Campus Settings",
-                "System Configuration",
-            ],
-            progress: 95,
-        },
+        });
+    const defaultRoles = [
+        { icon: makeRoleIcon("faculty"), title: "Faculty", desc: "Comprehensive evaluation tools for academic professionals", features: ["Self-Assessment Portal", "Peer Review Access", "Student Feedback View", "Performance History", "Development Reports"], progress: 85 },
+        { icon: makeRoleIcon("peer"), title: "Peer", desc: "Collaborative evaluation between colleagues", features: ["Anonymous Reviews", "360° Assessment", "Teaching Observation", "Collaborative Goals", "Best Practices Share"], progress: 78 },
+        { icon: makeRoleIcon("student"), title: "Student", desc: "Student-centered faculty evaluation system", features: ["Course Feedback", "Anonymous Surveys", "Learning Outcomes", "Suggestion Portal", "Progress Tracking"], progress: 92 },
+        { icon: makeRoleIcon("admin"), title: "Administrator", desc: "Complete system oversight and management", features: ["Analytics Dashboard", "User Management", "Report Generation", "Campus Settings", "System Configuration"], progress: 95 },
     ];
+    const roles = (customRolesSection?.roles ?? []).length > 0
+        ? customRolesSection.roles.map((r) => ({
+            icon: makeRoleIcon(r.icon_type ?? "faculty"),
+            title: r.title,
+            desc: r.desc_text,
+            features: r.features ?? [],
+            progress: r.progress ?? 0,
+        }))
+        : defaultRoles;
     const defaultFeatureCards = [
         {
             title: "Real-Time Analytics",
@@ -1732,18 +1669,17 @@ function App({
                                     className:
                                         "neumorphic-flat px-4 py-2 inline-block text-sm font-bold mb-4",
                                     style: { color: "var(--accent)" },
-                                    children: "User Roles",
+                                    children: customRolesSection?.badge_text || "User Roles",
                                 }),
                                 /* @__PURE__ */ jsx("h2", {
                                     className:
                                         "text-3xl md:text-4xl font-bold mb-4",
                                     style: { color: "var(--text-primary)" },
-                                    children: "Four Integrated Roles",
+                                    children: customRolesSection?.title_text || "Four Integrated Roles",
                                 }),
                                 /* @__PURE__ */ jsx("p", {
                                     style: { color: "var(--text-secondary)" },
-                                    children:
-                                        "Click a role to explore its capabilities",
+                                    children: customRolesSection?.subtitle_text || "Click a role to explore its capabilities",
                                 }),
                             ],
                         }),

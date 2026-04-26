@@ -9,6 +9,7 @@ export default function Home({
     headerLinks = [],
     homeSection = null,
     featuresSection = null,
+    rolesSection = null,
 }) {
     const [showSecretTeamCard, setShowSecretTeamCard] = useState(false);
     const secretSequence = useRef(["h", "e", "s", "o", "y", "a", "m"]);
@@ -135,6 +136,7 @@ export default function Home({
                 headerLinks={headerLinks}
                 homeSection={homeSection}
                 featuresSection={featuresSection}
+                rolesSection={rolesSection}
             />
         </>
     );
