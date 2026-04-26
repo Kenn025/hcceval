@@ -7,6 +7,8 @@ use App\Models\LandingPageFeature;
 use App\Models\LandingPageFeatureSection;
 use App\Models\LandingPageHeader;
 use App\Models\LandingPageHomeSection;
+use App\Models\LandingPageHowItWorksSection;
+use App\Models\LandingPageHowItWorksStep;
 use App\Models\LandingPageRole;
 use App\Models\LandingPageRolesSection;
 use App\Models\LandingPageStat;
@@ -40,6 +42,11 @@ class LandingPageHeaderController extends Controller
         'badge_text' => 'User Roles',
         'title_text' => 'Four Integrated Roles',
         'subtitle_text' => 'Click a role to explore its capabilities',
+    ];
+    private const DEFAULT_HOW_IT_WORKS_SECTION = [
+        'badge_text' => 'Process',
+        'title_text' => 'How It Works',
+        'subtitle_text' => 'Simple evaluation process in four steps',
     ];
     private const DEFAULT_ROLES = [
         [
@@ -107,6 +114,32 @@ class LandingPageHeaderController extends Controller
             'sort_order' => 6,
         ],
     ];
+    private const DEFAULT_HOW_IT_WORKS_STEPS = [
+        [
+            'step_number' => '01',
+            'title' => 'Register',
+            'subtitle' => 'Create account and select your role',
+            'sort_order' => 1,
+        ],
+        [
+            'step_number' => '02',
+            'title' => 'Configure',
+            'subtitle' => 'Set up evaluation criteria',
+            'sort_order' => 2,
+        ],
+        [
+            'step_number' => '03',
+            'title' => 'Evaluate',
+            'subtitle' => 'Complete evaluations forms',
+            'sort_order' => 3,
+        ],
+        [
+            'step_number' => '04',
+            'title' => 'Analyze',
+            'subtitle' => 'View reports and insights',
+            'sort_order' => 4,
+        ],
+    ];
     private const DEFAULT_STATS = [
         'students' => [
             'label' => 'Active Students',
@@ -160,6 +193,7 @@ class LandingPageHeaderController extends Controller
             'statsSection' => $this->statsSectionData(),
             'featuresSection' => $this->featureSectionData(),
             'rolesSection' => $this->rolesSectionData(),
+            'howItWorksSection' => $this->howItWorksSectionData(),
             'filters' => [
                 'search' => $search,
                 'per_page' => $perPage,
@@ -742,6 +776,107 @@ class LandingPageHeaderController extends Controller
         return back()->with('success', 'User Roles section updated successfully.');
     }
 
+    public function updateHowItWorksSection(Request $request)
+    {
+        if (! Schema::hasTable('landing_page_how_it_works_sections') || ! Schema::hasTable('landing_page_how_it_works_steps')) {
+            return back()->withErrors([
+                'how_it_works_section' => 'How It Works section table is not available yet. Please run migrations first.',
+            ]);
+        }
+
+        $validated = $request->validate([
+            'badge_text' => 'required|string|max:120',
+            'title_text' => 'required|string|max:255',
+            'subtitle_text' => 'required|string|max:1000',
+            'steps' => 'nullable|array',
+            'steps.*.id' => 'nullable|integer|exists:landing_page_how_it_works_steps,id',
+            'steps.*.step_number' => 'required|string|max:10',
+            'steps.*.title' => 'required|string|max:150',
+            'steps.*.subtitle' => 'required|string|max:500',
+            'steps.*.sort_order' => 'nullable|integer|min:0|max:9999',
+            'delete_ids' => 'nullable|array',
+            'delete_ids.*' => 'integer|exists:landing_page_how_it_works_steps,id',
+        ]);
+
+        $stepsPayload = collect($validated['steps'] ?? [])
+            ->map(fn(array $row, int $index) => [
+                'id' => $row['id'] ?? null,
+                'step_number' => trim((string) ($row['step_number'] ?? '')),
+                'title' => trim((string) ($row['title'] ?? '')),
+                'subtitle' => trim((string) ($row['subtitle'] ?? '')),
+                'sort_order' => $row['sort_order'] ?? ($index + 1),
+            ])
+            ->values();
+        $deleteIds = collect($validated['delete_ids'] ?? [])->filter()->values();
+        $ids = $stepsPayload->pluck('id')->filter()->values();
+        $stepsById = LandingPageHowItWorksStep::query()
+            ->whereIn('id', $ids)
+            ->get()
+            ->keyBy('id');
+
+        DB::transaction(function () use ($validated, $stepsPayload, $deleteIds, $stepsById) {
+            $section = LandingPageHowItWorksSection::query()->first();
+            if (! $section) {
+                $section = LandingPageHowItWorksSection::query()->create(self::DEFAULT_HOW_IT_WORKS_SECTION);
+            }
+
+            $section->update([
+                'badge_text' => $validated['badge_text'],
+                'title_text' => $validated['title_text'],
+                'subtitle_text' => $validated['subtitle_text'],
+            ]);
+
+            if ($deleteIds->isNotEmpty()) {
+                LandingPageHowItWorksStep::query()
+                    ->whereIn('id', $deleteIds)
+                    ->delete();
+            }
+
+            foreach ($stepsPayload as $index => $row) {
+                if (isset($row['id']) && $deleteIds->contains($row['id'])) {
+                    continue;
+                }
+
+                if (! empty($row['id'])) {
+                    $step = $stepsById->get($row['id']);
+                    if (! $step) {
+                        continue;
+                    }
+
+                    $step->update([
+                        'step_number' => $row['step_number'],
+                        'title' => $row['title'],
+                        'subtitle' => $row['subtitle'],
+                        'sort_order' => $row['sort_order'] ?? ($index + 1),
+                    ]);
+                    continue;
+                }
+
+                LandingPageHowItWorksStep::create([
+                    'step_number' => $row['step_number'],
+                    'title' => $row['title'],
+                    'subtitle' => $row['subtitle'],
+                    'sort_order' => $row['sort_order'] ?? ($index + 1),
+                    'is_active' => true,
+                ]);
+            }
+
+            $orderedIds = LandingPageHowItWorksStep::query()
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->pluck('id')
+                ->values();
+
+            foreach ($orderedIds as $position => $id) {
+                LandingPageHowItWorksStep::query()
+                    ->where('id', $id)
+                    ->update(['sort_order' => $position + 1]);
+            }
+        });
+
+        return back()->with('success', 'How It Works section updated successfully.');
+    }
+
     private function rolesSectionData(): array
     {
         $defaultRoles = collect(self::DEFAULT_ROLES)
@@ -787,6 +922,50 @@ class LandingPageHeaderController extends Controller
             'title_text' => $section?->title_text ?: self::DEFAULT_ROLES_SECTION['title_text'],
             'subtitle_text' => $section?->subtitle_text ?: self::DEFAULT_ROLES_SECTION['subtitle_text'],
             'roles' => count($roles) > 0 ? $roles : $defaultRoles,
+        ];
+    }
+
+    private function howItWorksSectionData(): array
+    {
+        $defaultSteps = collect(self::DEFAULT_HOW_IT_WORKS_STEPS)
+            ->map(fn(array $step) => [
+                'id' => null,
+                'step_number' => $step['step_number'],
+                'title' => $step['title'],
+                'subtitle' => $step['subtitle'],
+                'sort_order' => $step['sort_order'],
+            ])
+            ->values()
+            ->all();
+
+        if (! Schema::hasTable('landing_page_how_it_works_sections') || ! Schema::hasTable('landing_page_how_it_works_steps')) {
+            return [
+                ...self::DEFAULT_HOW_IT_WORKS_SECTION,
+                'steps' => $defaultSteps,
+            ];
+        }
+
+        $section = LandingPageHowItWorksSection::query()->first();
+        $steps = LandingPageHowItWorksStep::query()
+            ->where('is_active', 1)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get(['id', 'step_number', 'title', 'subtitle', 'sort_order'])
+            ->map(fn(LandingPageHowItWorksStep $step) => [
+                'id' => $step->id,
+                'step_number' => $step->step_number,
+                'title' => $step->title,
+                'subtitle' => $step->subtitle,
+                'sort_order' => $step->sort_order,
+            ])
+            ->values()
+            ->all();
+
+        return [
+            'badge_text' => $section?->badge_text ?: self::DEFAULT_HOW_IT_WORKS_SECTION['badge_text'],
+            'title_text' => $section?->title_text ?: self::DEFAULT_HOW_IT_WORKS_SECTION['title_text'],
+            'subtitle_text' => $section?->subtitle_text ?: self::DEFAULT_HOW_IT_WORKS_SECTION['subtitle_text'],
+            'steps' => count($steps) > 0 ? $steps : $defaultSteps,
         ];
     }
 

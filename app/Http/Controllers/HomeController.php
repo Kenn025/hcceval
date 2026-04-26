@@ -6,6 +6,8 @@ use App\Models\LandingPageFeature;
 use App\Models\LandingPageFeatureSection;
 use App\Models\LandingPageHeader;
 use App\Models\LandingPageHomeSection;
+use App\Models\LandingPageHowItWorksSection;
+use App\Models\LandingPageHowItWorksStep;
 use App\Models\LandingPageRole;
 use App\Models\LandingPageRolesSection;
 use App\Models\LandingPageStat;
@@ -25,6 +27,7 @@ class HomeController extends Controller
             'homeSection' => $this->homeSection(),
             'featuresSection' => $this->featuresSection(),
             'rolesSection' => $this->rolesSection(),
+            'howItWorksSection' => $this->howItWorksSection(),
         ]);
     }
 
@@ -256,6 +259,48 @@ class HomeController extends Controller
             'title_text' => $section?->title_text ?: $defaultSection['title_text'],
             'subtitle_text' => $section?->subtitle_text ?: $defaultSection['subtitle_text'],
             'features' => count($features) > 0 ? $features : $defaultFeatures,
+        ];
+    }
+
+    private function howItWorksSection(): array
+    {
+        $defaultSteps = [
+            ['step_number' => '01', 'title' => 'Register', 'subtitle' => 'Create account and select your role', 'sort_order' => 1],
+            ['step_number' => '02', 'title' => 'Configure', 'subtitle' => 'Set up evaluation criteria', 'sort_order' => 2],
+            ['step_number' => '03', 'title' => 'Evaluate', 'subtitle' => 'Complete evaluations forms', 'sort_order' => 3],
+            ['step_number' => '04', 'title' => 'Analyze', 'subtitle' => 'View reports and insights', 'sort_order' => 4],
+        ];
+        $defaultSection = [
+            'badge_text' => 'Process',
+            'title_text' => 'How It Works',
+            'subtitle_text' => 'Simple evaluation process in four steps',
+            'steps' => $defaultSteps,
+        ];
+
+        if (! Schema::hasTable('landing_page_how_it_works_sections') || ! Schema::hasTable('landing_page_how_it_works_steps')) {
+            return $defaultSection;
+        }
+
+        $section = LandingPageHowItWorksSection::query()->first();
+        $steps = LandingPageHowItWorksStep::query()
+            ->where('is_active', 1)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get(['step_number', 'title', 'subtitle', 'sort_order'])
+            ->map(fn(LandingPageHowItWorksStep $step) => [
+                'step_number' => $step->step_number,
+                'title' => $step->title,
+                'subtitle' => $step->subtitle,
+                'sort_order' => $step->sort_order,
+            ])
+            ->values()
+            ->all();
+
+        return [
+            'badge_text' => $section?->badge_text ?: $defaultSection['badge_text'],
+            'title_text' => $section?->title_text ?: $defaultSection['title_text'],
+            'subtitle_text' => $section?->subtitle_text ?: $defaultSection['subtitle_text'],
+            'steps' => count($steps) > 0 ? $steps : $defaultSteps,
         ];
     }
 }

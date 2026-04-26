@@ -90,6 +90,21 @@ function normalizeRolesSection(rolesSection = {}) {
     };
 }
 
+function normalizeHowItWorksSection(howItWorksSection = {}) {
+    return {
+        badge_text: String(howItWorksSection.badge_text ?? "").trim(),
+        title_text: String(howItWorksSection.title_text ?? "").trim(),
+        subtitle_text: String(howItWorksSection.subtitle_text ?? "").trim(),
+        steps: (howItWorksSection.steps ?? []).map((row) => ({
+            id: row.id ?? null,
+            step_number: String(row.step_number ?? "").trim(),
+            title: String(row.title ?? "").trim(),
+            subtitle: String(row.subtitle ?? "").trim(),
+            sort_order: Number(row.sort_order ?? 0),
+        })),
+    };
+}
+
 function normalizeStatKey(value) {
     return String(value ?? "")
         .trim()
@@ -138,6 +153,12 @@ export default function LandingPage({
         subtitle_text: "",
         roles: [],
     },
+    howItWorksSection = {
+        badge_text: "",
+        title_text: "",
+        subtitle_text: "",
+        steps: [],
+    },
 }) {
     const canEditStats =
         (statsSection ?? []).length > 0 &&
@@ -157,15 +178,20 @@ export default function LandingPage({
     const [rolesModalOpen, setRolesModalOpen] = useState(false);
     const [pendingRolesScrollToIndex, setPendingRolesScrollToIndex] =
         useState(null);
+    const [howItWorksModalOpen, setHowItWorksModalOpen] = useState(false);
+    const [pendingHowItWorksScrollToIndex, setPendingHowItWorksScrollToIndex] =
+        useState(null);
     const linkContainerRefs = useRef([]);
     const statContainerRefs = useRef([]);
     const featureContainerRefs = useRef([]);
     const roleContainerRefs = useRef([]);
+    const howItWorksContainerRefs = useRef([]);
     const initialHeadersSnapshotRef = useRef("[]");
     const initialHomeSectionSnapshotRef = useRef("{}");
     const initialStatsSnapshotRef = useRef("[]");
     const initialFeaturesSnapshotRef = useRef("{}");
     const initialRolesSnapshotRef = useRef("{}");
+    const initialHowItWorksSnapshotRef = useRef("{}");
 
     const { data, setData, errors, processing, reset, clearErrors } = useForm({
         headers: [],
@@ -227,6 +253,20 @@ export default function LandingPage({
         title_text: "",
         subtitle_text: "",
         roles: [],
+        delete_ids: [],
+    });
+    const {
+        data: howItWorksData,
+        setData: setHowItWorksData,
+        errors: howItWorksErrors,
+        processing: howItWorksProcessing,
+        reset: resetHowItWorks,
+        clearErrors: clearHowItWorksErrors,
+    } = useForm({
+        badge_text: "",
+        title_text: "",
+        subtitle_text: "",
+        steps: [],
         delete_ids: [],
     });
 
@@ -375,6 +415,40 @@ export default function LandingPage({
         setPendingRolesScrollToIndex(null);
         roleContainerRefs.current = [];
     };
+    const openHowItWorksEdit = () => {
+        clearHowItWorksErrors();
+        const nextSteps = (howItWorksSection?.steps ?? []).map((row) => ({
+            id: row.id ?? null,
+            step_number: row.step_number ?? "",
+            title: row.title ?? "",
+            subtitle: row.subtitle ?? "",
+            sort_order: row.sort_order ?? 0,
+        }));
+        setHowItWorksData("badge_text", howItWorksSection?.badge_text ?? "");
+        setHowItWorksData("title_text", howItWorksSection?.title_text ?? "");
+        setHowItWorksData(
+            "subtitle_text",
+            howItWorksSection?.subtitle_text ?? "",
+        );
+        setHowItWorksData("steps", nextSteps);
+        setHowItWorksData("delete_ids", []);
+        initialHowItWorksSnapshotRef.current = JSON.stringify(
+            normalizeHowItWorksSection({
+                badge_text: howItWorksSection?.badge_text ?? "",
+                title_text: howItWorksSection?.title_text ?? "",
+                subtitle_text: howItWorksSection?.subtitle_text ?? "",
+                steps: nextSteps,
+            }),
+        );
+        setHowItWorksModalOpen(true);
+    };
+    const closeHowItWorksModal = () => {
+        resetHowItWorks();
+        setHowItWorksModalOpen(false);
+        clearHowItWorksErrors();
+        setPendingHowItWorksScrollToIndex(null);
+        howItWorksContainerRefs.current = [];
+    };
 
     const updateRow = (index, key, value) => {
         const next = [...data.headers];
@@ -476,6 +550,25 @@ export default function LandingPage({
             setPendingRolesScrollToIndex(null);
         }
     }, [rolesData.roles?.length, rolesModalOpen, pendingRolesScrollToIndex]);
+    useEffect(() => {
+        if (
+            !howItWorksModalOpen ||
+            pendingHowItWorksScrollToIndex === null
+        ) {
+            return;
+        }
+
+        const target =
+            howItWorksContainerRefs.current[pendingHowItWorksScrollToIndex];
+        if (target) {
+            target.scrollIntoView({ behavior: "smooth", block: "start" });
+            setPendingHowItWorksScrollToIndex(null);
+        }
+    }, [
+        howItWorksData.steps?.length,
+        howItWorksModalOpen,
+        pendingHowItWorksScrollToIndex,
+    ]);
 
     const hasEmptyRequiredFields = useMemo(
         () =>
@@ -769,6 +862,60 @@ const removeRoleRow = (index) => {
         next[roleIndex] = { ...next[roleIndex], features };
         setRolesData("roles", next);
     };
+    const updateHowItWorksField = (key, value) => {
+        setHowItWorksData(key, value);
+    };
+    const withHowItWorksSortOrder = (rows = []) =>
+        rows.map((item, idx) => ({ ...item, sort_order: idx + 1 }));
+    const updateHowItWorksRow = (index, key, value) => {
+        const next = [...(howItWorksData.steps ?? [])];
+        next[index] = {
+            ...next[index],
+            [key]: value,
+        };
+        setHowItWorksData("steps", next);
+    };
+    const addHowItWorksRow = () => {
+        const nextRows = withHowItWorksSortOrder([
+            ...(howItWorksData.steps ?? []),
+            {
+                id: null,
+                step_number: String((howItWorksData.steps ?? []).length + 1).padStart(
+                    2,
+                    "0",
+                ),
+                title: "",
+                subtitle: "",
+                sort_order: 0,
+            },
+        ]);
+        setHowItWorksData("steps", nextRows);
+        setPendingHowItWorksScrollToIndex(nextRows.length - 1);
+    };
+    const removeHowItWorksRow = (index) => {
+        const row = (howItWorksData.steps ?? [])[index];
+        const nextRows = withHowItWorksSortOrder(
+            (howItWorksData.steps ?? []).filter((_, i) => i !== index),
+        );
+        setHowItWorksData("steps", nextRows);
+        if (row?.id) {
+            const nextDeleteIds = Array.from(
+                new Set([...(howItWorksData.delete_ids ?? []), row.id]),
+            );
+            setHowItWorksData("delete_ids", nextDeleteIds);
+        }
+    };
+    const moveHowItWorksRow = (index, direction) => {
+        const rows = [...(howItWorksData.steps ?? [])];
+        const targetIndex = direction === "up" ? index - 1 : index + 1;
+        if (targetIndex < 0 || targetIndex >= rows.length) {
+            return;
+        }
+        const temp = rows[index];
+        rows[index] = rows[targetIndex];
+        rows[targetIndex] = temp;
+        setHowItWorksData("steps", withHowItWorksSortOrder(rows));
+    };
 
     const moveFeatureRow = (index, direction) => {
         const rows = [...(featuresData.features ?? [])];
@@ -851,6 +998,46 @@ const removeRoleRow = (index) => {
             route("admin.landing-page.roles-section.update"),
             rolesData,
             { onSuccess: closeRolesModal },
+        );
+    };
+    const hasEmptyHowItWorksRequiredFields = useMemo(() => {
+        const sectionFields = [
+            howItWorksData.badge_text,
+            howItWorksData.title_text,
+            howItWorksData.subtitle_text,
+        ];
+        const sectionHasEmpty = sectionFields.some(
+            (value) => String(value ?? "").trim() === "",
+        );
+        const rowHasEmpty = (howItWorksData.steps ?? []).some(
+            (row) =>
+                String(row.step_number ?? "").trim() === "" ||
+                String(row.title ?? "").trim() === "" ||
+                String(row.subtitle ?? "").trim() === "",
+        );
+        return sectionHasEmpty || rowHasEmpty;
+    }, [howItWorksData]);
+    const hasHowItWorksSectionChanges = useMemo(() => {
+        const currentSnapshot = JSON.stringify(
+            normalizeHowItWorksSection(howItWorksData),
+        );
+        return currentSnapshot !== initialHowItWorksSnapshotRef.current;
+    }, [howItWorksData]);
+    const submitHowItWorksSection = (event) => {
+        event.preventDefault();
+        if (
+            hasEmptyHowItWorksRequiredFields ||
+            !hasHowItWorksSectionChanges
+        ) {
+            return;
+        }
+        router.post(
+            route("admin.landing-page.how-it-works-section.update"),
+            {
+                _method: "put",
+                ...howItWorksData,
+            },
+            { onSuccess: closeHowItWorksModal },
         );
     };
 
@@ -1183,6 +1370,90 @@ const removeRoleRow = (index) => {
                                                 </span>
                                             </div>
                                         ))}
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section className="mb-4 rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-5">
+                    <h2 className="text-base font-semibold text-slate-900">
+                        How It Works
+                    </h2>
+                    <button
+                        type="button"
+                        onClick={openHowItWorksEdit}
+                        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                    >
+                        Edit
+                    </button>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="min-w-full">
+                        <thead>
+                            <tr className="border-b border-slate-100 bg-slate-50/70 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                <th className="px-4 py-3 sm:px-5">Field</th>
+                                <th className="px-4 py-3 sm:px-5">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody className="text-sm text-slate-700">
+                            <tr className="border-b border-slate-100">
+                                <td className="px-4 py-3 font-medium sm:px-5">
+                                    Badge
+                                </td>
+                                <td className="px-4 py-3 sm:px-5">
+                                    {howItWorksSection?.badge_text || "-"}
+                                </td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                                <td className="px-4 py-3 font-medium sm:px-5">
+                                    Title
+                                </td>
+                                <td className="px-4 py-3 sm:px-5">
+                                    {howItWorksSection?.title_text || "-"}
+                                </td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                                <td className="px-4 py-3 font-medium sm:px-5">
+                                    Subtitle
+                                </td>
+                                <td className="px-4 py-3 sm:px-5">
+                                    {howItWorksSection?.subtitle_text || "-"}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td className="px-4 py-3 font-medium sm:px-5 align-top">
+                                    Cards
+                                </td>
+                                <td className="px-4 py-3 sm:px-5">
+                                    <div className="space-y-1">
+                                        {(howItWorksSection?.steps ?? []).map(
+                                            (row, index) => (
+                                                <div
+                                                    key={
+                                                        row.id ??
+                                                        `how-it-works-summary-${index}`
+                                                    }
+                                                >
+                                                    <span className="font-medium text-slate-900">
+                                                        {row.step_number ||
+                                                            String(
+                                                                index + 1,
+                                                            ).padStart(2, "0")}
+                                                        {" - "}
+                                                        {row.title ||
+                                                            `Card ${index + 1}`}
+                                                    </span>
+                                                    <span className="text-slate-500">
+                                                        {" "}
+                                                        - {row.subtitle || "-"}
+                                                    </span>
+                                                </div>
+                                            ),
+                                        )}
                                     </div>
                                 </td>
                             </tr>
@@ -1850,6 +2121,282 @@ const removeRoleRow = (index) => {
                                     <button
                                         type="button"
                                         onClick={closeFeaturesModal}
+                                        className="w-full md:w-[180px] rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+            {howItWorksModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div
+                        className="absolute inset-0 bg-slate-950/40"
+                        onClick={closeHowItWorksModal}
+                    />
+                    <div
+                        className="relative w-full max-w-4xl rounded-xl bg-white p-6 shadow-2xl"
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div className="mb-4 flex items-center justify-between">
+                            <h3 className="text-base font-semibold text-slate-900">
+                                Edit How It Works
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={closeHowItWorksModal}
+                                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                                aria-label="Close modal"
+                            >
+                                <svg
+                                    className="h-5 w-5"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={2}
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M6 18L18 6M6 6l12 12"
+                                    />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <form
+                            onSubmit={submitHowItWorksSection}
+                            className="space-y-4"
+                        >
+                            <div className="max-h-[60vh] overflow-y-auto space-y-3 pr-1">
+                                <div className="grid gap-3 md:grid-cols-3">
+                                    <FormField
+                                        label="Badge"
+                                        error={howItWorksErrors.badge_text}
+                                        required
+                                    >
+                                        <TextInput
+                                            value={howItWorksData.badge_text}
+                                            onChange={(event) =>
+                                                updateHowItWorksField(
+                                                    "badge_text",
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                    </FormField>
+                                    <FormField
+                                        label="Title"
+                                        error={howItWorksErrors.title_text}
+                                        required
+                                    >
+                                        <TextInput
+                                            value={howItWorksData.title_text}
+                                            onChange={(event) =>
+                                                updateHowItWorksField(
+                                                    "title_text",
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                    </FormField>
+                                    <FormField
+                                        label="Subtitle"
+                                        error={howItWorksErrors.subtitle_text}
+                                        required
+                                    >
+                                        <TextInput
+                                            value={howItWorksData.subtitle_text}
+                                            onChange={(event) =>
+                                                updateHowItWorksField(
+                                                    "subtitle_text",
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                    </FormField>
+                                </div>
+
+                                <div className="flex justify-end">
+                                    <button
+                                        type="button"
+                                        onClick={addHowItWorksRow}
+                                        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                                    >
+                                        + Add Card
+                                    </button>
+                                </div>
+
+                                {(howItWorksData.steps ?? []).map(
+                                    (row, index) => (
+                                        <div
+                                            key={
+                                                row.id ??
+                                                `how-it-works-${index}`
+                                            }
+                                            ref={(el) => {
+                                                howItWorksContainerRefs.current[
+                                                    index
+                                                ] = el;
+                                            }}
+                                            className="rounded-lg border border-slate-200 bg-slate-50 p-4"
+                                        >
+                                            <div className="mb-3 flex items-center justify-between gap-2">
+                                                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                    Card #{index + 1}
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            moveHowItWorksRow(
+                                                                index,
+                                                                "up",
+                                                            )
+                                                        }
+                                                        aria-label={`Move How It Works #${index + 1} up`}
+                                                        disabled={index === 0}
+                                                        className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                                    >
+                                                        <AppIcon
+                                                            name="arrow-up"
+                                                            className="h-4 w-4"
+                                                        />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            moveHowItWorksRow(
+                                                                index,
+                                                                "down",
+                                                            )
+                                                        }
+                                                        aria-label={`Move How It Works #${index + 1} down`}
+                                                        disabled={
+                                                            index ===
+                                                            (howItWorksData.steps ??
+                                                                []).length -
+                                                                1
+                                                        }
+                                                        className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                                    >
+                                                        <AppIcon
+                                                            name="arrow-down"
+                                                            className="h-4 w-4"
+                                                        />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            removeHowItWorksRow(
+                                                                index,
+                                                            )
+                                                        }
+                                                        aria-label={`Delete How It Works #${index + 1}`}
+                                                        className="rounded-lg border border-rose-200 bg-white p-1.5 text-rose-600 hover:bg-rose-50"
+                                                    >
+                                                        <AppIcon
+                                                            name="trash"
+                                                            className="h-4 w-4"
+                                                        />
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid gap-3 md:grid-cols-3">
+                                                <FormField
+                                                    label="Number Order"
+                                                    error={
+                                                        howItWorksErrors[
+                                                            `steps.${index}.step_number`
+                                                        ]
+                                                    }
+                                                    required
+                                                >
+                                                    <TextInput
+                                                        value={
+                                                            row.step_number ??
+                                                            ""
+                                                        }
+                                                        onChange={(event) =>
+                                                            updateHowItWorksRow(
+                                                                index,
+                                                                "step_number",
+                                                                event.target
+                                                                    .value,
+                                                            )
+                                                        }
+                                                        placeholder="e.g. 01"
+                                                    />
+                                                </FormField>
+                                                <FormField
+                                                    label="Card Title"
+                                                    error={
+                                                        howItWorksErrors[
+                                                            `steps.${index}.title`
+                                                        ]
+                                                    }
+                                                    required
+                                                >
+                                                    <TextInput
+                                                        value={row.title ?? ""}
+                                                        onChange={(event) =>
+                                                            updateHowItWorksRow(
+                                                                index,
+                                                                "title",
+                                                                event.target
+                                                                    .value,
+                                                            )
+                                                        }
+                                                    />
+                                                </FormField>
+                                                <FormField
+                                                    label="Card Subtitle"
+                                                    error={
+                                                        howItWorksErrors[
+                                                            `steps.${index}.subtitle`
+                                                        ]
+                                                    }
+                                                    required
+                                                >
+                                                    <TextInput
+                                                        value={
+                                                            row.subtitle ?? ""
+                                                        }
+                                                        onChange={(event) =>
+                                                            updateHowItWorksRow(
+                                                                index,
+                                                                "subtitle",
+                                                                event.target
+                                                                    .value,
+                                                            )
+                                                        }
+                                                    />
+                                                </FormField>
+                                            </div>
+                                        </div>
+                                    ),
+                                )}
+                            </div>
+
+                            <div className="pt-2">
+                                <div className="flex flex-col md:flex-row-reverse gap-3 md:justify-start w-full">
+                                    <SubmitButton
+                                        processing={howItWorksProcessing}
+                                        disabled={
+                                            hasEmptyHowItWorksRequiredFields ||
+                                            !hasHowItWorksSectionChanges
+                                        }
+                                        className="w-full md:w-[180px]"
+                                    >
+                                        Save Changes
+                                    </SubmitButton>
+                                    <button
+                                        type="button"
+                                        onClick={closeHowItWorksModal}
                                         className="w-full md:w-[180px] rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700"
                                     >
                                         Cancel

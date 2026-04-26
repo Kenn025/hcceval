@@ -10,6 +10,11 @@ import {
     Layers,
     CircleCheck,
     ListFilter,
+    Lightbulb,
+    Settings2,
+    UserPlus,
+    BookOpen,
+    Check,
     Users,
     GraduationCap,
     BarChart3,
@@ -152,6 +157,7 @@ function App({
     homeSection: customHomeSection = null,
     featuresSection: customFeaturesSection = null,
     rolesSection: customRolesSection = null,
+    howItWorksSection: customHowItWorksSection = null,
 }) {
     const [isDarkMode, setIsDarkMode] = useState(() => {
         if (typeof window === "undefined") return false;
@@ -230,27 +236,20 @@ function App({
             );
         }
     }, [isDarkMode]);
-    const ROLE_ICON_PATHS = {
-        faculty:
-            "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253",
-        peer: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z",
-        student:
-            "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z",
-        admin: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z",
+    const ROLE_ICON_COMPONENTS = {
+        faculty: BookOpen,
+        peer: Users,
+        student: GraduationCap,
+        admin: Shield,
     };
-    const makeRoleIcon = (iconType) =>
-        jsx("svg", {
+    const makeRoleIcon = (iconType) => {
+        const RoleIcon =
+            ROLE_ICON_COMPONENTS[iconType] ?? ROLE_ICON_COMPONENTS.faculty;
+        return jsx(RoleIcon, {
             className: "w-10 h-10",
-            fill: "none",
-            stroke: "currentColor",
-            viewBox: "0 0 24 24",
-            children: jsx("path", {
-                strokeLinecap: "round",
-                strokeLinejoin: "round",
-                strokeWidth: 1.5,
-                d: ROLE_ICON_PATHS[iconType] ?? ROLE_ICON_PATHS.faculty,
-            }),
+            strokeWidth: 1.9,
         });
+    };
     const defaultRoles = [
         {
             icon: makeRoleIcon("faculty"),
@@ -375,6 +374,104 @@ function App({
         "multi-campus": School,
         customizable: SquarePen,
         "detailed reports": ListFilter,
+    };
+    const defaultHowItWorksSteps = [
+        {
+            step_number: "01",
+            title: "Register",
+            subtitle: "Create account and select your role",
+            sort_order: 1,
+        },
+        {
+            step_number: "02",
+            title: "Configure",
+            subtitle: "Set up evaluation criteria",
+            sort_order: 2,
+        },
+        {
+            step_number: "03",
+            title: "Evaluate",
+            subtitle: "Complete evaluations forms",
+            sort_order: 3,
+        },
+        {
+            step_number: "04",
+            title: "Analyze",
+            subtitle: "View reports and insights",
+            sort_order: 4,
+        },
+    ];
+    const defaultHowItWorksSection = {
+        badge_text: "Process",
+        title_text: "How It Works",
+        subtitle_text: "Simple evaluation process in four steps",
+        steps: defaultHowItWorksSteps,
+    };
+    const howItWorksSection =
+        customHowItWorksSection &&
+        typeof customHowItWorksSection === "object"
+            ? {
+                  ...defaultHowItWorksSection,
+                  ...customHowItWorksSection,
+                  steps:
+                      Array.isArray(customHowItWorksSection.steps) &&
+                      customHowItWorksSection.steps.length > 0
+                          ? customHowItWorksSection.steps
+                          : defaultHowItWorksSection.steps,
+              }
+            : defaultHowItWorksSection;
+    const howItWorksSteps =
+        Array.isArray(howItWorksSection.steps) &&
+        howItWorksSection.steps.length > 0
+            ? howItWorksSection.steps.map((step, index) => ({
+                  step: String(
+                      step?.step_number ??
+                          String(index + 1).padStart(2, "0"),
+                  ),
+                  title: String(step?.title || ""),
+                  desc: String(step?.subtitle || step?.desc || ""),
+              }))
+            : defaultHowItWorksSteps.map((step) => ({
+                  step: step.step_number,
+                  title: step.title,
+                  desc: step.subtitle,
+              }));
+    const resolveHowItWorksIcon = (title, desc = "") => {
+        const text = `${String(title || "")} ${String(desc || "")}`.toLowerCase();
+
+        if (
+            /(register|signup|sign up|create account|account|enroll|join|add user)/.test(
+                text,
+            )
+        ) {
+            return UserPlus;
+        }
+
+        if (/(configure|setup|set up|settings|custom|options|preferences)/.test(text)) {
+            return Settings2;
+        }
+
+        if (/(evaluate|assessment|assess|review|verify|check|approval)/.test(text)) {
+            return CircleCheck;
+        }
+
+        if (/(analyze|analysis|report|insight|analytics|dashboard|metrics)/.test(text)) {
+            return BarChart3;
+        }
+
+        if (/(think|brainstorm|idea|plan|strategy|concept)/.test(text)) {
+            return Lightbulb;
+        }
+
+        if (/(form|write|draft|edit|input)/.test(text)) {
+            return SquarePen;
+        }
+
+        if (/(process|workflow|steps|layers)/.test(text)) {
+            return Layers;
+        }
+
+        return LayoutGrid;
     };
     const defaultStats = [
         { value: 4, label: "User Roles", icon: "group" },
@@ -1741,7 +1838,7 @@ function App({
                                         "div",
                                         {
                                             className:
-                                                "neumorphic p-8 hover:scale-[1.02] transition-transform duration-300 cursor-pointer",
+                                                "neumorphic p-8 hover:scale-[1.02] transition-transform duration-300",
                                             children: [
                                                 /* @__PURE__ */ jsx("div", {
                                                     className:
@@ -1925,7 +2022,14 @@ function App({
                                                                                     color: "var(--accent)",
                                                                                 },
                                                                                 children:
-                                                                                    "\u2713",
+                                                                                    /* @__PURE__ */ jsx(
+                                                                                        Check,
+                                                                                        {
+                                                                                            className:
+                                                                                                "w-3 h-3",
+                                                                                            strokeWidth: 2.2,
+                                                                                        },
+                                                                                    ),
                                                                             },
                                                                         ),
                                                                         feature,
@@ -2109,57 +2213,33 @@ function App({
                                     className:
                                         "neumorphic-flat px-4 py-2 inline-block text-sm font-bold mb-4",
                                     style: { color: "var(--accent)" },
-                                    children: "Process",
+                                    children:
+                                        howItWorksSection.badge_text ||
+                                        "Process",
                                 }),
                                 /* @__PURE__ */ jsx("h2", {
                                     className:
                                         "text-3xl md:text-4xl font-bold mb-4",
                                     style: { color: "var(--text-primary)" },
-                                    children: "How It Works",
+                                    children:
+                                        howItWorksSection.title_text ||
+                                        "How It Works",
                                 }),
                                 /* @__PURE__ */ jsx("p", {
                                     style: { color: "var(--text-secondary)" },
                                     children:
+                                        howItWorksSection.subtitle_text ||
                                         "Simple evaluation process in four steps",
                                 }),
                             ],
                         }),
                         /* @__PURE__ */ jsx("div", {
                             className: "grid md:grid-cols-4 gap-8",
-                            children: [
-                                {
-                                    step: "01",
-                                    title: "Register",
-                                    desc: "Create account and select your role",
-                                    iconKey: "edit",
-                                },
-                                {
-                                    step: "02",
-                                    title: "Configure",
-                                    desc: "Set up evaluation criteria",
-                                    iconKey: "layers",
-                                },
-                                {
-                                    step: "03",
-                                    title: "Evaluate",
-                                    desc: "Complete evaluations forms",
-                                    iconKey: "check-circle",
-                                },
-                                {
-                                    step: "04",
-                                    title: "Analyze",
-                                    desc: "View reports and insights",
-                                    iconKey: "dashboard",
-                                },
-                            ].map((item, i) => {
-                                const ProcessIcon =
-                                    item.iconKey === "edit"
-                                        ? SquarePen
-                                        : item.iconKey === "layers"
-                                          ? Layers
-                                          : item.iconKey === "check-circle"
-                                            ? CircleCheck
-                                            : LayoutGrid;
+                            children: howItWorksSteps.map((item, i) => {
+                                const ProcessIcon = resolveHowItWorksIcon(
+                                    item.title,
+                                    item.desc,
+                                );
                                 return /* @__PURE__ */ jsxs(
                                     "div",
                                     {
