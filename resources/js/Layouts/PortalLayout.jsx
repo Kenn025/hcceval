@@ -115,8 +115,8 @@ function SignOutButton({ collapsed, onClick }) {
             type="button"
             onClick={onClick}
             className={[
-                "flex items-center gap-3 rounded-2xl border border-red-400/55 bg-red-600 px-4 py-3.5 text-sm font-bold text-white shadow-[0_10px_24px_-12px_rgba(220,38,38,0.9)] transition-all hover:border-red-300 hover:bg-red-500",
-                collapsed ? "w-12 h-12 justify-center px-0" : "w-full",
+                "flex items-center gap-2.5 rounded-xl border border-red-400/55 bg-red-600 px-3.5 py-2.5 text-sm font-bold text-white shadow-[0_10px_24px_-12px_rgba(220,38,38,0.9)] transition-all hover:border-red-300 hover:bg-red-500",
+                collapsed ? "h-10 w-10 justify-center px-0" : "w-full",
             ].join(" ")}
         >
             <AppIcon name="logout" className="h-4 w-4 shrink-0" />
@@ -181,7 +181,7 @@ function PortalNavItem({ item, isActive, collapsed, onClick }) {
             onClick={onClick}
             data-sidebar-active={isActive ? "true" : undefined}
             className={[
-                "group relative flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-[0.85rem] font-bold tracking-tight transition-all duration-200",
+                "group relative flex w-full items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-[0.85rem] font-bold tracking-tight transition-all duration-200",
                 collapsed ? "justify-center px-0" : "",
                 isActive
                     ? "bg-blue-600 text-white shadow-[0_10px_25px_-5px_rgba(37,99,235,0.4)]"
@@ -190,13 +190,13 @@ function PortalNavItem({ item, isActive, collapsed, onClick }) {
         >
             <span
                 className={[
-                    "flex h-7 w-7 shrink-0 items-center justify-center rounded-xl transition-all",
+                    "flex h-6 w-6 shrink-0 items-center justify-center rounded-lg transition-all",
                     isActive
                         ? "bg-white/20 text-white"
                         : "text-white/40 group-hover:text-white",
                 ].join(" ")}
             >
-                <AppIcon name={item.icon} className="h-4 w-4" />
+                <AppIcon name={item.icon} className="h-3.5 w-3.5" />
             </span>
             {!collapsed && <span className="truncate">{item.label}</span>}
             {isActive && !collapsed && (
@@ -210,11 +210,11 @@ function PortalNavItem({ item, isActive, collapsed, onClick }) {
 
 function PortalNavDivider({ item, collapsed }) {
     if (collapsed) {
-        return <div className="mx-auto my-2 h-px w-8 bg-white/10" />;
+        return <div className="mx-auto my-1.5 h-px w-8 bg-white/10" />;
     }
 
     return (
-        <div className="px-3 pt-4 pb-2">
+        <div className="px-3 pb-1.5 pt-3">
             <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/35">
                 {item.label}
             </p>
@@ -224,16 +224,27 @@ function PortalNavDivider({ item, collapsed }) {
 
 function PortalNavSection({ label, collapsed }) {
     if (collapsed) {
-        return <div className="mx-auto my-3 h-px w-8 rounded-full bg-white/15" />;
+        return <div className="mx-auto my-2 h-px w-8 rounded-full bg-white/15" />;
     }
 
     return (
-        <div className="px-4 pb-1 pt-4">
+        <div className="px-3.5 pb-1 pt-3">
             <p className="text-[10px] font-bold uppercase tracking-wider text-white/35">
                 {label}
             </p>
         </div>
     );
+}
+
+function normalizeSidebarDetail(detail) {
+    if (typeof detail === "string") {
+        return { label: null, value: detail };
+    }
+
+    return {
+        label: detail?.label ?? null,
+        value: detail?.value ?? "",
+    };
 }
 
 export default function PortalLayout({
@@ -388,36 +399,32 @@ export default function PortalLayout({
             {/* User card */}
             {!sidebarCollapsed && (
                 <div className="mx-3 mb-4 rounded-2xl bg-white/10 px-3 py-3 ring-1 ring-white/10 shadow-sm">
-                    <div className="flex items-start gap-3">
-                        <div
-                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${theme.avatarGradient} text-xs font-bold text-white shadow`}
-                        >
-                            {userInitials}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-bold text-white">
-                                {user?.name ?? ""}
-                            </p>
-                            <p className="truncate text-[10px] text-white/40 uppercase tracking-wider">
-                                {theme.portalLabel}
-                            </p>
-                        </div>
-                    </div>
                     {sidebarDetails.length > 0 && (
-                        <div className="mt-3 space-y-1.5 border-t border-white/10 pt-3">
-                            {sidebarDetails.map((detail, index) => (
-                                <p
-                                    key={`${detail}-${index}`}
-                                    className="truncate text-[11px] text-white/65"
-                                >
-                                    {detail}
-                                </p>
-                            ))}
+                        <div className="space-y-2.5">
+                            {sidebarDetails.map((detail, index) => {
+                                const item = normalizeSidebarDetail(detail);
+
+                                return (
+                                    <div
+                                        key={`${item.label ?? "detail"}-${item.value}-${index}`}
+                                        className="min-w-0 border-l-2 border-blue-300/35 pl-3"
+                                    >
+                                        {item.label && (
+                                            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-blue-100/50">
+                                                {item.label}
+                                            </p>
+                                        )}
+                                        <p className="mt-0.5 line-clamp-2 text-[12px] font-semibold leading-4 text-white/90">
+                                            {item.value}
+                                        </p>
+                                    </div>
+                                );
+                            })}
                         </div>
                     )}
                     {sidebarBadge ? (
-                        <div className="mt-3">
-                            <span className="inline-flex items-center gap-2 rounded-full bg-blue-500/15 px-3 py-1.5 text-[11px] font-semibold text-blue-100 ring-1 ring-blue-300/20">
+                        <div className="mt-4">
+                            <span className="inline-flex items-center gap-2 rounded-full bg-blue-500/15 px-3 py-1.5 text-[11px] font-bold text-blue-50 ring-1 ring-blue-300/25">
                                 <span className="h-2 w-2 rounded-full bg-blue-300" />
                                 {sidebarBadge}
                             </span>
@@ -434,7 +441,7 @@ export default function PortalLayout({
             )}
 
             {/* Nav */}
-            <nav ref={navRef} className="flex-1 overflow-y-auto px-2 pb-2">
+            <nav ref={navRef} className="sidebar-scroll flex-1 overflow-y-auto px-2 pb-2">
                 <div className="space-y-0.5">
                     {navItems.map((item) => {
                         if (item.type === "divider") {
@@ -491,7 +498,7 @@ export default function PortalLayout({
             <FlashNotification />
             <div
                 className={[
-                    "portal-shell min-h-screen transition-colors duration-300",
+                    "portal-shell min-h-screen overflow-x-hidden transition-colors duration-300",
                     isDarkMode
                         ? "bg-[#172033] text-slate-100"
                         : `text-slate-900 ${theme.mainBg ?? "bg-slate-50"}`,
@@ -658,11 +665,19 @@ export default function PortalLayout({
                                                 {theme.portalLabel}
                                             </p>
                                         </div>
-                                        <div
-                                            className={`flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br ${theme.topAvatarBg} text-xs font-bold text-white shadow`}
-                                        >
-                                            {userInitials}
-                                        </div>
+                                        {user?.photo_url ? (
+                                            <img
+                                                src={user.photo_url}
+                                                alt=""
+                                                className="h-9 w-9 rounded-xl object-cover shadow ring-1 ring-slate-200/60"
+                                            />
+                                        ) : (
+                                            <div
+                                                className={`flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br ${theme.topAvatarBg} text-xs font-bold text-white shadow`}
+                                            >
+                                                {userInitials}
+                                            </div>
+                                        )}
                                         <AppIcon
                                             name="chevronDown"
                                             className={[
@@ -712,6 +727,25 @@ export default function PortalLayout({
                                                     {theme.portalLabel}
                                                 </p>
                                             </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setShowUserMenu(false);
+                                                    router.visit(route("portal.profile.edit"));
+                                                }}
+                                                className={[
+                                                    "flex w-full items-center gap-2.5 px-3 py-2.5 text-sm transition",
+                                                    isDarkMode
+                                                        ? "text-slate-200 hover:bg-white/5"
+                                                        : "text-slate-700 hover:bg-slate-50",
+                                                ].join(" ")}
+                                            >
+                                                <AppIcon
+                                                    name="profile"
+                                                    className="h-4 w-4 text-blue-500"
+                                                />
+                                                Profile Settings
+                                            </button>
                                             <button
                                                 type="button"
                                                 onClick={() => {

@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -1927,6 +1928,7 @@ class TeacherPortalController extends Controller
                 'strand' => $teacher->strand?->name ?? '',
                 'email' => $teacher->email ?? '',
                 'role' => $teacher->role ?? 'faculty',
+                'photo_url' => $teacher->profile_photo_path ? Storage::disk('public')->url($teacher->profile_photo_path) : null,
             ],
             'cycle' => $cycle ? [
                 'school_year' => "{$cycle->from_year}-{$cycle->to_year}",

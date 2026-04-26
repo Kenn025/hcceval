@@ -11,6 +11,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Throwable;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -1729,6 +1730,7 @@ class StudentPortalController extends Controller
                 'department'  => $student->department?->name ?? '',
                 'program'     => $student->program?->name ?? $student->yearLevel?->name ?? '',
                 'email'       => $student->email ?? '',
+                'photo_url'   => $student->profile_photo_path ? Storage::disk('public')->url($student->profile_photo_path) : null,
             ],
             'cycle'       => $cycle ? [
                 'school_year' => "{$cycle->from_year}-{$cycle->to_year}",

@@ -23,6 +23,7 @@ use App\Http\Controllers\Admin\TeacherController;
 use App\Http\Controllers\Admin\YearLevelController;
 use App\Http\Controllers\Client\ClientLoginController;
 use App\Http\Controllers\Client\ClientPasswordResetController;
+use App\Http\Controllers\Client\ClientProfileController;
 use App\Http\Controllers\Client\EmployeePortalController;
 use App\Http\Controllers\Client\StudentPortalController;
 use App\Http\Controllers\Client\TeacherPortalController;
@@ -200,12 +201,14 @@ Route::middleware('auth')->group(function () {
     Route::post('/admin/import/students', [BulkImportController::class, 'students'])->name('admin.import.students');
     Route::post('/admin/import/teachers', [BulkImportController::class, 'teachers'])->name('admin.import.teachers');
     Route::post('/admin/import/employees', [BulkImportController::class, 'employees'])->name('admin.import.employees');
+    Route::post('/admin/import/questions', [QuestionController::class, 'import'])->name('admin.import.questions');
 
     // Global search
     Route::get('/admin/search', [GlobalSearchController::class, 'search'])->name('admin.search');
 
     // Bug Reports
     Route::post('/bug-report', [BugReportController::class, 'store'])->name('bug-report.store');
+    Route::middleware(['student.auth', 'teacher.auth', 'employee.auth']);
 
     // Notifications (admin)
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
@@ -240,6 +243,9 @@ Route::prefix('portal')->name('portal.')->group(function () {
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead'])->name('notifications.read')->whereNumber('id');
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
     Route::delete('/notifications/clear', [NotificationController::class, 'clear'])->name('notifications.clear');
+
+    Route::get('/profile', [ClientProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ClientProfileController::class, 'update'])->name('profile.update');
 
     // Student portal
     Route::middleware('student.auth')->group(function () {

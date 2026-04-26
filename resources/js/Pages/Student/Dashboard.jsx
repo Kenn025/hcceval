@@ -298,12 +298,12 @@ function ProgramChairEvaluationTab({ targets = [], onStartEvaluation }) {
         return (
             <div
                 key={target.id}
-                className={`flex items-start gap-3 rounded-xl border bg-white p-4 shadow-sm ${
+                className={`flex items-start gap-2.5 rounded-xl border bg-white p-3 shadow-sm ${
                     target.done ? 'border-slate-100' : 'border-slate-200'
                 }`}
             >
-                <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
-                    <AppIcon name={target.done ? 'check-circle' : 'school'} className="h-5 w-5" />
+                <div className={`mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg ${target.done ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                    <AppIcon name={target.done ? 'check-circle' : 'school'} className="h-4 w-4" />
                 </div>
                 <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
@@ -323,13 +323,15 @@ function ProgramChairEvaluationTab({ targets = [], onStartEvaluation }) {
                         {target.role}
                         {target.scope ? ` · ${target.scope}` : ''}
                     </p>
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2">
                         {target.questionnaire_id && (
                             <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-700 ring-1 ring-slate-200">
                                 Questionnaire ID: {target.questionnaire_code || target.questionnaire_id}
                             </span>
                         )}
-                        <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-700 ring-1 ring-amber-200">
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium ring-1 ${
+                            target.questionnaire_title ? 'bg-slate-100 text-slate-700 ring-slate-200' : 'bg-amber-50 text-amber-700 ring-amber-200'
+                        }`}>
                             {target.questionnaire_title || 'No assigned questionnaire'}
                         </span>
                         {!target.questionnaire_id && (
@@ -363,17 +365,17 @@ function ProgramChairEvaluationTab({ targets = [], onStartEvaluation }) {
     }
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-3">
             {scopedTargets.length > 0 && (
                 <div>
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Scoped Program Chairs ({scopedTargets.length})</p>
-                    <div className="space-y-2">{scopedTargets.map(renderTarget)}</div>
+                    <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500">Scoped Program Chairs ({scopedTargets.length})</p>
+                    <div className="space-y-3">{scopedTargets.map(renderTarget)}</div>
                 </div>
             )}
             {otherTargets.length > 0 && (
                 <div>
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Other Program Chairs ({otherTargets.length})</p>
-                    <div className="space-y-2">{otherTargets.map(renderTarget)}</div>
+                    <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500">Other Program Chairs ({otherTargets.length})</p>
+                    <div className="space-y-3">{otherTargets.map(renderTarget)}</div>
                 </div>
             )}
         </div>
@@ -1291,11 +1293,13 @@ export default function StudentDashboard({ student, cycle, subjects = [], progra
             activeNav={activeNav}
             onNavChange={setActiveNav}
             sidebarDetails={[
-                student.student_no,
-                student.department,
-                student.program ?? student.strand,
-                student.branch,
-            ].filter(Boolean)}
+                { label: 'Department', value: student.department },
+                {
+                    label: student.program ? 'Program' : 'Strand',
+                    value: student.program ?? student.strand,
+                },
+                { label: 'Campus', value: student.branch },
+            ].filter((detail) => detail.value)}
             sidebarBadge={cycle ? `${cycle.school_year} · ${cycle.semester}` : null}
         >
             {/* Section header */}

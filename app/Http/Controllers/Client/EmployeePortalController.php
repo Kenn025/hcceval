@@ -8,6 +8,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -368,6 +369,7 @@ class EmployeePortalController extends Controller
                 'department'  => $employee->department?->name ?? '',
                 'email'       => $employee->email ?? '',
                 'role'        => $employee->role ?? 'Employee',
+                'photo_url'   => $employee->profile_photo_path ? Storage::disk('public')->url($employee->profile_photo_path) : null,
             ],
             'cycle'          => $cycle ? [
                 'school_year' => "{$cycle->from_year}-{$cycle->to_year}",

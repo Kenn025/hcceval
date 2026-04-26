@@ -14,7 +14,7 @@ class Student extends Model
         'strand_id', 'education_level_id', 'subject_id', 'removed_subject_map',
         'is_irreg', 'irreg_subject_id', 'irreg_subject_map', 'evaluation_submission_ids',
         'firstname', 'middlename', 'lastname',
-        'email', 'password', 'is_activated', 'is_deleted',
+        'email', 'password', 'profile_photo_path', 'is_activated', 'is_deleted',
     ];
 
     protected $hidden = ['password'];

@@ -12,7 +12,7 @@ class Employee extends Model
     protected $fillable = [
         'code', 'branch_id', 'department_id', 'employee_department_id', 'program_id', 'strand_id',
         'firstname', 'middlename', 'lastname',
-        'email', 'password', 'role', 'is_activated', 'is_deleted',
+        'email', 'password', 'profile_photo_path', 'role', 'is_activated', 'is_deleted',
     ];
 
     protected $hidden = ['password'];

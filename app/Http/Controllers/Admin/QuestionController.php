@@ -133,6 +133,83 @@ class QuestionController extends Controller
         return back()->with('success', 'Question created.');
     }
 
+    public function import(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:csv,txt|max:5120',
+        ]);
+
+        $handle = fopen($request->file('file')->getRealPath(), 'r');
+        if (! $handle) {
+            return back()->withErrors(['file' => 'Unable to read uploaded file.']);
+        }
+
+        $header = fgetcsv($handle);
+        if (! $header) {
+            fclose($handle);
+            return back()->withErrors(['file' => 'CSV is empty or missing a header row.']);
+        }
+
+        $header = array_map(fn ($value) => $this->normalizeCsvHeader($value), $header);
+        $created = 0;
+        $skipped = 0;
+        $errors = [];
+        $rowNum = 1;
+
+        while (($row = fgetcsv($handle)) !== false) {
+            $rowNum++;
+            $assoc = array_combine($header, array_pad($row, count($header), null));
+            if (! $assoc) {
+                $skipped++;
+                continue;
+            }
+
+            $questionText = trim((string) ($this->csvValue($assoc, ['question_text', 'question']) ?? ''));
+            $typeValue = trim((string) ($this->csvValue($assoc, ['question_type', 'question_type_id', 'type']) ?? ''));
+            $classValue = trim((string) ($this->csvValue($assoc, ['question_class', 'question_class_id', 'class']) ?? ''));
+            $statusValue = strtolower(trim((string) ($this->csvValue($assoc, ['status', 'is_active']) ?? 'active')));
+
+            $typeId = $this->resolveQuestionReference('question_type', $typeValue);
+            $classId = $this->resolveQuestionReference('question_class', $classValue);
+
+            $rowErrors = [];
+            if ($questionText === '') {
+                $rowErrors[] = 'Question Text is required.';
+            }
+            if (! $typeId) {
+                $rowErrors[] = 'Question Type was not found.';
+            }
+            if (! $classId) {
+                $rowErrors[] = 'Question Class was not found.';
+            }
+
+            if ($rowErrors) {
+                $skipped++;
+                $errors[] = "Row {$rowNum}: " . implode(' ', $rowErrors);
+                continue;
+            }
+
+            DB::table('question')->insert([
+                'code' => $this->generateQuestionCode(),
+                'description' => $questionText,
+                'question_type_id' => $typeId,
+                'question_class_id' => $classId,
+                'is_required' => 1,
+                'is_activated' => in_array($statusValue, ['inactive', 'disabled', '0'], true) ? 0 : 1,
+                'is_deleted' => 0,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $created++;
+        }
+
+        fclose($handle);
+
+        return back()
+            ->with('success', "Imported {$created} questions, skipped {$skipped}.")
+            ->with('import_errors', array_slice($errors, 0, 25));
+    }
+
     public function update(Request $request, int $id)
     {
         $validated = $request->validate([
@@ -157,5 +234,49 @@ class QuestionController extends Controller
     {
         DB::table('question')->where('id', $id)->update(['is_deleted' => 1, 'updated_at' => now()]);
         return back()->with('success', 'Question deleted.');
+    }
+
+    private function normalizeCsvHeader(mixed $header): string
+    {
+        $normalized = strtolower(trim((string) $header));
+        $normalized = preg_replace('/[^a-z0-9]+/', '_', $normalized) ?? '';
+
+        return trim($normalized, '_');
+    }
+
+    private function csvValue(array $assoc, array $keys): ?string
+    {
+        foreach ($keys as $key) {
+            $key = $this->normalizeCsvHeader($key);
+
+            if (isset($assoc[$key]) && trim((string) $assoc[$key]) !== '') {
+                return trim((string) $assoc[$key]);
+            }
+        }
+
+        return null;
+    }
+
+    private function resolveQuestionReference(string $table, string $value): ?int
+    {
+        if ($value === '') {
+            return null;
+        }
+
+        if (ctype_digit($value)) {
+            return (int) $value;
+        }
+
+        $normalized = strtolower(trim(preg_replace('/\s+/', ' ', $value) ?? ''));
+        $matches = DB::table($table)
+            ->where('is_deleted', 0)
+            ->where(function ($query) use ($value, $normalized) {
+                $query->whereRaw('LOWER(name) = ?', [strtolower($value)])
+                    ->orWhereRaw('LOWER(code) = ?', [strtolower($value)])
+                    ->orWhereRaw('LOWER(name) = ?', [$normalized]);
+            })
+            ->pluck('id');
+
+        return $matches->count() === 1 ? (int) $matches->first() : null;
     }
 }
