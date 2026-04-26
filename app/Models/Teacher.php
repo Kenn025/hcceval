@@ -12,12 +12,18 @@ class Teacher extends Model
     protected $fillable = [
         'code', 'branch_id', 'department_id', 'program_id', 'strand_id',
         'firstname', 'middlename', 'lastname',
-        'email', 'password', 'role', 'personal_info', 'is_activated', 'is_deleted',
+        'email', 'password', 'role', 'personal_info', 'evaluation_submission_ids', 'assigned_subject_ids', 'is_activated', 'is_deleted',
     ];
 
     protected $hidden = ['password'];
 
-    protected $casts = ['personal_info' => 'array', 'is_activated' => 'boolean', 'is_deleted' => 'boolean'];
+    protected $casts = [
+        'personal_info' => 'array',
+        'evaluation_submission_ids' => 'array',
+        'assigned_subject_ids' => 'array',
+        'is_activated' => 'boolean',
+        'is_deleted' => 'boolean',
+    ];
 
     public function branch(): BelongsTo
     {
@@ -58,6 +64,8 @@ class Teacher extends Model
         $attributes['last_name'] = $attributes['lastname'] ?? null;
         $attributes['suffix_name'] = null;
         $attributes['employee_no'] = $attributes['code'] ?? $this->employee_no;
+        $attributes['evaluation_submission_ids'] = $attributes['evaluation_submission_ids'] ?? [];
+        $attributes['assigned_subject_ids'] = $attributes['assigned_subject_ids'] ?? [];
         $attributes['is_active'] = (bool) ($attributes['is_activated'] ?? false);
         $attributes['status'] = ($attributes['is_activated'] ?? false) ? 'Active' : 'Inactive';
 

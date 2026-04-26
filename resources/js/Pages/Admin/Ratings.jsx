@@ -152,6 +152,68 @@ const COLUMNS_MAP = {
     branch: BRANCH_COLUMNS,
 };
 
+function SubjectRatingsList({ subjects = [], onTeacherClick }) {
+    if (!subjects.length) {
+        return (
+            <div className="rounded-xl border border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-500 shadow-sm">
+                No subjects found.
+            </div>
+        );
+    }
+
+    return (
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div className="hidden grid-cols-[1.4fr_1fr_1fr_0.7fr_0.7fr] gap-4 border-b border-slate-100 bg-slate-50 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
+                <span>Subject</span>
+                <span>Program / Strand</span>
+                <span>Teacher</span>
+                <span>Rating</span>
+                <span>Responses</span>
+            </div>
+            <div className="divide-y divide-slate-100">
+                {subjects.map((subject) => {
+                    const teachers = subject.teachers?.length ? subject.teachers : [{}];
+
+                    return teachers.map((teacher, index) => {
+                        const row = {
+                            ...teacher,
+                            subject_name: subject.name,
+                            subject_code: subject.code,
+                            program_name: subject.program_name,
+                            strand_name: subject.strand_name,
+                        };
+                        const hasRating = teacher.overall_rating != null;
+
+                        return (
+                            <button
+                                key={`${subject.id}-${teacher.teacher_id ?? 'teacher'}-${index}`}
+                                type="button"
+                                onClick={() => hasRating && onTeacherClick(row)}
+                                disabled={!hasRating}
+                                className={`grid w-full gap-3 px-5 py-4 text-left transition lg:grid-cols-[1.4fr_1fr_1fr_0.7fr_0.7fr] lg:items-center ${hasRating ? 'hover:bg-slate-50' : 'cursor-default'}`}
+                            >
+                                <div>
+                                    <p className="text-sm font-semibold text-slate-900">{subject.name}</p>
+                                    <p className="mt-1 text-xs text-slate-500">{subject.code ?? 'No subject code'}</p>
+                                </div>
+                                <p className="text-sm text-slate-700">{subject.program_name ?? subject.strand_name ?? subject.type ?? '-'}</p>
+                                <div>
+                                    <p className="text-sm font-medium text-slate-800">{teacher.teacher_name ?? 'Unassigned teacher'}</p>
+                                    <p className="mt-1 text-xs text-slate-500">{teacher.teacher_role ?? 'Teacher'}</p>
+                                </div>
+                                <p className={`text-sm font-semibold ${hasRating ? 'text-blue-700' : 'text-slate-400'}`}>
+                                    {hasRating ? Number(teacher.overall_rating).toFixed(2) : 'No rating'}
+                                </p>
+                                <p className="text-sm text-slate-600">{teacher.submission_count ?? 0}</p>
+                            </button>
+                        );
+                    });
+                })}
+            </div>
+        </div>
+    );
+}
+
 export default function Ratings({
     ratings,
     ratingType,
@@ -164,6 +226,7 @@ export default function Ratings({
     isBranchAdmin = false,
     selectedBranchId = null,
     scopedBranchId = null,
+    subjectRatingContext = null,
 }) {
     const [selectedYear, setSelectedYear] = useState(filters.school_year ?? '');
     const [detailOpen, setDetailOpen] = useState(false);
@@ -211,6 +274,16 @@ export default function Ratings({
         ))),
         [matchingDepartmentIds, selectedDepartmentType, strands],
     );
+    const subjectBranches = subjectRatingContext?.branches ?? [];
+    const subjectDepartments = subjectRatingContext?.departments ?? [];
+    const subjectPrograms = subjectRatingContext?.programs ?? [];
+    const subjectStrands = subjectRatingContext?.strands ?? [];
+    const subjectSubjects = subjectRatingContext?.subjects ?? [];
+    const selectedSubjectBranchId = String(subjectRatingContext?.selectedBranchId ?? filters.branch_id ?? '');
+    const selectedSubjectDepartmentId = String(subjectRatingContext?.selectedDepartmentId ?? filters.department_id ?? '');
+    const selectedSubjectProgramId = String(subjectRatingContext?.selectedProgramId ?? filters.program_id ?? '');
+    const selectedSubjectStrandId = String(subjectRatingContext?.selectedStrandId ?? filters.strand_id ?? '');
+    const subjectEducationType = subjectRatingContext?.educationType ?? 'college';
 
     useEffect(() => {
         if (ratingType !== 'peer' || selectedDepartmentGroup || peerFilterDepartments.length === 0) {
@@ -242,6 +315,62 @@ export default function Ratings({
     const handleYearFilter = (year) => {
         setSelectedYear(year);
         router.get(route(activeRoute), { ...filters, school_year: year, page: 1 }, { preserveState: true, replace: true });
+    };
+
+    const handleSubjectBranchChange = (branchId) => {
+        router.get(route(activeRoute), {
+            ...filters,
+            branch_id: branchId,
+            department_id: '',
+            program_id: '',
+            strand_id: '',
+            page: 1,
+        }, {
+            preserveState: true,
+            replace: true,
+        });
+    };
+
+    const handleSubjectDepartmentChange = (departmentId) => {
+        router.get(route(activeRoute), {
+            ...filters,
+            branch_id: selectedSubjectBranchId,
+            department_id: departmentId,
+            program_id: '',
+            strand_id: '',
+            page: 1,
+        }, {
+            preserveState: true,
+            replace: true,
+        });
+    };
+
+    const handleSubjectProgramChange = (programId) => {
+        router.get(route(activeRoute), {
+            ...filters,
+            branch_id: selectedSubjectBranchId,
+            department_id: selectedSubjectDepartmentId,
+            program_id: programId,
+            strand_id: '',
+            page: 1,
+        }, {
+            preserveState: true,
+            replace: true,
+        });
+    };
+
+    const handleSubjectStrandChange = (strandId) => {
+        router.get(route(activeRoute), {
+            ...filters,
+            branch_id: selectedSubjectBranchId,
+            department_id: selectedSubjectDepartmentId,
+            program_id: '',
+            strand_id: strandId,
+            page: 1,
+        }, {
+            preserveState: true,
+            replace: true,
+        });
     };
 
     const handlePeerBranchChange = (branchId) => {
@@ -364,7 +493,7 @@ export default function Ratings({
                             className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
                         >
                             <option value="">All school years</option>
-                            {schoolYears.map((y) => <option key={y} value={y}>{y}</option>)}
+                            {schoolYears.map((y, index) => <option key={`${y}-${index}`} value={y}>{y}</option>)}
                         </select>
                     )}
                     <button
@@ -386,6 +515,71 @@ export default function Ratings({
                 </div>
                 )}
             </div>
+
+            {isSubjectRatings && (
+                <div className="mb-4 space-y-3">
+                    <div className="flex flex-wrap items-end justify-between gap-3">
+                        <div className="min-w-[240px]">
+                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Branch
+                            </label>
+                            <select
+                                value={selectedSubjectBranchId}
+                                onChange={(e) => handleSubjectBranchChange(e.target.value)}
+                                disabled={Boolean(subjectRatingContext?.scopedBranchId)}
+                                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500"
+                            >
+                                {subjectBranches.map((branch) => (
+                                    <option key={branch.id} value={branch.id}>{branch.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {(subjectEducationType === 'college' || subjectEducationType === 'shs') && (
+                            <div className="ml-auto">
+                                {subjectEducationType === 'college' && subjectPrograms.length > 0 && (
+                                    <select
+                                        value={selectedSubjectProgramId}
+                                        onChange={(e) => handleSubjectProgramChange(e.target.value)}
+                                        className="min-w-[240px] rounded-full border border-slate-200 bg-white py-1.5 pl-4 pr-9 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    >
+                                        {subjectPrograms.map((program) => (
+                                            <option key={program.id} value={program.id}>{program.name}</option>
+                                        ))}
+                                    </select>
+                                )}
+
+                                {subjectEducationType === 'shs' && subjectStrands.length > 0 && (
+                                    <select
+                                        value={selectedSubjectStrandId}
+                                        onChange={(e) => handleSubjectStrandChange(e.target.value)}
+                                        className="min-w-[240px] rounded-full border border-slate-200 bg-white py-1.5 pl-4 pr-9 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    >
+                                        {subjectStrands.map((strand) => (
+                                            <option key={strand.id} value={strand.id}>{strand.name}</option>
+                                        ))}
+                                    </select>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {subjectDepartments.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-2">
+                            {subjectDepartments.map((department) => (
+                                <button
+                                    key={department.id}
+                                    type="button"
+                                    onClick={() => handleSubjectDepartmentChange(department.id)}
+                                    className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${String(department.id) === selectedSubjectDepartmentId ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50'}`}
+                                >
+                                    {department.name}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
 
             {ratingType === 'peer' && (
                 <div className="mb-4 space-y-3">
@@ -454,15 +648,19 @@ export default function Ratings({
                 </div>
             )}
 
-            <ResourceTable
-                columns={columns}
-                data={ratings}
-                filters={{ ...filters, school_year: selectedYear }}
-                routeName={activeRoute}
-                searchPlaceholder={ratingType === 'peer' ? 'Search teachers...' : 'Search ratings...'}
-                onRowClick={openView}
-                extraHeaderActions={null}
-            />
+            {isSubjectRatings ? (
+                <SubjectRatingsList subjects={subjectSubjects} onTeacherClick={openView} />
+            ) : (
+                <ResourceTable
+                    columns={columns}
+                    data={ratings}
+                    filters={{ ...filters, school_year: selectedYear }}
+                    routeName={activeRoute}
+                    searchPlaceholder={ratingType === 'peer' ? 'Search teachers...' : 'Search ratings...'}
+                    onRowClick={openView}
+                    extraHeaderActions={null}
+                />
+            )}
 
             <SlideOver open={detailOpen} onClose={() => setDetailOpen(false)} title="Rating Information">
                 {viewing && (
@@ -498,7 +696,7 @@ export default function Ratings({
                             <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">School Year</p><p className="mt-1 text-sm text-slate-900">{viewing.school_year ?? '-'}</p></div>
                         </div>
 
-                        {ratingType === 'peer' && viewing.questionnaire && (
+                        {(ratingType === 'peer' || ratingType === 'subject') && viewing.questionnaire && (
                             <div className="space-y-4">
                                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
                                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Questionnaire</p>

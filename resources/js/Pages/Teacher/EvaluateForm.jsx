@@ -87,8 +87,6 @@ export default function TeacherEvaluateForm({ category, questionnaireId, questio
                 questionnaire_id: questionnaireId ?? null,
                 evaluatee_id: evaluatee.id,
                 academic_year_id: cycle.id,
-                school_year: cycle.school_year,
-                term: cycle.term,
                 answers: Object.entries(answers).map(([questionId, rating]) => ({
                     question_id: parseInt(questionId, 10),
                     rating,

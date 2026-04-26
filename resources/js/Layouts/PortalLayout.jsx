@@ -75,7 +75,7 @@ const NAV_ITEMS = {
         { key: "my_subject_ratings", label: "My Subject Ratings", icon: "ratings" },
         { key: "peer_ratings", label: "Peer Ratings", icon: "group" },
         { key: "teacher-records", type: "divider", label: "Records and Archive" },
-        { key: "submissions", label: "Submissions", icon: "check-circle" },
+        { key: "submissions", label: "Evaluation Submissions", icon: "check-circle" },
         { key: "archives", label: "Archives", icon: "archive" },
     ],
     employee: [

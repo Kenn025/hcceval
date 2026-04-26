@@ -1510,6 +1510,99 @@ function CustomSubjectsModal({
         </>
     );
 }
+
+function EmployeeDepartmentEmployeesModal({
+    open,
+    scopeItem,
+    employees = [],
+    onClose,
+}) {
+    if (!open || !scopeItem) {
+        return null;
+    }
+
+    const scopedEmployees = employees.filter((employee) => (
+        String(employee.employee_department_id ?? '') === String(scopeItem.entityId)
+            && String(employee.branch_id ?? '') === String(scopeItem.branchId ?? '')
+    ));
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-slate-950/40" onClick={onClose} />
+            <div className="relative max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+                <div className="flex items-start justify-between gap-4">
+                    <div>
+                        <h3 className="text-lg font-semibold text-slate-900">Custom Employees</h3>
+                        <p className="mt-1 text-sm text-slate-500">
+                            {scopeItem.primary} employees in {scopeItem.branchName ?? 'the active branch'}.
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                    >
+                        Close
+                    </button>
+                </div>
+
+                <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
+                    <div className="hidden md:block overflow-x-auto">
+                        <table className="min-w-full divide-y divide-slate-200">
+                            <thead className="bg-slate-50">
+                                <tr>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">#</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Employee</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Code</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Role</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-200 bg-white">
+                                {scopedEmployees.length > 0 ? (
+                                    scopedEmployees.map((employee, index) => (
+                                        <tr key={`employee-scope-${employee.id}`} className="hover:bg-slate-50/80">
+                                            <td className="px-4 py-3 text-sm text-slate-600">{index + 1}</td>
+                                            <td className="px-4 py-3 text-sm font-medium text-slate-900">{employee.name || '-'}</td>
+                                            <td className="px-4 py-3 text-sm text-slate-600">{employee.code || '-'}</td>
+                                            <td className="px-4 py-3 text-sm text-slate-600">{employee.role || '-'}</td>
+                                        </tr>
+                                    ))
+                                ) : (
+                                    <tr>
+                                        <td colSpan={4} className="px-4 py-8 text-center text-sm text-slate-500">
+                                            No active employees found for this employee department in the active branch.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div className="md:hidden divide-y divide-slate-100">
+                        {scopedEmployees.length > 0 ? (
+                            scopedEmployees.map((employee, index) => (
+                                <div key={`mobile-employee-scope-${employee.id}`} className="p-4 active:bg-slate-50 transition-colors">
+                                    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400"># {index + 1}</div>
+                                    <div className="mt-0.5 text-sm font-semibold text-slate-900">{employee.name || '-'}</div>
+                                    <div className="text-xs text-slate-500">{employee.code || '-'}</div>
+                                    <div className="mt-3">
+                                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Role</div>
+                                        <div className="mt-0.5 text-xs text-slate-600">{employee.role || '-'}</div>
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="px-4 py-8 text-center text-sm text-slate-500">
+                                No active employees found for this employee department in the active branch.
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function Assignments({
     assignmentType,
     filters = {},
@@ -1522,6 +1615,7 @@ export default function Assignments({
     yearLevels = [],
     subjects = [],
     faculty = [],
+    employees = [],
     selectedQuestionnaires = {},
     customSubjectGroups = {},
 }) {
@@ -1556,7 +1650,7 @@ export default function Assignments({
     const changeBranchFilter = (branchId) => {
         router.get(route(activeTab.routeName), {
             ...filters,
-            branch_id: branchId || '',
+            branch_id: branchId,
         }, {
             preserveScroll: true,
             preserveState: true,
@@ -1639,16 +1733,21 @@ export default function Assignments({
         if (assignmentType === 'employee') {
             return employeeDepartments.map((department) => {
                 const branch = branches.find((item) => String(item.id) === String(department.branch_id));
+                const scopedEmployees = employees.filter((employee) => (
+                    String(employee.employee_department_id ?? '') === String(department.id)
+                        && String(employee.branch_id ?? '') === String(activeBranchId)
+                ));
 
                 return {
                     id: `employee-department-${department.id}`,
                     entityId: department.id,
                     scopeType: 'employee-department',
-                    branchId: department.branch_id ?? null,
+                    branchId: activeBranchId || department.branch_id || null,
                     departmentId: null,
                     primary: department.name,
                     secondary: department.code,
-                    branchName: branch?.name ?? 'All Branches',
+                    branchName: branch?.name ?? branches.find((item) => String(item.id) === String(activeBranchId))?.name ?? 'Active Branch',
+                    employeeCount: scopedEmployees.length,
                     selectedQuestionnaire: selectedQuestionnaires[`employee-department-${department.id}`] ?? null,
                 };
             });
@@ -1723,7 +1822,7 @@ export default function Assignments({
                     customGroups: selectedQuestionnaire?.custom_scope_groups ?? [],
                 };
             }));
-    }, [activeDepartmentLayer, activeHeadDepartmentId, assignmentType, branches, departments, employeeDepartments, faculty, peerDepartmentStatusCards, programs, selectedQuestionnaires, strands, yearLevels]);
+    }, [activeBranchId, activeDepartmentLayer, activeHeadDepartmentId, assignmentType, branches, departments, employeeDepartments, employees, faculty, peerDepartmentStatusCards, programs, selectedQuestionnaires, strands, yearLevels]);
 
     return (
         <AdminLayout title={TITLE_MAP[assignmentType]} activeRoute="admin.questionnaire-distribution" breadcrumbs={['Question Bank']}>
@@ -1739,7 +1838,6 @@ export default function Assignments({
                         onChange={(event) => changeBranchFilter(event.target.value)}
                         className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
                     >
-                        <option value="">All Branches</option>
                         {branchOptions.map((branch) => (
                             <option key={branch.id} value={branch.id}>
                                 {branch.name}
@@ -2001,14 +2099,14 @@ export default function Assignments({
                                             {assignmentType === 'peer' ? (
                                                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Branch</th>
                                             ) : null}
-                                            {assignmentType === 'employee' ? (
-                                                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Branch</th>
-                                            ) : null}
                                             {assignmentType === 'head' ? (
                                                 <>
                                                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Program</th>
                                                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Branch</th>
                                                 </>
+                                            ) : null}
+                                            {assignmentType === 'employee' ? (
+                                                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Employees</th>
                                             ) : null}
                                             <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Code</th>
                                             <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Selected Questionnaire</th>
@@ -2023,14 +2121,14 @@ export default function Assignments({
                                                 {assignmentType === 'peer' ? (
                                                     <td className="px-4 py-3 text-sm text-slate-600">{item.branchName ?? '-'}</td>
                                                 ) : null}
-                                                {assignmentType === 'employee' ? (
-                                                    <td className="px-4 py-3 text-sm text-slate-600">{item.branchName ?? '-'}</td>
-                                                ) : null}
                                                 {assignmentType === 'head' ? (
                                                     <>
                                                         <td className="px-4 py-3 text-sm text-slate-600">{item.programName ?? '-'}</td>
                                                         <td className="px-4 py-3 text-sm text-slate-600">{item.branchName ?? '-'}</td>
                                                     </>
+                                                ) : null}
+                                                {assignmentType === 'employee' ? (
+                                                    <td className="px-4 py-3 text-sm text-slate-600">{item.employeeCount ?? 0}</td>
                                                 ) : null}
                                                 <td className="px-4 py-3 text-sm text-slate-600">{item.secondary || '-'}</td>
                                                 <td className="px-4 py-3 text-sm text-slate-700">
@@ -2087,10 +2185,15 @@ export default function Assignments({
                                                         >
                                                             {assignmentType === 'head' ? 'Assign' : 'Distribute'}
                                                         </button>
-                                                        {assignmentType !== 'head' && assignmentType !== 'employee' ? (
+                                                        {assignmentType !== 'head' ? (
                                                             <button
                                                                 type="button"
                                                                 onClick={() => {
+                                                                    if (assignmentType === 'employee') {
+                                                                        setCustomTarget(item);
+                                                                        return;
+                                                                    }
+
                                                                     if (assignmentType === 'peer') {
                                                                         setCustomTarget(item);
                                                                         return;
@@ -2136,6 +2239,13 @@ export default function Assignments({
                                                         <div className="mt-0.5 text-xs text-slate-600">{item.programName}</div>
                                                     </div>
                                                 )}
+
+                                                {assignmentType === 'employee' ? (
+                                                    <div>
+                                                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Employees</div>
+                                                        <div className="mt-0.5 text-xs text-slate-600">{item.employeeCount ?? 0}</div>
+                                                    </div>
+                                                ) : null}
 
                                                 <div>
                                                     <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Questionnaire</div>
@@ -2194,10 +2304,15 @@ export default function Assignments({
                                                 >
                                                     {assignmentType === 'head' ? 'Assign' : 'Distribute'}
                                                 </button>
-                                                {assignmentType !== 'head' && assignmentType !== 'employee' ? (
+                                                {assignmentType !== 'head' ? (
                                                     <button
                                                         type="button"
                                                         onClick={() => {
+                                                            if (assignmentType === 'employee') {
+                                                                setCustomTarget(item);
+                                                                return;
+                                                            }
+
                                                             if (assignmentType === 'peer') {
                                                                 setCustomTarget(item);
                                                                 return;
@@ -2252,18 +2367,27 @@ export default function Assignments({
                 }}
             />
 
-            <CustomSubjectsModal
-                open={Boolean(customTarget)}
-                scopeItem={customTarget}
-                subjects={subjects}
-                faculty={faculty}
-                programs={programs}
-                strands={strands}
-                yearLevels={yearLevels}
-                questionnaires={questionnaires}
-                assignmentType={assignmentType}
-                onClose={() => setCustomTarget(null)}
-            />
+            {assignmentType === 'employee' ? (
+                <EmployeeDepartmentEmployeesModal
+                    open={Boolean(customTarget)}
+                    scopeItem={customTarget}
+                    employees={employees}
+                    onClose={() => setCustomTarget(null)}
+                />
+            ) : (
+                <CustomSubjectsModal
+                    open={Boolean(customTarget)}
+                    scopeItem={customTarget}
+                    subjects={subjects}
+                    faculty={faculty}
+                    programs={programs}
+                    strands={strands}
+                    yearLevels={yearLevels}
+                    questionnaires={questionnaires}
+                    assignmentType={assignmentType}
+                    onClose={() => setCustomTarget(null)}
+                />
+            )}
 
             <AssignedQuestionnairesModal
                 open={Boolean(assignedQuestionnaireTarget)}

@@ -602,5 +602,7 @@ class DatabaseSeeder extends Seeder
             ['id' => 1, 'branch_id' => 2, 'code' => 'QD-001', 'questionnaire_id' => 1, 'academic_year_id' => 1, 'items' => json_encode([1, 2, 3, 4, 5, 6]), 'is_activated' => 1, 'is_deleted' => 0],
             ['id' => 2, 'branch_id' => 3, 'code' => 'QD-002', 'questionnaire_id' => 2, 'academic_year_id' => 1, 'items' => json_encode([9, 10, 11, 12, 13, 14]), 'is_activated' => 1, 'is_deleted' => 0],
         ]);
+
+        $this->call(EvaluationSubmissionArchiveSeeder::class);
     }
 }

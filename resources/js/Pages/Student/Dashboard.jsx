@@ -3,7 +3,7 @@ import ConfirmDialog from '@/Components/ConfirmDialog';
 import Modal from '@/Components/Modal';
 import PortalLayout from '@/Layouts/PortalLayout';
 import { router } from '@inertiajs/react';
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 
 const SECTION_TITLES = {
     subjects:    'My Subjects',
@@ -324,8 +324,24 @@ function EvaluationModal({ form, open, onClose }) {
                             <p className="mb-4 text-xs text-slate-500">Rate each item from <strong>1 (Poor)</strong> to <strong>5 (Excellent)</strong>.</p>
 
                             <div className="space-y-3">
-                                {questions.map((q, index) => (
-                                    <div key={q.question_id} className="rounded-lg border border-slate-200 bg-white p-4">
+                                {questions.map((q, index) => {
+                                    const previousClass = questions[index - 1]?.class_name ?? '';
+                                    const currentClass = q.class_name ?? '';
+                                    const showDivider = currentClass && currentClass !== previousClass;
+
+                                    return (
+                                    <Fragment key={q.question_id}>
+                                        {showDivider && (
+                                            <div className="flex items-center gap-3 pt-2">
+                                                <div className="h-px flex-1 bg-slate-200" />
+                                                <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                                    {currentClass}
+                                                    {q.weight_percentage != null ? ` (${q.weight_percentage}%)` : ''}
+                                                </div>
+                                                <div className="h-px flex-1 bg-slate-200" />
+                                            </div>
+                                        )}
+                                    <div className="rounded-lg border border-slate-200 bg-white p-4">
                                         <p className="mb-3 text-sm text-slate-700">
                                             <span className="mr-1 font-semibold text-slate-500">{index + 1}.</span>{q.question_text}
                                         </p>
@@ -351,7 +367,9 @@ function EvaluationModal({ form, open, onClose }) {
                                             <p className="mt-2 text-xs text-red-500">Please select a rating.</p>
                                         )}
                                     </div>
-                                ))}
+                                    </Fragment>
+                                    );
+                                })}
                             </div>
 
                             <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
