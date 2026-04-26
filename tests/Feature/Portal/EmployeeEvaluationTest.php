@@ -43,6 +43,17 @@ class EmployeeEvaluationTest extends TestCase
             'updated_at' => now(),
         ]);
 
+        DB::table('department_evaluation_windows')->insert([
+            'academic_year_id' => $cycleId,
+            'branch_id' => $branchId,
+            'department_id' => $deptId,
+            'status' => 'active',
+            'date_opened' => now()->subMinute(),
+            'date_closed' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
         $evaluatorId = (int) DB::table('employee')->insertGetId([
             'code' => 'EMP-001',
             'firstname' => 'Eve',

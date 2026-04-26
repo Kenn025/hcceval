@@ -71,6 +71,17 @@ class StudentEvaluationTest extends TestCase
             'updated_at' => now(),
         ]);
 
+        DB::table('department_evaluation_windows')->insert([
+            'academic_year_id' => $cycleId,
+            'branch_id' => $branchId,
+            'department_id' => $departmentId,
+            'status' => 'active',
+            'date_opened' => now()->subMinute(),
+            'date_closed' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
         $studentId = (int) DB::table('student')->insertGetId([
             'code' => 'STU-001',
             'firstname' => 'Sam',
@@ -195,6 +206,7 @@ class StudentEvaluationTest extends TestCase
             'subject_id' => $subjectId,
             'subject_section_id' => $subjectSectionId,
             'branch_id' => $branchId,
+            'department_id' => $departmentId,
             'questionnaire_type_id' => $questionnaireTypeId,
             'questionnaire_id' => $questionnaireId,
         ];
@@ -279,7 +291,7 @@ class StudentEvaluationTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Student/Dashboard')
                 ->where('subjects.0.overall_rating', 4.5)
-                ->where('subjects.0.overall_percentage', 90.0)
+                ->where('subjects.0.overall_percentage', 90)
                 ->where('subjects.0.rating_submission_count', 1))
             ->assertSee('Evaluation Testing')
             ->assertSee('Terry  Teacher')
@@ -329,6 +341,7 @@ class StudentEvaluationTest extends TestCase
             'email' => 'casey.student@hcc.local',
             'password' => bcrypt('test12345'),
             'branch_id' => $ids['branch_id'],
+            'department_id' => $ids['department_id'],
             'is_activated' => 1,
             'is_deleted' => 0,
             'created_at' => now(),

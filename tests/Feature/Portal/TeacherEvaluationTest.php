@@ -63,6 +63,17 @@ class TeacherEvaluationTest extends TestCase
             'updated_at' => now(),
         ]);
 
+        DB::table('department_evaluation_windows')->insert([
+            'academic_year_id' => $cycleId,
+            'branch_id' => $branchId,
+            'department_id' => $departmentId,
+            'status' => 'active',
+            'date_opened' => now()->subMinute(),
+            'date_closed' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
         $peerQuestionTypeId = (int) DB::table('question_type')->insertGetId([
             'code' => 'QTYPE-PEER',
             'name' => 'Peer Evaluation',
@@ -225,6 +236,17 @@ class TeacherEvaluationTest extends TestCase
             'term' => '2nd Sem',
             'is_activated' => 1,
             'is_deleted' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('department_evaluation_windows')->insert([
+            'academic_year_id' => $cycleId,
+            'branch_id' => $branchId,
+            'department_id' => $departmentId,
+            'status' => 'active',
+            'date_opened' => now()->subMinute(),
+            'date_closed' => null,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
