@@ -99,7 +99,7 @@ export default function UnifiedLogin({ status, error, submitRoute = 'login' }) {
 
           <div className="px-6 pb-6">
             {(status || error) && (
-              <div className="neumorphic-inset px-3 py-2 text-sm mb-4" style={{ color: '#c0392b' }}>
+              <div className="neumorphic-inset px-3 py-2 text-sm mb-4 text-rose-600 dark:text-rose-400">
                 {error || status}
               </div>
             )}
@@ -115,7 +115,6 @@ export default function UnifiedLogin({ status, error, submitRoute = 'login' }) {
                   id="identifier"
                   name="identifier"
                   placeholder="Admin, student, teacher, or employee code/email"
-                  style={{ border: '1px solid rgba(0, 217, 255, 0.35)' }}
                   required
                   autoComplete="username"
                   value={data.identifier}
@@ -138,7 +137,6 @@ export default function UnifiedLogin({ status, error, submitRoute = 'login' }) {
                     id="password"
                     name="password"
                     placeholder="Enter your password"
-                    style={{ border: '1px solid rgba(0, 217, 255, 0.35)' }}
                     required
                     autoComplete="current-password"
                     value={data.password}

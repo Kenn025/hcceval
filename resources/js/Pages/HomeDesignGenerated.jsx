@@ -2,6 +2,7 @@ import { jsx, jsxs } from "react/jsx-runtime";
 import { useState, useEffect, useRef } from "react";
 import { router } from "@inertiajs/react";
 import AppIcon from "@/Components/AppIcon";
+const HERO_VIDEO_LOOP_SECONDS = 73;
 const Counter = ({ end, suffix = "" }) => {
     const [count, setCount] = useState(0);
     const ref = useRef(null);
@@ -128,12 +129,23 @@ function App({
         return localStorage.getItem("hcceval-theme-mode") === "dark";
     });
     const [menuOpen, setMenuOpen] = useState(false);
+    const isIslandExpanded = true;
     const [activeRole, setActiveRole] = useState(0);
     const [openFaq, setOpenFaq] = useState(null);
     const [loginOpen, setLoginOpen] = useState(false);
     const [registerOpen, setRegisterOpen] = useState(false);
     const [selectedRole, setSelectedRole] = useState("");
+    const handleHeroVideoTimeUpdate = (event) => {
+        const video = event.currentTarget;
+        if (video.currentTime >= HERO_VIDEO_LOOP_SECONDS) {
+            video.currentTime = 0;
+            if (video.paused) {
+                video.play().catch(() => {});
+            }
+        }
+    };
     const goToLogin = () => {
+        setMenuOpen(false);
         router.visit(loginUrl);
     };
     const submitLogin = (e) => {
@@ -382,178 +394,309 @@ function App({
         document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
         setMenuOpen(false);
     };
+    const navSections = ["home", "features", "roles", "how-it-works", "faq"];
+    const islandExpanded = isIslandExpanded || menuOpen;
     return /* @__PURE__ */ jsxs("div", {
-        className: "min-h-screen transition-all duration-500",
+        className: "min-h-screen transition-all duration-500 overflow-x-hidden",
         style: { backgroundColor: "var(--bg-primary)" },
         children: [
             /* @__PURE__ */ jsx("nav", {
-                className: "fixed top-0 left-0 right-0 z-50 p-4",
-                style: { backgroundColor: "var(--bg-primary)" },
+                className: "fixed z-50 w-full px-3 pointer-events-none",
+                style: { top: "calc(env(safe-area-inset-top, 0px) + 10px)" },
                 children: /* @__PURE__ */ jsxs("div", {
-                    className: "max-w-7xl mx-auto",
+                    className: "mx-auto w-full max-w-[980px] pointer-events-auto",
                     children: [
-                        /* @__PURE__ */ jsxs(NeuCard, {
-                            className: "flex items-center justify-between !p-4",
+                        /* @__PURE__ */ jsxs("div", {
+                            className: `mx-auto transition-all duration-300 ${islandExpanded ? "w-full" : "w-[min(92vw,540px)]"}`,
                             children: [
                                 /* @__PURE__ */ jsxs("div", {
-                                    className: "flex items-center gap-3",
+                                    className:
+                                        "rounded-[999px] border px-3 py-2 sm:px-4 sm:py-3 flex items-center justify-between gap-2 transition-all duration-300",
+                                    style: {
+                                        background: isDarkMode
+                                            ? "rgba(15, 23, 42, 0.78)"
+                                            : "rgba(255, 255, 255, 0.72)",
+                                        borderColor: isDarkMode
+                                            ? "rgba(148, 163, 184, 0.26)"
+                                            : "rgba(148, 163, 184, 0.34)",
+                                        backdropFilter: "blur(20px) saturate(140%)",
+                                        WebkitBackdropFilter:
+                                            "blur(20px) saturate(140%)",
+                                        boxShadow: isDarkMode
+                                            ? "0 14px 34px rgba(2, 6, 23, 0.5)"
+                                            : "0 14px 30px rgba(15, 23, 42, 0.22)",
+                                    },
                                     children: [
-                                        /* @__PURE__ */ jsx("div", {
+                                        /* @__PURE__ */ jsxs("div", {
                                             className:
-                                                "w-12 h-12 neumorphic-circle flex items-center justify-center",
-                                            children: /* @__PURE__ */ jsx(
-                                                AppIcon,
-                                                {
-                                                    name: "graduation",
-                                                    className: "h-6 w-6",
-                                                    strokeWidth: 1.9,
-                                                },
+                                                "flex items-center gap-3 min-w-0",
+                                            children: [
+                                                /* @__PURE__ */ jsx("div", {
+                                                    className:
+                                                        "w-10 h-10 rounded-full flex items-center justify-center border",
+                                                    style: {
+                                                        background: isDarkMode
+                                                            ? "rgba(30, 41, 59, 0.85)"
+                                                            : "rgba(255, 255, 255, 0.9)",
+                                                        borderColor: isDarkMode
+                                                            ? "rgba(148, 163, 184, 0.24)"
+                                                            : "rgba(148, 163, 184, 0.28)",
+                                                    },
+                                                    children:
+                                                        /* @__PURE__ */ jsx(
+                                                            AppIcon,
+                                                            {
+                                                                name: "graduation",
+                                                                className: "h-5 w-5",
+                                                                strokeWidth: 1.9,
+                                                            },
+                                                        ),
+                                                }),
+                                                /* @__PURE__ */ jsxs("div", {
+                                                    className: `overflow-hidden transition-all duration-300 ${islandExpanded ? "max-w-[180px] opacity-100" : "max-w-0 opacity-0 sm:max-w-[140px] sm:opacity-100"}`,
+                                                    children: [
+                                                        /* @__PURE__ */ jsx(
+                                                            "span",
+                                                            {
+                                                                className:
+                                                                    "block font-bold text-sm sm:text-base leading-tight whitespace-nowrap",
+                                                                style: {
+                                                                    color: "var(--text-primary)",
+                                                                },
+                                                                children: "MCH-PEMS",
+                                                            },
+                                                        ),
+                                                        /* @__PURE__ */ jsx(
+                                                            "p",
+                                                            {
+                                                                className:
+                                                                    "text-[11px] leading-tight whitespace-nowrap",
+                                                                style: {
+                                                                    color: "var(--text-secondary)",
+                                                                },
+                                                                children:
+                                                                    "Evaluation System",
+                                                            },
+                                                        ),
+                                                    ],
+                                                }),
+                                            ],
+                                        }),
+                                        /* @__PURE__ */ jsx("div", {
+                                            className: `hidden lg:flex items-center gap-2 overflow-hidden transition-all duration-300 ${isIslandExpanded ? "max-w-[520px] opacity-100 translate-x-0" : "max-w-0 opacity-0 -translate-x-2 pointer-events-none"}`,
+                                            children: navSections.map(
+                                                (section) =>
+                                                    /* @__PURE__ */ jsx(
+                                                        "button",
+                                                        {
+                                                            onClick: () =>
+                                                                scrollTo(
+                                                                    section,
+                                                                ),
+                                                            className:
+                                                                "px-4 py-2 rounded-full text-sm font-medium capitalize transition-all duration-300 hover:scale-[1.01]",
+                                                            style: {
+                                                                color: "var(--text-secondary)",
+                                                                background: isDarkMode
+                                                                    ? "rgba(30, 41, 59, 0.66)"
+                                                                    : "rgba(255, 255, 255, 0.72)",
+                                                                border: "1px solid var(--border)",
+                                                            },
+                                                            children:
+                                                                section.replace(
+                                                                    "-",
+                                                                    " ",
+                                                                ),
+                                                        },
+                                                        section,
+                                                    ),
                                             ),
                                         }),
                                         /* @__PURE__ */ jsxs("div", {
-                                            className: "hidden sm:block",
+                                            className:
+                                                "flex items-center justify-end gap-2 sm:gap-3",
                                             children: [
-                                                /* @__PURE__ */ jsx("span", {
+                                                /* @__PURE__ */ jsx(
+                                                    ThemeToggle,
+                                                    {
+                                                        isDark: isDarkMode,
+                                                        onToggle: () =>
+                                                            setIsDarkMode(
+                                                                !isDarkMode,
+                                                            ),
+                                                    },
+                                                ),
+                                                /* @__PURE__ */ jsx("button", {
+                                                    onClick: goToLogin,
+                                                    className: `hidden sm:inline-flex px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 ${isIslandExpanded ? "opacity-100" : "lg:opacity-0 lg:pointer-events-none"}`,
+                                                    style: {
+                                                        color: "var(--accent)",
+                                                        background: isDarkMode
+                                                            ? "rgba(30, 41, 59, 0.66)"
+                                                            : "rgba(255, 255, 255, 0.72)",
+                                                        border: "1px solid var(--border)",
+                                                    },
+                                                    children: "Sign In",
+                                                }),
+                                                /* @__PURE__ */ jsx("button", {
                                                     className:
-                                                        "font-bold text-lg",
+                                                        "lg:hidden w-10 h-10 rounded-full flex items-center justify-center",
                                                     style: {
                                                         color: "var(--text-primary)",
+                                                        background: isDarkMode
+                                                            ? "rgba(30, 41, 59, 0.72)"
+                                                            : "rgba(255, 255, 255, 0.76)",
+                                                        border: "1px solid var(--border)",
                                                     },
-                                                    children: "MCH-PEMS",
-                                                }),
-                                                /* @__PURE__ */ jsx("p", {
-                                                    className: "text-xs",
-                                                    style: {
-                                                        color: "var(--text-secondary)",
-                                                    },
+                                                    onClick: () =>
+                                                        setMenuOpen(!menuOpen),
+                                                    "aria-label":
+                                                        "Toggle navigation menu",
                                                     children:
-                                                        "Evaluation System",
+                                                        /* @__PURE__ */ jsx(
+                                                            "svg",
+                                                            {
+                                                                className: "w-5 h-5",
+                                                                fill: "none",
+                                                                stroke: "currentColor",
+                                                                viewBox:
+                                                                    "0 0 24 24",
+                                                                children:
+                                                                    /* @__PURE__ */ jsx(
+                                                                        "path",
+                                                                        {
+                                                                            strokeLinecap:
+                                                                                "round",
+                                                                            strokeLinejoin:
+                                                                                "round",
+                                                                            strokeWidth: 2,
+                                                                            d: menuOpen
+                                                                                ? "M6 18L18 6M6 6l12 12"
+                                                                                : "M4 6h16M4 12h16M4 18h16",
+                                                                        },
+                                                                    ),
+                                                            },
+                                                        ),
                                                 }),
                                             ],
                                         }),
                                     ],
                                 }),
-                                /* @__PURE__ */ jsx("div", {
-                                    className:
-                                        "hidden lg:flex items-center gap-2",
-                                    children: [
-                                        "home",
-                                        "features",
-                                        "roles",
-                                        "how-it-works",
-                                        "faq",
-                                    ].map((section) =>
-                                        /* @__PURE__ */ jsx(
-                                            "button",
-                                            {
-                                                onClick: () =>
-                                                    scrollTo(section),
-                                                className:
-                                                    "neumorphic-btn px-4 py-2 text-sm font-medium capitalize transition-all duration-300",
-                                                style: {
-                                                    color: "var(--text-secondary)",
-                                                },
-                                                children: section.replace(
-                                                    "-",
-                                                    " ",
-                                                ),
-                                            },
-                                            section,
-                                        ),
-                                    ),
-                                }),
-                                /* @__PURE__ */ jsxs("div", {
-                                    className: "flex items-center gap-4",
-                                    children: [
-                                        /* @__PURE__ */ jsx(ThemeToggle, {
-                                            isDark: isDarkMode,
-                                            onToggle: () =>
-                                                setIsDarkMode(!isDarkMode),
-                                        }),
-                                        /* @__PURE__ */ jsx("button", {
-                                            onClick: goToLogin,
-                                            className:
-                                                "neumorphic-btn px-4 py-2 text-sm font-medium",
-                                            style: { color: "var(--accent)" },
-                                            children: "Sign In",
-                                        }),
-                                        /* @__PURE__ */ jsx("button", {
-                                            className:
-                                                "lg:hidden neumorphic-btn p-2",
-                                            onClick: () =>
-                                                setMenuOpen(!menuOpen),
-                                            children: /* @__PURE__ */ jsx(
-                                                "svg",
-                                                {
-                                                    className: "w-6 h-6",
-                                                    style: {
-                                                        color: "var(--text-primary)",
+                                menuOpen &&
+                                    /* @__PURE__ */ jsxs("div", {
+                                        className:
+                                            "lg:hidden mt-3 rounded-3xl border p-3",
+                                        style: {
+                                            background: isDarkMode
+                                                ? "rgba(15, 23, 42, 0.82)"
+                                                : "rgba(255, 255, 255, 0.84)",
+                                            borderColor: isDarkMode
+                                                ? "rgba(148, 163, 184, 0.24)"
+                                                : "rgba(148, 163, 184, 0.32)",
+                                            backdropFilter: "blur(18px)",
+                                            WebkitBackdropFilter: "blur(18px)",
+                                        },
+                                        children: [
+                                            navSections.map((section) =>
+                                                /* @__PURE__ */ jsx(
+                                                    "button",
+                                                    {
+                                                        onClick: () =>
+                                                            scrollTo(section),
+                                                        className:
+                                                            "w-full text-left px-4 py-3 mb-2 rounded-2xl capitalize font-medium",
+                                                        style: {
+                                                            color: "var(--text-primary)",
+                                                            background: isDarkMode
+                                                                ? "rgba(30, 41, 59, 0.66)"
+                                                                : "rgba(255, 255, 255, 0.72)",
+                                                            border: "1px solid var(--border)",
+                                                        },
+                                                        children:
+                                                            section.replace(
+                                                                "-",
+                                                                " ",
+                                                            ),
                                                     },
-                                                    fill: "none",
-                                                    stroke: "currentColor",
-                                                    viewBox: "0 0 24 24",
-                                                    children:
-                                                        /* @__PURE__ */ jsx(
-                                                            "path",
-                                                            {
-                                                                strokeLinecap:
-                                                                    "round",
-                                                                strokeLinejoin:
-                                                                    "round",
-                                                                strokeWidth: 2,
-                                                                d: menuOpen
-                                                                    ? "M6 18L18 6M6 6l12 12"
-                                                                    : "M4 6h16M4 12h16M4 18h16",
-                                                            },
-                                                        ),
-                                                },
+                                                    section,
+                                                ),
                                             ),
-                                        }),
-                                    ],
-                                }),
+                                            /* @__PURE__ */ jsx("button", {
+                                                onClick: goToLogin,
+                                                className:
+                                                    "w-full px-4 py-3 rounded-2xl text-sm font-semibold",
+                                                style: {
+                                                    color: "var(--accent)",
+                                                    background: isDarkMode
+                                                        ? "rgba(30, 41, 59, 0.66)"
+                                                        : "rgba(255, 255, 255, 0.72)",
+                                                    border: "1px solid var(--border)",
+                                                },
+                                                children: "Sign In",
+                                            }),
+                                        ],
+                                    }),
                             ],
                         }),
-                        menuOpen &&
-                            /* @__PURE__ */ jsx("div", {
-                                className: "lg:hidden mt-4 neumorphic p-4",
-                                children: [
-                                    "home",
-                                    "features",
-                                    "roles",
-                                    "how-it-works",
-                                    "faq",
-                                ].map((section) =>
-                                    /* @__PURE__ */ jsx(
-                                        "button",
-                                        {
-                                            onClick: () => scrollTo(section),
-                                            className:
-                                                "w-full text-left neumorphic-btn px-4 py-3 mb-2 capitalize font-medium",
-                                            style: {
-                                                color: "var(--text-primary)",
-                                            },
-                                            children: section.replace("-", " "),
-                                        },
-                                        section,
-                                    ),
-                                ),
-                            }),
                     ],
                 }),
             }),
             /* @__PURE__ */ jsx("section", {
                 id: "home",
-                className: "pt-32 pb-20 px-4",
+                className: "pt-0 pb-20",
                 children: /* @__PURE__ */ jsxs("div", {
-                    className: "max-w-7xl mx-auto",
+                    className: "w-full",
                     children: [
                         /* @__PURE__ */ jsxs("div", {
+                            className: "relative overflow-hidden",
+                            children: [
+                                /* @__PURE__ */ jsx("video", {
+                                    className:
+                                        "absolute inset-0 w-full h-full object-cover pointer-events-none",
+                                    src: "/videos/hero-loop.mp4",
+                                    autoPlay: true,
+                                    muted: true,
+                                    playsInline: true,
+                                    preload: "metadata",
+                                    onTimeUpdate: handleHeroVideoTimeUpdate,
+                                    "aria-hidden": "true",
+                                    style: {
+                                        filter: isDarkMode
+                                            ? "brightness(0.45) contrast(1.08) saturate(0.85)"
+                                            : "brightness(0.85) contrast(1.02) saturate(0.9)",
+                                        objectPosition: "center top",
+                                        transform: "scale(1.06)",
+                                        transformOrigin: "center",
+                                    },
+                                }),
+                                /* @__PURE__ */ jsx("div", {
+                                    className:
+                                        "absolute inset-0 pointer-events-none",
+                                    style: {
+                                        background: isDarkMode
+                                            ? "linear-gradient(180deg, rgba(8, 12, 26, 0.58) 0%, rgba(8, 12, 26, 0.74) 100%)"
+                                            : "linear-gradient(180deg, rgba(232, 237, 244, 0.56) 0%, rgba(232, 237, 244, 0.68) 100%)",
+                                    },
+                                }),
+                                /* @__PURE__ */ jsx("div", {
+                                    className:
+                                        "absolute inset-x-0 bottom-0 h-[32rem] pointer-events-none",
+                                    style: {
+                                        background:
+                                            "linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, var(--bg-primary) 100%)",
+                                    },
+                                }),
+                                /* @__PURE__ */ jsxs("div", {
+                                    className:
+                                        "relative z-10 px-4 pt-36 pb-16",
+                                    children: [
+                        /* @__PURE__ */ jsxs("div", {
                             className:
-                                "grid lg:grid-cols-2 gap-12 items-center",
+                                "flex justify-center",
                             children: [
                                 /* @__PURE__ */ jsxs("div", {
                                     className:
-                                        "animate-slide-up ml-4 sm:ml-8 lg:ml-10",
+                                        "animate-slide-up max-w-4xl mx-auto text-center flex flex-col items-center",
                                     children: [
                                         /* @__PURE__ */ jsxs("div", {
                                             className:
@@ -601,7 +744,7 @@ function App({
                                         }),
                                         /* @__PURE__ */ jsx("p", {
                                             className:
-                                                "text-lg mb-8 max-w-xl",
+                                                "text-lg mb-8 max-w-3xl mx-auto",
                                             style: {
                                                 color: "var(--text-secondary)",
                                             },
@@ -610,7 +753,7 @@ function App({
                                         }),
                                         /* @__PURE__ */ jsxs("div", {
                                             className:
-                                                "flex flex-wrap gap-4 mb-12",
+                                                "flex flex-wrap gap-4 mb-12 justify-center",
                                             children: [
                                                 /* @__PURE__ */ jsxs("button", {
                                                     onClick: goToLogin,
@@ -670,7 +813,7 @@ function App({
                                     ],
                                 }),
                                 /* @__PURE__ */ jsx("div", {
-                                    className: "flex justify-center",
+                                    className: "hidden",
                                     children: /* @__PURE__ */ jsxs("div", {
                                         className: "relative animate-float",
                                         children: [
@@ -1073,9 +1216,13 @@ function App({
                                 }),
                             ],
                         }),
+                                    ],
+                                }),
+                            ],
+                        }),
                         /* @__PURE__ */ jsx("div", {
                             className:
-                                "grid grid-cols-2 md:grid-cols-4 gap-6 mt-20",
+                                "max-w-7xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-6 mt-20",
                             children: stats.map((stat, i) =>
                                 /* @__PURE__ */ jsxs(
                                     "div",
