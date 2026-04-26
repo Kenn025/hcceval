@@ -1195,6 +1195,7 @@ export default function StudentDashboard({ student, cycle, subjects = [], progra
     const [activeSubmissionTab, setActiveSubmissionTab] = useState('subject');
     const [selectedEvaluationKey, setSelectedEvaluationKey] = useState(null);
     const [selectedSubmittedEvaluation, setSelectedSubmittedEvaluation] = useState(null);
+    const [unavailableEvaluation, setUnavailableEvaluation] = useState(null);
     const [viewOnly, setViewOnly] = useState(false);
 
     const submittedEvaluationLookup = [...evaluations, ...archive].reduce((lookup, evaluation) => {
@@ -1224,7 +1225,9 @@ export default function StudentDashboard({ student, cycle, subjects = [], progra
     const selectedEvaluationForm = selectedEvaluationKey ? evaluationForms[selectedEvaluationKey] : null;
 
     function startEvaluation(subject) {
-        const key = String(subject.section_id ?? subject.course_id);
+        const key = subject.section_id
+            ? `subject_section:${subject.section_id}`
+            : `subject:${subject.course_id}`;
         const form = evaluationForms[key];
 
         if (form) {
@@ -1233,12 +1236,10 @@ export default function StudentDashboard({ student, cycle, subjects = [], progra
             return;
         }
 
-        router.visit(route('portal.student.evaluate', {
-            subject_section_id: subject.section_id,
-            subject_id: subject.course_id,
-            questionnaire_id: subject.questionnaire_id,
-            category: 'teacher_subject',
-        }));
+        setUnavailableEvaluation({
+            title: subject.course_name || 'Subject Evaluation',
+            message: 'The evaluation form for this subject is not available yet. Please check that a questionnaire with questions is assigned to this subject.',
+        });
     }
 
     function startProgramChairEvaluation(target) {
@@ -1251,11 +1252,10 @@ export default function StudentDashboard({ student, cycle, subjects = [], progra
             return;
         }
 
-        router.visit(route('portal.student.evaluate', {
-            evaluatee_id: target.id,
-            questionnaire_id: target.questionnaire_id,
-            category: 'program_chair',
-        }));
+        setUnavailableEvaluation({
+            title: target.name || 'Program Chair Evaluation',
+            message: 'The evaluation form for this program chair is not available yet. Please check that a questionnaire with questions is assigned.',
+        });
     }
 
     function startEmployeeEvaluation(employee) {
@@ -1268,11 +1268,10 @@ export default function StudentDashboard({ student, cycle, subjects = [], progra
             return;
         }
 
-        router.visit(route('portal.student.evaluate', {
-            evaluatee_id: employee.id,
-            questionnaire_id: employee.questionnaire_id,
-            category: 'employee_evaluation',
-        }));
+        setUnavailableEvaluation({
+            title: employee.name || 'Employee Feedback',
+            message: 'The employee feedback form is not available yet. Please check that a questionnaire with questions is assigned to this employee.',
+        });
     }
 
     function viewCompletedEvaluation(subject) {
@@ -1354,6 +1353,29 @@ export default function StudentDashboard({ student, cycle, subjects = [], progra
                 evaluation={selectedSubmittedEvaluation}
                 onClose={() => setSelectedSubmittedEvaluation(null)}
             />
+            <Modal show={Boolean(unavailableEvaluation)} maxWidth="md" onClose={() => setUnavailableEvaluation(null)}>
+                <div className="p-5">
+                    <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-600 ring-1 ring-amber-100">
+                            <AppIcon name="questions" className="h-5 w-5" />
+                        </div>
+                        <div className="min-w-0">
+                            <p className="text-xs font-semibold uppercase tracking-wider text-amber-600">Evaluation Form</p>
+                            <h3 className="mt-1 text-lg font-bold text-slate-900">{unavailableEvaluation?.title}</h3>
+                            <p className="mt-2 text-sm leading-6 text-slate-600">{unavailableEvaluation?.message}</p>
+                        </div>
+                    </div>
+                    <div className="mt-5 flex justify-end">
+                        <button
+                            type="button"
+                            onClick={() => setUnavailableEvaluation(null)}
+                            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                        >
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </Modal>
         </PortalLayout>
     );
 }

@@ -1684,7 +1684,11 @@ class StudentPortalController extends Controller
                     return [];
                 }
 
-                return [(string) ($subject['section_id'] ?? $subject['course_id']) => [
+                $formKey = ! empty($subject['section_id'])
+                    ? 'subject_section:' . $subject['section_id']
+                    : 'subject:' . $subject['course_id'];
+
+                return [$formKey => [
                     'category' => 'teacher_subject',
                     'questionnaireId' => $questionnaireId,
                     'questionnaireTypeId' => $this->questionnaireTypeId($questionnaireId),
