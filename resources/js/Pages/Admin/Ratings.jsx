@@ -3,7 +3,7 @@ import ResourceTable from '@/Components/Admin/ResourceTable';
 import SlideOver from '@/Components/Admin/SlideOver';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { router } from '@inertiajs/react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 const normalizeLabel = (value) => String(value ?? '').trim().toLowerCase();
 
@@ -211,6 +211,33 @@ export default function Ratings({
         ))),
         [matchingDepartmentIds, selectedDepartmentType, strands],
     );
+
+    useEffect(() => {
+        if (ratingType !== 'peer' || selectedDepartmentGroup || peerFilterDepartments.length === 0) {
+            return;
+        }
+
+        router.get(route(activeRoute), {
+            ...filters,
+            branch_id: selectedFilterBranchId,
+            department_group: peerFilterDepartments[0].name,
+            program_group: '',
+            strand_group: '',
+            school_year: selectedYear,
+            page: 1,
+        }, {
+            preserveState: true,
+            replace: true,
+        });
+    }, [
+        activeRoute,
+        filters,
+        peerFilterDepartments,
+        ratingType,
+        selectedDepartmentGroup,
+        selectedFilterBranchId,
+        selectedYear,
+    ]);
 
     const handleYearFilter = (year) => {
         setSelectedYear(year);
