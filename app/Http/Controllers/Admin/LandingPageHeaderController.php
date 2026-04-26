@@ -7,6 +7,8 @@ use App\Models\LandingPageFeature;
 use App\Models\LandingPageFeatureSection;
 use App\Models\LandingPageHeader;
 use App\Models\LandingPageHomeSection;
+use App\Models\LandingPageRole;
+use App\Models\LandingPageRolesSection;
 use App\Models\LandingPageStat;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Http\Request;
@@ -33,6 +35,45 @@ class LandingPageHeaderController extends Controller
         'badge_text' => 'Features',
         'title_text' => 'Powerful Capabilities',
         'subtitle_text' => 'Everything you need for comprehensive evaluation management',
+    ];
+    private const DEFAULT_ROLES_SECTION = [
+        'badge_text' => 'User Roles',
+        'title_text' => 'Four Integrated Roles',
+        'subtitle_text' => 'Click a role to explore its capabilities',
+    ];
+    private const DEFAULT_ROLES = [
+        [
+            'title' => 'Faculty',
+            'desc_text' => 'Comprehensive evaluation tools for academic professionals',
+            'features' => ['Self-Assessment Portal', 'Peer Review Access', 'Student Feedback View', 'Performance History', 'Development Reports'],
+            'progress' => 85,
+            'icon_type' => 'faculty',
+            'sort_order' => 1,
+        ],
+        [
+            'title' => 'Peer',
+            'desc_text' => 'Collaborative evaluation between colleagues',
+            'features' => ['Anonymous Reviews', '360° Assessment', 'Teaching Observation', 'Collaborative Goals', 'Best Practices Share'],
+            'progress' => 78,
+            'icon_type' => 'peer',
+            'sort_order' => 2,
+        ],
+        [
+            'title' => 'Student',
+            'desc_text' => 'Student-centered faculty evaluation system',
+            'features' => ['Course Feedback', 'Anonymous Surveys', 'Learning Outcomes', 'Suggestion Portal', 'Progress Tracking'],
+            'progress' => 92,
+            'icon_type' => 'student',
+            'sort_order' => 3,
+        ],
+        [
+            'title' => 'Administrator',
+            'desc_text' => 'Complete system oversight and management',
+            'features' => ['Analytics Dashboard', 'User Management', 'Report Generation', 'Campus Settings', 'System Configuration'],
+            'progress' => 95,
+            'icon_type' => 'admin',
+            'sort_order' => 4,
+        ],
     ];
     private const DEFAULT_FEATURES = [
         [
@@ -118,6 +159,7 @@ class LandingPageHeaderController extends Controller
             'homeSection' => $this->homeSectionData(),
             'statsSection' => $this->statsSectionData(),
             'featuresSection' => $this->featureSectionData(),
+            'rolesSection' => $this->rolesSectionData(),
             'filters' => [
                 'search' => $search,
                 'per_page' => $perPage,
@@ -588,6 +630,164 @@ class LandingPageHeaderController extends Controller
         });
 
         return back()->with('success', 'Features section updated successfully.');
+    }
+
+    public function updateRolesSection(Request $request)
+    {
+        if (! Schema::hasTable('landing_page_roles_section') || ! Schema::hasTable('landing_page_roles')) {
+            return back()->withErrors([
+                'roles_section' => 'Roles section table is not available yet. Please run migrations first.',
+            ]);
+        }
+
+        $validated = $request->validate([
+            'badge_text' => 'required|string|max:120',
+            'title_text' => 'required|string|max:255',
+            'subtitle_text' => 'required|string|max:1000',
+            'roles' => 'nullable|array',
+            'roles.*.id' => 'nullable|integer|exists:landing_page_roles,id',
+            'roles.*.title' => 'required|string|max:120',
+            'roles.*.desc_text' => 'required|string|max:500',
+            'roles.*.features' => 'nullable|array',
+            'roles.*.features.*' => 'string|max:150',
+            'roles.*.progress' => 'nullable|integer|min:0|max:100',
+            'roles.*.icon_type' => 'nullable|in:faculty,peer,student,admin',
+            'roles.*.sort_order' => 'nullable|integer|min:0|max:9999',
+            'delete_ids' => 'nullable|array',
+            'delete_ids.*' => 'integer|exists:landing_page_roles,id',
+        ]);
+
+        $rolesPayload = collect($validated['roles'] ?? [])
+            ->map(fn(array $row, int $index) => [
+                'id' => $row['id'] ?? null,
+                'title' => trim((string) ($row['title'] ?? '')),
+                'desc_text' => trim((string) ($row['desc_text'] ?? '')),
+                'features' => array_values(array_filter(array_map('trim', $row['features'] ?? []), fn($f) => $f !== '')),
+                'progress' => (int) ($row['progress'] ?? 0),
+                'icon_type' => $row['icon_type'] ?? 'faculty',
+                'sort_order' => $row['sort_order'] ?? ($index + 1),
+            ])
+            ->values();
+        $deleteIds = collect($validated['delete_ids'] ?? [])->filter()->values();
+        $ids = $rolesPayload->pluck('id')->filter()->values();
+        $rolesById = LandingPageRole::query()
+            ->whereIn('id', $ids)
+            ->get()
+            ->keyBy('id');
+
+        DB::transaction(function () use ($validated, $rolesPayload, $deleteIds, $rolesById) {
+            $rolesSection = LandingPageRolesSection::query()->first();
+            if (! $rolesSection) {
+                $rolesSection = LandingPageRolesSection::query()->create(self::DEFAULT_ROLES_SECTION);
+            }
+
+            $rolesSection->update([
+                'badge_text' => $validated['badge_text'],
+                'title_text' => $validated['title_text'],
+                'subtitle_text' => $validated['subtitle_text'],
+            ]);
+
+            if ($deleteIds->isNotEmpty()) {
+                LandingPageRole::query()
+                    ->whereIn('id', $deleteIds)
+                    ->delete();
+            }
+
+            foreach ($rolesPayload as $index => $row) {
+                if (isset($row['id']) && $deleteIds->contains($row['id'])) {
+                    continue;
+                }
+
+                if (! empty($row['id'])) {
+                    $role = $rolesById->get($row['id']);
+                    if (! $role) {
+                        continue;
+                    }
+
+                    $role->update([
+                        'title' => $row['title'],
+                        'desc_text' => $row['desc_text'],
+                        'features' => $row['features'],
+                        'progress' => $row['progress'],
+                        'icon_type' => $row['icon_type'],
+                        'sort_order' => $row['sort_order'] ?? ($index + 1),
+                    ]);
+                    continue;
+                }
+
+                LandingPageRole::create([
+                    'title' => $row['title'],
+                    'desc_text' => $row['desc_text'],
+                    'features' => $row['features'],
+                    'progress' => $row['progress'],
+                    'icon_type' => $row['icon_type'],
+                    'sort_order' => $row['sort_order'] ?? ($index + 1),
+                    'is_active' => true,
+                ]);
+            }
+
+            $orderedIds = LandingPageRole::query()
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->pluck('id')
+                ->values();
+
+            foreach ($orderedIds as $position => $id) {
+                LandingPageRole::query()
+                    ->where('id', $id)
+                    ->update(['sort_order' => $position + 1]);
+            }
+        });
+
+        return back()->with('success', 'User Roles section updated successfully.');
+    }
+
+    private function rolesSectionData(): array
+    {
+        $defaultRoles = collect(self::DEFAULT_ROLES)
+            ->map(fn(array $role) => [
+                'id' => null,
+                'title' => $role['title'],
+                'desc_text' => $role['desc_text'],
+                'features' => $role['features'],
+                'progress' => $role['progress'],
+                'icon_type' => $role['icon_type'],
+                'sort_order' => $role['sort_order'],
+            ])
+            ->values()
+            ->all();
+
+        if (! Schema::hasTable('landing_page_roles_section') || ! Schema::hasTable('landing_page_roles')) {
+            return [
+                ...self::DEFAULT_ROLES_SECTION,
+                'roles' => $defaultRoles,
+            ];
+        }
+
+        $section = LandingPageRolesSection::query()->first();
+        $roles = LandingPageRole::query()
+            ->where('is_active', 1)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get(['id', 'title', 'desc_text', 'features', 'progress', 'icon_type', 'sort_order'])
+            ->map(fn(LandingPageRole $role) => [
+                'id' => $role->id,
+                'title' => $role->title,
+                'desc_text' => $role->desc_text,
+                'features' => $role->features ?? [],
+                'progress' => $role->progress,
+                'icon_type' => $role->icon_type,
+                'sort_order' => $role->sort_order,
+            ])
+            ->values()
+            ->all();
+
+        return [
+            'badge_text' => $section?->badge_text ?: self::DEFAULT_ROLES_SECTION['badge_text'],
+            'title_text' => $section?->title_text ?: self::DEFAULT_ROLES_SECTION['title_text'],
+            'subtitle_text' => $section?->subtitle_text ?: self::DEFAULT_ROLES_SECTION['subtitle_text'],
+            'roles' => count($roles) > 0 ? $roles : $defaultRoles,
+        ];
     }
 
     private function storeLogoFile(UploadedFile $file): string

@@ -187,6 +187,7 @@ Route::middleware('auth')->group(function () {
             Route::put('/admin/landing-page/home-section', [LandingPageHeaderController::class, 'updateHomeSection'])->name('admin.landing-page.home-section.update');
             Route::put('/admin/landing-page/stats-section', [LandingPageHeaderController::class, 'updateStatsSection'])->name('admin.landing-page.stats-section.update');
             Route::put('/admin/landing-page/features-section', [LandingPageHeaderController::class, 'updateFeaturesSection'])->name('admin.landing-page.features-section.update');
+            Route::put('/admin/landing-page/roles-section', [LandingPageHeaderController::class, 'updateRolesSection'])->name('admin.landing-page.roles-section.update');
             Route::put('/admin/landing-page/{landingPageHeader}', [LandingPageHeaderController::class, 'update']);
             Route::delete('/admin/landing-page/{landingPageHeader}', [LandingPageHeaderController::class, 'destroy']);
         });

@@ -73,6 +73,23 @@ function normalizeFeaturesSection(featuresSection = {}) {
     };
 }
 
+function normalizeRolesSection(rolesSection = {}) {
+    return {
+        badge_text: String(rolesSection.badge_text ?? "").trim(),
+        title_text: String(rolesSection.title_text ?? "").trim(),
+        subtitle_text: String(rolesSection.subtitle_text ?? "").trim(),
+        roles: (rolesSection.roles ?? []).map((row) => ({
+            id: row.id ?? null,
+            title: String(row.title ?? "").trim(),
+            desc_text: String(row.desc_text ?? "").trim(),
+            features: (row.features ?? []).map((f) => String(f ?? "").trim()),
+            progress: Number(row.progress ?? 0),
+            icon_type: String(row.icon_type ?? "faculty"),
+            sort_order: Number(row.sort_order ?? 0),
+        })),
+    };
+}
+
 function normalizeStatKey(value) {
     return String(value ?? "")
         .trim()
@@ -115,6 +132,12 @@ export default function LandingPage({
         subtitle_text: "",
         features: [],
     },
+    rolesSection = {
+        badge_text: "",
+        title_text: "",
+        subtitle_text: "",
+        roles: [],
+    },
 }) {
     const canEditStats =
         (statsSection ?? []).length > 0 &&
@@ -131,13 +154,18 @@ export default function LandingPage({
         useState(null);
     const [pendingFeaturesScrollToIndex, setPendingFeaturesScrollToIndex] =
         useState(null);
+    const [rolesModalOpen, setRolesModalOpen] = useState(false);
+    const [pendingRolesScrollToIndex, setPendingRolesScrollToIndex] =
+        useState(null);
     const linkContainerRefs = useRef([]);
     const statContainerRefs = useRef([]);
     const featureContainerRefs = useRef([]);
+    const roleContainerRefs = useRef([]);
     const initialHeadersSnapshotRef = useRef("[]");
     const initialHomeSectionSnapshotRef = useRef("{}");
     const initialStatsSnapshotRef = useRef("[]");
     const initialFeaturesSnapshotRef = useRef("{}");
+    const initialRolesSnapshotRef = useRef("{}");
 
     const { data, setData, errors, processing, reset, clearErrors } = useForm({
         headers: [],
@@ -185,6 +213,20 @@ export default function LandingPage({
         title_text: "",
         subtitle_text: "",
         features: [],
+        delete_ids: [],
+    });
+    const {
+        data: rolesData,
+        setData: setRolesData,
+        errors: rolesErrors,
+        processing: rolesProcessing,
+        reset: resetRoles,
+        clearErrors: clearRolesErrors,
+    } = useForm({
+        badge_text: "",
+        title_text: "",
+        subtitle_text: "",
+        roles: [],
         delete_ids: [],
     });
 
@@ -300,6 +342,39 @@ export default function LandingPage({
         setPendingFeaturesScrollToIndex(null);
         featureContainerRefs.current = [];
     };
+    const openRolesEdit = () => {
+        clearRolesErrors();
+        const nextRoles = (rolesSection?.roles ?? []).map((row) => ({
+            id: row.id ?? null,
+            title: row.title ?? "",
+            desc_text: row.desc_text ?? "",
+            features: row.features ?? [],
+            progress: row.progress ?? 0,
+            icon_type: row.icon_type ?? "faculty",
+            sort_order: row.sort_order ?? 0,
+        }));
+        setRolesData("badge_text", rolesSection?.badge_text ?? "");
+        setRolesData("title_text", rolesSection?.title_text ?? "");
+        setRolesData("subtitle_text", rolesSection?.subtitle_text ?? "");
+        setRolesData("roles", nextRoles);
+        setRolesData("delete_ids", []);
+        initialRolesSnapshotRef.current = JSON.stringify(
+            normalizeRolesSection({
+                badge_text: rolesSection?.badge_text ?? "",
+                title_text: rolesSection?.title_text ?? "",
+                subtitle_text: rolesSection?.subtitle_text ?? "",
+                roles: nextRoles,
+            }),
+        );
+        setRolesModalOpen(true);
+    };
+    const closeRolesModal = () => {
+        resetRoles();
+        setRolesModalOpen(false);
+        clearRolesErrors();
+        setPendingRolesScrollToIndex(null);
+        roleContainerRefs.current = [];
+    };
 
     const updateRow = (index, key, value) => {
         const next = [...data.headers];
@@ -392,6 +467,15 @@ export default function LandingPage({
         featuresModalOpen,
         pendingFeaturesScrollToIndex,
     ]);
+    useEffect(() => {
+        if (!rolesModalOpen || pendingRolesScrollToIndex === null) return;
+
+        const target = roleContainerRefs.current[pendingRolesScrollToIndex];
+        if (target) {
+            target.scrollIntoView({ behavior: "smooth", block: "start" });
+            setPendingRolesScrollToIndex(null);
+        }
+    }, [rolesData.roles?.length, rolesModalOpen, pendingRolesScrollToIndex]);
 
     const hasEmptyRequiredFields = useMemo(
         () =>
@@ -628,6 +712,80 @@ export default function LandingPage({
             setFeaturesData("delete_ids", nextDeleteIds);
         }
     };
+    const withRoleSortOrder = (rows = []) =>
+        rows.map((item, idx) => ({ ...item, sort_order: idx + 1 }));
+    const updateRoleField = (key, value) => {
+        setRolesData(key, value);
+    };
+    const updateRoleRow = (index, key, value) => {
+        const next = [...(rolesData.roles ?? [])];
+        next[index] = { ...next[index], [key]: value };
+        setRolesData("roles", next);
+    };
+    const addRoleRow = () => {
+        const nextRoles = withRoleSortOrder([
+            ...(rolesData.roles ?? []),
+            {
+                id: null,
+                title: "",
+                desc_text: "",
+                features: [],
+                progress: 0,
+                icon_type: "faculty",
+                sort_order: 0,
+            },
+        ]);
+        setRolesData("roles", nextRoles);
+        setPendingRolesScrollToIndex(nextRoles.length - 1);
+    };
+    const removeRoleRow = (index) => {
+        const row = (rolesData.roles ?? [])[index];
+        const nextRows = withRoleSortOrder(
+            (rolesData.roles ?? []).filter((_, i) => i !== index),
+        );
+        setRolesData("roles", nextRows);
+        if (row?.id) {
+            const nextDeleteIds = Array.from(
+                new Set([...(rolesData.delete_ids ?? []), row.id]),
+            );
+            setRolesData("delete_ids", nextDeleteIds);
+        }
+    };
+    const moveRoleRow = (index, direction) => {
+        const rows = [...(rolesData.roles ?? [])];
+        const targetIndex = direction === "up" ? index - 1 : index + 1;
+        if (targetIndex < 0 || targetIndex >= rows.length) return;
+        const temp = rows[index];
+        rows[index] = rows[targetIndex];
+        rows[targetIndex] = temp;
+        setRolesData("roles", withRoleSortOrder(rows));
+    };
+    const addFeatureToRole = (roleIndex) => {
+        const next = [...(rolesData.roles ?? [])];
+        next[roleIndex] = {
+            ...next[roleIndex],
+            features: [...(next[roleIndex].features ?? []), ""],
+        };
+        setRolesData("roles", next);
+    };
+    const removeFeatureFromRole = (roleIndex, featureIndex) => {
+        const next = [...(rolesData.roles ?? [])];
+        next[roleIndex] = {
+            ...next[roleIndex],
+            features: (next[roleIndex].features ?? []).filter(
+                (_, i) => i !== featureIndex,
+            ),
+        };
+        setRolesData("roles", next);
+    };
+    const updateFeatureInRole = (roleIndex, featureIndex, value) => {
+        const next = [...(rolesData.roles ?? [])];
+        const features = [...(next[roleIndex].features ?? [])];
+        features[featureIndex] = value;
+        next[roleIndex] = { ...next[roleIndex], features };
+        setRolesData("roles", next);
+    };
+
     const moveFeatureRow = (index, direction) => {
         const rows = [...(featuresData.features ?? [])];
         const targetIndex = direction === "up" ? index - 1 : index + 1;
@@ -682,6 +840,33 @@ export default function LandingPage({
                 forceFormData: true,
                 onSuccess: closeFeaturesModal,
             },
+        );
+    };
+    const hasEmptyRolesRequiredFields = useMemo(() => {
+        const sectionFields = [
+            rolesData.badge_text,
+            rolesData.title_text,
+            rolesData.subtitle_text,
+        ];
+        const sectionHasEmpty = sectionFields.some(
+            (value) => String(value ?? "").trim() === "",
+        );
+        const rowHasEmpty = (rolesData.roles ?? []).some(
+            (row) => String(row.title ?? "").trim() === "",
+        );
+        return sectionHasEmpty || rowHasEmpty;
+    }, [rolesData]);
+    const hasRolesSectionChanges = useMemo(() => {
+        const currentSnapshot = JSON.stringify(normalizeRolesSection(rolesData));
+        return currentSnapshot !== initialRolesSnapshotRef.current;
+    }, [rolesData]);
+    const submitRolesSection = (event) => {
+        event.preventDefault();
+        if (hasEmptyRolesRequiredFields || !hasRolesSectionChanges) return;
+        router.put(
+            route("admin.landing-page.roles-section.update"),
+            rolesData,
+            { onSuccess: closeRolesModal },
         );
     };
 
@@ -958,6 +1143,62 @@ export default function LandingPage({
                                                 </div>
                                             ),
                                         )}
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section className="mb-4 rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-5">
+                    <h2 className="text-base font-semibold text-slate-900">
+                        User Roles
+                    </h2>
+                    <button
+                        type="button"
+                        onClick={openRolesEdit}
+                        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                    >
+                        Edit
+                    </button>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="min-w-full">
+                        <thead>
+                            <tr className="border-b border-slate-100 bg-slate-50/70 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                <th className="px-4 py-3 sm:px-5">Field</th>
+                                <th className="px-4 py-3 sm:px-5">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody className="text-sm text-slate-700">
+                            <tr className="border-b border-slate-100">
+                                <td className="px-4 py-3 font-medium sm:px-5">Badge</td>
+                                <td className="px-4 py-3 sm:px-5">{rolesSection?.badge_text || "-"}</td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                                <td className="px-4 py-3 font-medium sm:px-5">Title</td>
+                                <td className="px-4 py-3 sm:px-5">{rolesSection?.title_text || "-"}</td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                                <td className="px-4 py-3 font-medium sm:px-5">Subtitle</td>
+                                <td className="px-4 py-3 sm:px-5">{rolesSection?.subtitle_text || "-"}</td>
+                            </tr>
+                            <tr>
+                                <td className="px-4 py-3 font-medium sm:px-5 align-top">Roles</td>
+                                <td className="px-4 py-3 sm:px-5">
+                                    <div className="space-y-1">
+                                        {(rolesSection?.roles ?? []).map((row, index) => (
+                                            <div key={row.id ?? `role-summary-${index}`}>
+                                                <span className="font-medium text-slate-900">
+                                                    {row.title || `Role ${index + 1}`}
+                                                </span>
+                                                <span className="text-slate-500">
+                                                    {" "}- {row.desc_text || "-"}
+                                                </span>
+                                            </div>
+                                        ))}
                                     </div>
                                 </td>
                             </tr>
@@ -1911,6 +2152,254 @@ export default function LandingPage({
                     </div>
                 </div>
             )}
+            {rolesModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div
+                        className="absolute inset-0 bg-slate-950/40"
+                        onClick={closeRolesModal}
+                    />
+                    <div
+                        className="relative w-full max-w-4xl rounded-xl bg-white p-6 shadow-2xl"
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div className="mb-4 flex items-center justify-between">
+                            <h3 className="text-base font-semibold text-slate-900">
+                                Edit User Roles
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={closeRolesModal}
+                                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                                aria-label="Close modal"
+                            >
+                                <svg
+                                    className="h-5 w-5"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={2}
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M6 18L18 6M6 6l12 12"
+                                    />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <form onSubmit={submitRolesSection} className="space-y-4">
+                            <div className="max-h-[60vh] overflow-y-auto space-y-3 pr-1">
+                                <div className="grid gap-3 md:grid-cols-3">
+                                    <FormField
+                                        label="Badge"
+                                        error={rolesErrors.badge_text}
+                                        required
+                                    >
+                                        <TextInput
+                                            value={rolesData.badge_text}
+                                            onChange={(event) =>
+                                                updateRoleField("badge_text", event.target.value)
+                                            }
+                                        />
+                                    </FormField>
+                                    <FormField
+                                        label="Title"
+                                        error={rolesErrors.title_text}
+                                        required
+                                    >
+                                        <TextInput
+                                            value={rolesData.title_text}
+                                            onChange={(event) =>
+                                                updateRoleField("title_text", event.target.value)
+                                            }
+                                        />
+                                    </FormField>
+                                    <FormField
+                                        label="Subtitle"
+                                        error={rolesErrors.subtitle_text}
+                                        required
+                                    >
+                                        <TextInput
+                                            value={rolesData.subtitle_text}
+                                            onChange={(event) =>
+                                                updateRoleField("subtitle_text", event.target.value)
+                                            }
+                                        />
+                                    </FormField>
+                                </div>
+
+                                <div className="flex justify-end">
+                                    <button
+                                        type="button"
+                                        onClick={addRoleRow}
+                                        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                                    >
+                                        + Add Role
+                                    </button>
+                                </div>
+
+                                {(rolesData.roles ?? []).map((row, index) => (
+                                    <div
+                                        key={row.id ?? `role-${index}`}
+                                        ref={(el) => {
+                                            roleContainerRefs.current[index] = el;
+                                        }}
+                                        className="rounded-lg border border-slate-200 bg-slate-50 p-4"
+                                    >
+                                        <div className="mb-3 flex items-center justify-between gap-2">
+                                            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                Role #{index + 1}
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => moveRoleRow(index, "up")}
+                                                    aria-label={`Move Role #${index + 1} up`}
+                                                    disabled={index === 0}
+                                                    className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                                >
+                                                    <AppIcon name="arrow-up" className="h-4 w-4" />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => moveRoleRow(index, "down")}
+                                                    aria-label={`Move Role #${index + 1} down`}
+                                                    disabled={index === (rolesData.roles ?? []).length - 1}
+                                                    className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                                >
+                                                    <AppIcon name="arrow-down" className="h-4 w-4" />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeRoleRow(index)}
+                                                    aria-label={`Delete Role #${index + 1}`}
+                                                    className="rounded-lg border border-rose-200 bg-white p-1.5 text-rose-600 hover:bg-rose-50"
+                                                >
+                                                    <AppIcon name="trash" className="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid gap-3 md:grid-cols-2 mb-3">
+                                            <FormField
+                                                label="Title"
+                                                error={rolesErrors[`roles.${index}.title`]}
+                                                required
+                                            >
+                                                <TextInput
+                                                    value={row.title ?? ""}
+                                                    onChange={(event) =>
+                                                        updateRoleRow(index, "title", event.target.value)
+                                                    }
+                                                    placeholder="e.g. Faculty"
+                                                />
+                                            </FormField>
+                                            <FormField
+                                                label="Description"
+                                                error={rolesErrors[`roles.${index}.desc_text`]}
+                                            >
+                                                <TextInput
+                                                    value={row.desc_text ?? ""}
+                                                    onChange={(event) =>
+                                                        updateRoleRow(index, "desc_text", event.target.value)
+                                                    }
+                                                />
+                                            </FormField>
+                                            <FormField
+                                                label="Icon Type"
+                                                error={rolesErrors[`roles.${index}.icon_type`]}
+                                            >
+                                                <SelectInput
+                                                    value={row.icon_type ?? "faculty"}
+                                                    onChange={(event) =>
+                                                        updateRoleRow(index, "icon_type", event.target.value)
+                                                    }
+                                                >
+                                                    <option value="faculty">Faculty</option>
+                                                    <option value="peer">Peer</option>
+                                                    <option value="student">Student</option>
+                                                    <option value="admin">Administrator</option>
+                                                </SelectInput>
+                                            </FormField>
+                                            <FormField
+                                                label="Progress (%)"
+                                                error={rolesErrors[`roles.${index}.progress`]}
+                                            >
+                                                <TextInput
+                                                    type="number"
+                                                    min={0}
+                                                    max={100}
+                                                    value={row.progress ?? 0}
+                                                    onChange={(event) =>
+                                                        updateRoleRow(index, "progress", Number(event.target.value))
+                                                    }
+                                                />
+                                            </FormField>
+                                        </div>
+
+                                        <div>
+                                            <div className="mb-2 flex items-center justify-between">
+                                                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                    Features
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => addFeatureToRole(index)}
+                                                    className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                                                >
+                                                    + Add
+                                                </button>
+                                            </div>
+                                            <div className="space-y-2">
+                                                {(row.features ?? []).map((feat, fi) => (
+                                                    <div key={fi} className="flex gap-2">
+                                                        <TextInput
+                                                            value={feat}
+                                                            onChange={(event) =>
+                                                                updateFeatureInRole(index, fi, event.target.value)
+                                                            }
+                                                            placeholder={`Feature ${fi + 1}`}
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeFeatureFromRole(index, fi)}
+                                                            aria-label={`Remove feature ${fi + 1}`}
+                                                            className="shrink-0 rounded-lg border border-rose-200 bg-white p-1.5 text-rose-600 hover:bg-rose-50"
+                                                        >
+                                                            <AppIcon name="trash" className="h-4 w-4" />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="pt-2">
+                                <div className="flex flex-col md:flex-row-reverse gap-3 md:justify-start w-full">
+                                    <SubmitButton
+                                        processing={rolesProcessing}
+                                        disabled={hasEmptyRolesRequiredFields || !hasRolesSectionChanges}
+                                        className="w-full md:w-[180px]"
+                                    >
+                                        Save Changes
+                                    </SubmitButton>
+                                    <button
+                                        type="button"
+                                        onClick={closeRolesModal}
+                                        className="w-full md:w-[180px] rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
         </AdminLayout>
     );
 }

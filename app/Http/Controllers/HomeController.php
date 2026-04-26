@@ -6,6 +6,8 @@ use App\Models\LandingPageFeature;
 use App\Models\LandingPageFeatureSection;
 use App\Models\LandingPageHeader;
 use App\Models\LandingPageHomeSection;
+use App\Models\LandingPageRole;
+use App\Models\LandingPageRolesSection;
 use App\Models\LandingPageStat;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -22,6 +24,7 @@ class HomeController extends Controller
             'headerLinks' => $this->headerLinks(),
             'homeSection' => $this->homeSection(),
             'featuresSection' => $this->featuresSection(),
+            'rolesSection' => $this->rolesSection(),
         ]);
     }
 
@@ -166,6 +169,50 @@ class HomeController extends Controller
             'secondary_cta_label' => $homeSection->secondary_cta_label,
             'secondary_cta_target' => $homeSection->secondary_cta_target,
             'background_video_path' => $homeSection->background_video_path,
+        ];
+    }
+
+    private function rolesSection(): array
+    {
+        $defaultRoles = [
+            ['title' => 'Faculty', 'desc_text' => 'Comprehensive evaluation tools for academic professionals', 'features' => ['Self-Assessment Portal', 'Peer Review Access', 'Student Feedback View', 'Performance History', 'Development Reports'], 'progress' => 85, 'icon_type' => 'faculty', 'sort_order' => 1],
+            ['title' => 'Peer', 'desc_text' => 'Collaborative evaluation between colleagues', 'features' => ['Anonymous Reviews', '360° Assessment', 'Teaching Observation', 'Collaborative Goals', 'Best Practices Share'], 'progress' => 78, 'icon_type' => 'peer', 'sort_order' => 2],
+            ['title' => 'Student', 'desc_text' => 'Student-centered faculty evaluation system', 'features' => ['Course Feedback', 'Anonymous Surveys', 'Learning Outcomes', 'Suggestion Portal', 'Progress Tracking'], 'progress' => 92, 'icon_type' => 'student', 'sort_order' => 3],
+            ['title' => 'Administrator', 'desc_text' => 'Complete system oversight and management', 'features' => ['Analytics Dashboard', 'User Management', 'Report Generation', 'Campus Settings', 'System Configuration'], 'progress' => 95, 'icon_type' => 'admin', 'sort_order' => 4],
+        ];
+        $defaultSection = [
+            'badge_text' => 'User Roles',
+            'title_text' => 'Four Integrated Roles',
+            'subtitle_text' => 'Click a role to explore its capabilities',
+            'roles' => $defaultRoles,
+        ];
+
+        if (! Schema::hasTable('landing_page_roles_section') || ! Schema::hasTable('landing_page_roles')) {
+            return $defaultSection;
+        }
+
+        $section = LandingPageRolesSection::query()->first();
+        $roles = LandingPageRole::query()
+            ->where('is_active', 1)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get(['title', 'desc_text', 'features', 'progress', 'icon_type', 'sort_order'])
+            ->map(fn(LandingPageRole $role) => [
+                'title' => $role->title,
+                'desc_text' => $role->desc_text,
+                'features' => $role->features ?? [],
+                'progress' => $role->progress,
+                'icon_type' => $role->icon_type,
+                'sort_order' => $role->sort_order,
+            ])
+            ->values()
+            ->all();
+
+        return [
+            'badge_text' => $section?->badge_text ?: $defaultSection['badge_text'],
+            'title_text' => $section?->title_text ?: $defaultSection['title_text'],
+            'subtitle_text' => $section?->subtitle_text ?: $defaultSection['subtitle_text'],
+            'roles' => count($roles) > 0 ? $roles : $defaultRoles,
         ];
     }
 
