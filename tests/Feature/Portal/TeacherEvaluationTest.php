@@ -170,7 +170,7 @@ class TeacherEvaluationTest extends TestCase
         $this->assertDatabaseHas('evaluation_submissions', [
             'academic_year_id' => $cycleId,
             'teacher_id' => $coTeacherId,
-            'category' => 'peer_teacher',
+            'questionnaire_type_id' => $peerQuestionnaireTypeId,
         ]);
 
         $row = DB::table('ratings_peer')
@@ -336,7 +336,7 @@ class TeacherEvaluationTest extends TestCase
         $this->assertDatabaseHas('evaluation_submissions', [
             'academic_year_id' => $cycleId,
             'teacher_id' => $chairId,
-            'category' => 'head_teacher',
+            'questionnaire_type_id' => $questionnaireTypeId,
         ]);
 
         $this->assertSame(0, DB::table('ratings_head')->count());
