@@ -106,11 +106,13 @@ export default function Home({ stats = [] }) {
             <Head title="Holy Cross College - Evaluation System" />
             {showSecretTeamCard && (
                 <div
-                    className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+                    className="fixed inset-0 z-[9999] overflow-y-auto overscroll-contain bg-black/60 backdrop-blur-sm"
                     onClick={() => setShowSecretTeamCard(false)}
                 >
-                    <div onClick={(event) => event.stopPropagation()} className="relative">
-                        <SecretTeamCard />
+                    <div className="flex min-h-full items-start justify-center px-4 py-8 sm:items-center sm:py-12">
+                        <div onClick={(event) => event.stopPropagation()} className="relative w-full max-w-[980px]">
+                            <SecretTeamCard />
+                        </div>
                     </div>
                 </div>
             )}
