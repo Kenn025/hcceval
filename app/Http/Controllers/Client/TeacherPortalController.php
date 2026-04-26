@@ -1879,14 +1879,14 @@ class TeacherPortalController extends Controller
             $schoolYear = trim("{$cycle->from_year}-{$cycle->to_year}");
             $semesterLabel = $this->semesterLabel($cycle->term ?? null);
 
-            $classes = $this->buildAssignedSubjectClasses($teacher, $semesterLabel, $schoolYear);
-
-            if (empty($classes)) {
-                $classes = array_merge(
-                    $this->buildSubjectSectionClasses($employeeId, $schoolYear, [$termA, $termB]),
-                    $this->buildLegacyEducationLevelClasses($teacher, $semesterLabel),
-                );
-            }
+            $classes = collect([
+                ...$this->buildAssignedSubjectClasses($teacher, $semesterLabel, $schoolYear),
+                ...$this->buildSubjectSectionClasses($employeeId, $schoolYear, [$termA, $termB]),
+                ...$this->buildLegacyEducationLevelClasses($teacher, $semesterLabel),
+            ])
+                ->unique('class_key')
+                ->values()
+                ->all();
 
             $subjectRatings = $this->subjectRatingsForClasses($teacher, $classes, $cycle, $schoolYear, [$termA, $termB]);
             $peerRatings = $this->peerRatingsForTeacher($teacher, $cycle);

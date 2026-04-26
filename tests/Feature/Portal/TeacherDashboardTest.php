@@ -142,11 +142,23 @@ class TeacherDashboardTest extends TestCase
             ],
         ]);
 
-        $this->asTeacher($teacherId)
+        $response = $this->asTeacher($teacherId)
             ->get(route('portal.teacher.dashboard'))
-            ->assertOk()
-            ->assertSeeText('Foundations of Education')
-            ->assertSeeText('Bachelor of Secondary Education')
-            ->assertSeeText('2 enrolled');
+            ->assertOk();
+
+        $classes = collect(data_get($response->viewData('page'), 'props.classes', []));
+
+        $this->assertTrue(
+            $classes->contains(fn (array $class) => $class['course_name'] === 'Foundations of Education'),
+            'Expected the teacher dashboard classes prop to include Foundations of Education.'
+        );
+        $this->assertTrue(
+            $classes->contains(fn (array $class) => $class['scope_label'] === 'Bachelor of Secondary Education'),
+            'Expected the teacher dashboard classes prop to include the BSED scope label.'
+        );
+        $this->assertTrue(
+            $classes->contains(fn (array $class) => (int) $class['enrolled_count'] === 2),
+            'Expected the teacher dashboard classes prop to include 2 enrolled students.'
+        );
     }
 }

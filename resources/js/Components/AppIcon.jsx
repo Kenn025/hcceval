@@ -25,6 +25,8 @@ const iconPaths = {
     shield: ['M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z'],
     menu: ['M4 7h16', 'M4 12h16', 'M4 17h16'],
     close: ['M6 6l12 12', 'M18 6 6 18'],
+    'chevron-left': ['m15 18-6-6 6-6'],
+    'chevron-right': ['m9 18 6-6-6-6'],
     chevronDown: ['m6 9 6 6 6-6'],
     logout: ['M10 17l5-5-5-5', 'M15 12H4', 'M20 4v16'],
     briefcase: ['M7 7h10a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2Z', 'M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2'],

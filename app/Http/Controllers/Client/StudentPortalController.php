@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Client;
 
 use App\Http\Controllers\Controller;
+use App\Models\Employee;
 use App\Models\Student;
 use App\Models\Subject;
 use App\Models\Teacher;
@@ -413,6 +414,19 @@ class StudentPortalController extends Controller
         return $typeId ? (int) $typeId : null;
     }
 
+    private function questionnaireTypeIdByCode(string $code): ?int
+    {
+        if (! Schema::hasTable('questionnaire_type')) {
+            return null;
+        }
+
+        $typeId = DB::table('questionnaire_type')
+            ->where('code', $code)
+            ->value('id');
+
+        return $typeId ? (int) $typeId : null;
+    }
+
     private function studentHasEvaluationSubmission(Student $student, ?int $academicYearId, ?int $questionnaireId, ?int $subjectId): bool
     {
         if (! $academicYearId || ! $questionnaireId || ! $subjectId || ! Schema::hasTable('evaluation_submissions')) {
@@ -435,6 +449,371 @@ class StudentPortalController extends Controller
             ->where('questionnaire_id', $questionnaireId)
             ->where('subject_id', $subjectId)
             ->exists();
+    }
+
+    private function studentHasTargetSubmission(Student $student, ?int $academicYearId, ?int $questionnaireId, ?int $teacherId): bool
+    {
+        if (! $academicYearId || ! $questionnaireId || ! $teacherId || ! Schema::hasTable('evaluation_submissions')) {
+            return false;
+        }
+
+        $submissionIds = collect($student->evaluation_submission_ids ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($submissionIds->isEmpty()) {
+            return false;
+        }
+
+        return DB::table('evaluation_submissions')
+            ->whereIn('id', $submissionIds->all())
+            ->where('academic_year_id', $academicYearId)
+            ->where('questionnaire_id', $questionnaireId)
+            ->where('questionnaire_type_id', $this->questionnaireTypeIdByCode('QTYPE-HEAD'))
+            ->where('teacher_id', $teacherId)
+            ->exists();
+    }
+
+    private function programChairTargets(Student $student, ?object $cycle): array
+    {
+        if (! $cycle || ! Schema::hasTable('teacher') || ! Schema::hasTable('evaluation_submissions')) {
+            return [];
+        }
+
+        $targets = Teacher::query()
+            ->with(['program:id,name', 'strand:id,name', 'department:id,name'])
+            ->where('branch_id', $student->branch_id)
+            ->where('department_id', $student->department_id)
+            ->where('is_activated', 1)
+            ->where('is_deleted', 0)
+            ->whereRaw('LOWER(COALESCE(role, "")) LIKE ?', ['%program chair%'])
+            ->orderBy('lastname')
+            ->orderBy('firstname')
+            ->get();
+
+        $questionnaires = Schema::hasTable('questionnaires')
+            ? DB::table('questionnaires')
+                ->select('id', 'code', 'title')
+                ->whereIn('id', $targets->pluck('questionnaire_id')->filter()->unique()->values())
+                ->where('is_deleted', 0)
+                ->where('is_activated', 1)
+                ->get()
+                ->keyBy('id')
+            : collect();
+
+        return $targets
+            ->map(fn (Teacher $target) => [
+                'id' => $target->id,
+                'form_key' => 'program_chair:' . $target->id,
+                'name' => $target->full_name,
+                'role' => $target->role ?? 'Program Chair',
+                'scope' => $target->program?->name ?? $target->strand?->name ?? $target->department?->name ?? '',
+                'scoped' => (
+                    (! empty($student->program_id) && (int) $target->program_id === (int) $student->program_id)
+                    || (! empty($student->strand_id) && empty($student->program_id) && (int) $target->strand_id === (int) $student->strand_id)
+                ),
+                'questionnaire_id' => $target->questionnaire_id ? (int) $target->questionnaire_id : null,
+                'questionnaire_code' => $target->questionnaire_id
+                    ? data_get($questionnaires->get((int) $target->questionnaire_id), 'code')
+                    : null,
+                'questionnaire_title' => $target->questionnaire_id
+                    ? data_get($questionnaires->get((int) $target->questionnaire_id), 'title')
+                    : null,
+                'category' => 'program_chair',
+                'done' => $this->studentHasTargetSubmission(
+                    $student,
+                    (int) $cycle->id,
+                    $target->questionnaire_id ? (int) $target->questionnaire_id : null,
+                    (int) $target->id,
+                ),
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function submittedProgramChairForms(Student $student, array $targets, ?object $cycle): array
+    {
+        if (! $cycle || empty($targets) || ! Schema::hasTable('evaluation_submissions')) {
+            return [];
+        }
+
+        $submissionIds = collect($student->evaluation_submission_ids ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($submissionIds->isEmpty()) {
+            return [];
+        }
+
+        $targetIds = collect($targets)->pluck('id')->map(fn ($id) => (int) $id)->values();
+
+        return DB::table('evaluation_submissions')
+            ->select('id', 'questionnaire_type_id', 'teacher_id', 'answers', 'comments', 'submitted_at', 'created_at')
+            ->whereIn('id', $submissionIds->all())
+            ->where('academic_year_id', (int) $cycle->id)
+            ->where('questionnaire_type_id', $this->questionnaireTypeIdByCode('QTYPE-HEAD'))
+            ->whereIn('teacher_id', $targetIds->all())
+            ->orderByDesc('submitted_at')
+            ->orderByDesc('created_at')
+            ->get()
+            ->mapWithKeys(function ($row) {
+                $comments = json_decode($row->comments ?? '{}', true) ?: [];
+
+                return [(string) $row->teacher_id => [
+                    'id' => (int) $row->id,
+                    'questionnaire_type_id' => $row->questionnaire_type_id ? (int) $row->questionnaire_type_id : null,
+                    'answers' => json_decode($row->answers ?? '[]', true) ?: [],
+                    'comments' => $comments['text'] ?? null,
+                    'submitted_at' => $row->submitted_at ?? $row->created_at,
+                ]];
+            })
+            ->all();
+    }
+
+    private function studentHasEmployeeSubmission(Student $student, ?int $academicYearId, ?int $questionnaireId, ?int $employeeId): bool
+    {
+        if (! $academicYearId || ! $questionnaireId || ! $employeeId || ! Schema::hasTable('evaluation_submissions')) {
+            return false;
+        }
+
+        $submissionIds = collect($student->evaluation_submission_ids ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($submissionIds->isEmpty()) {
+            return false;
+        }
+
+        return DB::table('evaluation_submissions')
+            ->whereIn('id', $submissionIds->all())
+            ->where('academic_year_id', $academicYearId)
+            ->where('questionnaire_id', $questionnaireId)
+            ->where('questionnaire_type_id', $this->questionnaireTypeIdByCode('QTYPE-EMPLOYEE'))
+            ->where('employee_id', $employeeId)
+            ->exists();
+    }
+
+    private function branchEmployeesForStudent(Student $student, ?object $cycle): array
+    {
+        if (! $cycle || ! Schema::hasTable('employee') || ! Schema::hasTable('evaluation_submissions')) {
+            return [];
+        }
+
+        $employeeDepartmentTable = Schema::hasTable('employee_departments')
+            ? 'employee_departments'
+            : (Schema::hasTable('employee_department') ? 'employee_department' : null);
+        $hasEmployeeDepartmentColumn = Schema::hasColumn('employee', 'employee_department_id');
+        $hasEmployeeQuestionnaireId = Schema::hasColumn('employee', 'questionnaire_id');
+
+        $query = DB::table('employee as e')
+            ->select(
+                'e.id',
+                'e.code',
+                'e.firstname',
+                'e.middlename',
+                'e.lastname',
+                'e.role',
+                'e.email',
+                'e.branch_id'
+            )
+            ->where('e.branch_id', $student->branch_id)
+            ->where('e.is_deleted', 0)
+            ->where('e.is_activated', 1)
+            ->orderBy('e.lastname')
+            ->orderBy('e.firstname');
+
+        if ($hasEmployeeQuestionnaireId && Schema::hasTable('questionnaires')) {
+            $query
+                ->leftJoin('questionnaires as qn', 'qn.id', '=', 'e.questionnaire_id')
+                ->addSelect(
+                    'e.questionnaire_id',
+                    'qn.code as questionnaire_code',
+                    'qn.title as questionnaire_title'
+                );
+        } else {
+            $query->addSelect(
+                DB::raw('NULL as questionnaire_id'),
+                DB::raw('NULL as questionnaire_code'),
+                DB::raw('NULL as questionnaire_title')
+            );
+        }
+
+        if ($employeeDepartmentTable && $hasEmployeeDepartmentColumn) {
+            $query
+                ->leftJoin($employeeDepartmentTable . ' as ed', 'ed.id', '=', 'e.employee_department_id')
+                ->addSelect(
+                    'e.employee_department_id',
+                    'ed.name as employee_department_name',
+                    'ed.code as employee_department_code'
+                );
+        } else {
+            $query->addSelect(
+                DB::raw('NULL as employee_department_id'),
+                DB::raw('NULL as employee_department_name'),
+                DB::raw('NULL as employee_department_code')
+            );
+        }
+
+        return $query
+            ->get()
+            ->map(fn ($employee) => [
+                'id' => (int) $employee->id,
+                'form_key' => 'employee-' . (int) $employee->id,
+                'code' => $employee->code,
+                'name' => trim(collect([$employee->firstname, $employee->middlename, $employee->lastname])->filter()->implode(' ')),
+                'role' => $employee->role ?? 'Employee',
+                'scope' => $employee->employee_department_name ?? '',
+                'email' => $employee->email,
+                'branch_id' => $employee->branch_id,
+                'employee_department_id' => $employee->employee_department_id,
+                'employee_department_name' => $employee->employee_department_name,
+                'employee_department_code' => $employee->employee_department_code,
+                'questionnaire_id' => $employee->questionnaire_id ? (int) $employee->questionnaire_id : null,
+                'questionnaire_code' => $employee->questionnaire_code,
+                'questionnaire_title' => $employee->questionnaire_title,
+                'category' => 'employee_evaluation',
+                'done' => $this->studentHasEmployeeSubmission(
+                    $student,
+                    (int) $cycle->id,
+                    $employee->questionnaire_id ? (int) $employee->questionnaire_id : null,
+                    (int) $employee->id,
+                ),
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function submittedEmployeeForms(Student $student, array $employees, ?object $cycle): array
+    {
+        if (! $cycle || empty($employees) || ! Schema::hasTable('evaluation_submissions')) {
+            return [];
+        }
+
+        $submissionIds = collect($student->evaluation_submission_ids ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($submissionIds->isEmpty()) {
+            return [];
+        }
+
+        $employeeIds = collect($employees)->pluck('id')->map(fn ($id) => (int) $id)->values();
+
+        return DB::table('evaluation_submissions')
+            ->select('id', 'questionnaire_type_id', 'employee_id', 'answers', 'comments', 'submitted_at', 'created_at')
+            ->whereIn('id', $submissionIds->all())
+            ->where('academic_year_id', (int) $cycle->id)
+            ->where('questionnaire_type_id', $this->questionnaireTypeIdByCode('QTYPE-EMPLOYEE'))
+            ->whereIn('employee_id', $employeeIds->all())
+            ->orderByDesc('submitted_at')
+            ->orderByDesc('created_at')
+            ->get()
+            ->mapWithKeys(function ($row) {
+                $comments = json_decode($row->comments ?? '{}', true) ?: [];
+
+                return ['employee-' . (int) $row->employee_id => [
+                    'id' => (int) $row->id,
+                    'questionnaire_type_id' => $row->questionnaire_type_id ? (int) $row->questionnaire_type_id : null,
+                    'answers' => json_decode($row->answers ?? '[]', true) ?: [],
+                    'comments' => $comments['text'] ?? null,
+                    'submitted_at' => $row->submitted_at ?? $row->created_at,
+                ]];
+            })
+            ->all();
+    }
+
+    private function evaluationFormsForProgramChairs(array $targets, ?object $cycle, array $submittedForms = []): array
+    {
+        if (! $cycle) {
+            return [];
+        }
+
+        $forms = [];
+
+        foreach ($targets as $target) {
+            $questionnaireId = (int) ($target['questionnaire_id'] ?? 0);
+            $questions = $this->questionnaireQuestions($questionnaireId);
+
+            if (! $questionnaireId || $questions->isEmpty()) {
+                continue;
+            }
+
+            $formKey = (string) ($target['form_key'] ?? ('program_chair:' . $target['id']));
+
+            $forms[$formKey] = [
+                'category' => 'program_chair',
+                'questionnaireId' => $questionnaireId,
+                'questionnaireTypeId' => $this->questionnaireTypeId($questionnaireId),
+                'questionnaireTitle' => $target['questionnaire_title'] ?? null,
+                'submission' => $submittedForms[(string) $target['id']] ?? null,
+                'evaluatee' => [
+                    'id' => $target['id'],
+                    'name' => $target['name'],
+                    'role' => $target['role'] ?? 'Program Chair',
+                    'scope' => $target['scope'] ?? '',
+                ],
+                'questions' => $questions->values()->all(),
+                'cycle' => [
+                    'id' => $cycle->id,
+                    'school_year' => "{$cycle->from_year}-{$cycle->to_year}",
+                    'semester' => $this->semesterLabel($cycle->term ?? null),
+                    'term' => $cycle->term,
+                ],
+            ];
+        }
+
+        return $forms;
+    }
+
+    private function evaluationFormsForEmployees(array $employees, ?object $cycle, array $submittedForms = []): array
+    {
+        if (! $cycle) {
+            return [];
+        }
+
+        $forms = [];
+
+        foreach ($employees as $employee) {
+            $questionnaireId = (int) ($employee['questionnaire_id'] ?? 0);
+            $questions = $this->questionnaireQuestions($questionnaireId);
+
+            if (! $questionnaireId || $questions->isEmpty()) {
+                continue;
+            }
+
+            $formKey = (string) ($employee['form_key'] ?? ('employee-' . $employee['id']));
+
+            $forms[$formKey] = [
+                'category' => 'employee_evaluation',
+                'questionnaireId' => $questionnaireId,
+                'questionnaireTypeId' => $this->questionnaireTypeId($questionnaireId),
+                'questionnaireTitle' => $employee['questionnaire_title'] ?? null,
+                'submission' => $submittedForms[$formKey] ?? null,
+                'evaluatee' => [
+                    'id' => $employee['id'],
+                    'name' => $employee['name'],
+                    'role' => $employee['role'] ?? 'Employee',
+                    'scope' => $employee['employee_department_name'] ?? '',
+                ],
+                'questions' => $questions->values()->all(),
+                'cycle' => [
+                    'id' => $cycle->id,
+                    'school_year' => "{$cycle->from_year}-{$cycle->to_year}",
+                    'semester' => $this->semesterLabel($cycle->term ?? null),
+                    'term' => $cycle->term,
+                ],
+            ];
+        }
+
+        return $forms;
     }
 
     private function studentEvaluationRecords(Student $student, ?object $cycle, array $subjects): array
@@ -490,13 +869,37 @@ class StudentPortalController extends Controller
                 ->get()
                 ->keyBy('id')
             : collect();
+        $teacherIds = DB::table('evaluation_submissions')
+            ->whereIn('id', $submissionIds->all())
+            ->pluck('teacher_id')
+            ->filter()
+            ->unique()
+            ->values();
+        $teacherNames = $teacherIds->isNotEmpty() && Schema::hasTable('teacher')
+            ? Teacher::query()
+                ->whereIn('id', $teacherIds->all())
+                ->get()
+                ->mapWithKeys(fn (Teacher $teacher) => [$teacher->id => $teacher->full_name])
+            : collect();
+        $employeeIds = DB::table('evaluation_submissions')
+            ->whereIn('id', $submissionIds->all())
+            ->pluck('employee_id')
+            ->filter()
+            ->unique()
+            ->values();
+        $employeeNames = $employeeIds->isNotEmpty() && Schema::hasTable('employee')
+            ? Employee::query()
+                ->whereIn('id', $employeeIds->all())
+                ->get()
+                ->mapWithKeys(fn (Employee $employee) => [$employee->id => $employee->full_name])
+            : collect();
 
         $activeAcademicYearId = $cycle ? (int) $cycle->id : null;
         $records = DB::table('evaluation_submissions')
             ->whereIn('id', $submissionIds->all())
             ->orderByDesc('created_at')
             ->get()
-            ->map(function ($row) use ($subjectLookup, $questionTexts, $academicYears) {
+            ->map(function ($row) use ($subjectLookup, $questionTexts, $academicYears, $teacherNames, $employeeNames) {
                 $answers = collect(json_decode($row->answers ?? '[]', true) ?: [])
                     ->map(function ($answer) use ($questionTexts) {
                         $questionId = (int) ($answer['question_id'] ?? 0);
@@ -520,21 +923,27 @@ class StudentPortalController extends Controller
                     ? $this->semesterLabel($academicYear->term)
                     : (isset($subject['term']) ? $this->semesterLabel($subject['term']) : null);
                 $ratings = $answers->pluck('rating')->filter();
+                $questionnaireTypeId = $row->questionnaire_type_id ? (int) $row->questionnaire_type_id : null;
+                $evaluateeName = match ($questionnaireTypeId) {
+                    3 => $teacherNames[(int) $row->teacher_id] ?? 'School Head',
+                    4 => $employeeNames[(int) $row->employee_id] ?? 'Employee',
+                    default => $subject['teacher_name'] ?? ($teacherNames[(int) $row->teacher_id] ?? 'Teacher'),
+                };
 
                 return [
                     'submission_id' => (int) $row->id,
-                    'category' => 'teacher_subject',
+                    'questionnaire_type_id' => $questionnaireTypeId,
                     'subject_id' => $row->subject_id ? (int) $row->subject_id : null,
                     'course_code' => $subject['course_code'] ?? null,
                     'course_name' => $subject['course_name'] ?? null,
-                    'evaluatee_name' => $subject['teacher_name'] ?? 'Teacher',
-                    'teacher_name' => $subject['teacher_name'] ?? null,
+                    'evaluatee_name' => $evaluateeName,
+                    'teacher_name' => $questionnaireTypeId === 1 ? $evaluateeName : null,
                     'questionnaire_id' => $row->questionnaire_id ? (int) $row->questionnaire_id : null,
                     'academic_year_id' => $row->academic_year_id ? (int) $row->academic_year_id : null,
                     'school_year' => $schoolYear,
                     'semester_label' => $semesterLabel,
                     'archive_group_label' => trim(($schoolYear ?? 'Unknown Academic Year') . ' · ' . ($semesterLabel ?? 'Unknown Term')),
-                    'submitted_at' => $row->created_at,
+                    'submitted_at' => $row->submitted_at ?? $row->created_at,
                     'overall_average' => $ratings->isNotEmpty() ? round($ratings->avg(), 2) : null,
                     'answers' => $answers->all(),
                     'comments' => $comments['text'] ?? null,
@@ -562,10 +971,7 @@ class StudentPortalController extends Controller
         $category = $request->query('category', 'teacher_subject');
         $cycle = $this->activeCycle();
 
-        if (
-            ! Schema::hasTable('evaluation_submissions')
-            || ! Schema::hasTable('subject')
-        ) {
+        if (! Schema::hasTable('evaluation_submissions') || ($category === 'teacher_subject' && ! Schema::hasTable('subject'))) {
             return redirect()->route('portal.student.dashboard')
                 ->with('error', 'Submissions storage is not available yet.');
         }
@@ -579,7 +985,78 @@ class StudentPortalController extends Controller
         $schoolYear = "{$cycle->from_year}-{$cycle->to_year}";
 
         $student = Student::with('yearLevel')->findOrFail($studentId);
+        $submissionSubjects = $this->legacyRegisteredSubjects($student, $cycle);
+        $submissionRecords = $this->studentEvaluationRecords($student, $cycle, $submissionSubjects);
         $subjectSection = null;
+
+        if (in_array($category, ['program_chair', 'employee_evaluation'], true)) {
+            if ($category === 'employee_evaluation') {
+                $evaluatee = Employee::query()
+                    ->where('id', (int) $request->query('evaluatee_id'))
+                    ->where('branch_id', $student->branch_id)
+                    ->where('is_deleted', 0)
+                    ->where('is_activated', 1)
+                    ->first();
+                $notFoundMessage = 'Employee not found in your assigned branch.';
+                $missingQuestionnaireMessage = 'No questionnaire is assigned to this employee yet.';
+            } else {
+                $evaluatee = Teacher::query()
+                    ->with(['program:id,name', 'strand:id,name', 'department:id,name'])
+                    ->where('id', (int) $request->query('evaluatee_id'))
+                    ->where('branch_id', $student->branch_id)
+                    ->where('department_id', $student->department_id)
+                    ->where('is_deleted', 0)
+                    ->where('is_activated', 1)
+                    ->whereRaw('LOWER(COALESCE(role, "")) LIKE ?', ['%program chair%'])
+                    ->first();
+                $notFoundMessage = 'Program chair not found for this student.';
+                $missingQuestionnaireMessage = 'No questionnaire is assigned to this program chair yet.';
+            }
+
+            if (! $evaluatee) {
+                return redirect()->route('portal.student.dashboard')->with('error', $notFoundMessage);
+            }
+
+            $questionnaireId = $evaluatee->questionnaire_id ? (int) $evaluatee->questionnaire_id : null;
+            $questions = $this->questionnaireQuestions($questionnaireId);
+
+            if ($questions->isEmpty()) {
+                return redirect()->route('portal.student.dashboard')->with('error', $missingQuestionnaireMessage);
+            }
+
+            $questionnaireTitle = Schema::hasTable('questionnaires')
+                ? DB::table('questionnaires')
+                    ->where('id', $questionnaireId)
+                    ->where('is_deleted', 0)
+                    ->where('is_activated', 1)
+                    ->value('title')
+                : null;
+
+            return Inertia::render('Student/EvaluateForm', [
+                'category' => $category,
+                'questionnaireId' => $questionnaireId,
+                'questionnaireTitle' => $questionnaireTitle,
+                'evaluatee' => [
+                    'id' => $evaluatee->id,
+                    'name' => $evaluatee->full_name,
+                    'role' => $evaluatee->role ?? ($category === 'employee_evaluation' ? 'Employee' : 'Program Chair'),
+                    'scope' => $category === 'employee_evaluation'
+                        ? ''
+                        : ($evaluatee->program?->name ?? $evaluatee->strand?->name ?? $evaluatee->department?->name ?? ''),
+                ],
+                'subjectSectionId' => null,
+                'subjectId' => null,
+                'subjectInfo' => null,
+                'questions' => $questions,
+                'submissions' => $submissionRecords['current'],
+                'cycle' => [
+                    'id' => $cycle->id,
+                    'school_year' => $schoolYear,
+                    'semester' => $this->semesterLabel($cycle->term ?? null),
+                    'term' => $cycle->term,
+                ],
+            ]);
+        }
 
         if ($subjectSectionId > 0 && Schema::hasTable('student_enrollments') && Schema::hasTable('subject_sections')) {
             $subjectSection = DB::table('student_enrollments as se')
@@ -650,6 +1127,7 @@ class StudentPortalController extends Controller
                 'name' => $subjectSection->subject_name,
             ],
             'questions' => $questions,
+            'submissions' => $submissionRecords['current'],
             'cycle' => [
                 'id' => $cycle->id,
                 'school_year' => $schoolYear,
@@ -664,7 +1142,7 @@ class StudentPortalController extends Controller
         $studentId = (int) session('client_id');
 
         $data = $request->validate([
-            'category' => 'required|in:teacher_subject',
+            'category' => 'required|in:teacher_subject,program_chair,employee_evaluation',
             'evaluatee_id' => 'nullable|integer',
             'subject_section_id' => 'nullable|integer',
             'subject_id' => 'nullable|integer',
@@ -678,10 +1156,7 @@ class StudentPortalController extends Controller
             'comments' => 'nullable|string|max:2000',
         ]);
 
-        if (
-            ! Schema::hasTable('evaluation_submissions')
-            || ! Schema::hasTable('subject')
-        ) {
+        if (! Schema::hasTable('evaluation_submissions') || ($data['category'] === 'teacher_subject' && ! Schema::hasTable('subject'))) {
             return back()->withErrors(['message' => 'Submissions storage is not available.']);
         }
 
@@ -691,6 +1166,226 @@ class StudentPortalController extends Controller
         ])));
 
         $student = Student::with('yearLevel')->findOrFail($studentId);
+
+        if ($data['category'] === 'program_chair') {
+            $target = Teacher::query()
+                ->where('id', (int) ($data['evaluatee_id'] ?? 0))
+                ->where('branch_id', $student->branch_id)
+                ->where('department_id', $student->department_id)
+                ->where('is_activated', 1)
+                ->where('is_deleted', 0)
+                ->whereRaw('LOWER(COALESCE(role, "")) LIKE ?', ['%program chair%'])
+                ->first();
+
+            if (! $target) {
+                return redirect()->route('portal.student.dashboard')
+                    ->with('error', 'Program chair not found for this student.');
+            }
+
+            $questionnaireId = (int) ($target->questionnaire_id ?: ($data['questionnaire_id'] ?? 0));
+            $allowedQuestionIds = $this->questionnaireQuestions($questionnaireId)
+                ->pluck('question_id')
+                ->map(fn ($id) => (int) $id);
+
+            $submittedQuestionIds = collect($data['answers'])
+                ->pluck('question_id')
+                ->map(fn ($id) => (int) $id);
+
+            if ($allowedQuestionIds->isEmpty()) {
+                return back()->withErrors(['message' => 'No questionnaire is assigned to this program chair yet.']);
+            }
+
+            if ($submittedQuestionIds->diff($allowedQuestionIds)->isNotEmpty()) {
+                return back()->withErrors(['message' => 'Submitted answers do not match the assigned questionnaire.']);
+            }
+
+            if ($this->studentHasTargetSubmission($student, (int) $data['academic_year_id'], $questionnaireId, (int) $target->id)) {
+                return redirect()->route('portal.student.dashboard')
+                    ->with('error', 'You have already submitted this evaluation.');
+            }
+
+            $ratings = array_column($data['answers'], 'rating');
+            $avg = count($ratings) ? round(array_sum($ratings) / count($ratings), 2) : 0;
+
+            try {
+                DB::transaction(function () use ($student, $target, $data, $questionnaireId, $avg) {
+                    $submissionPayload = [
+                        'branch_id' => $student->branch_id,
+                        'academic_year_id' => $data['academic_year_id'],
+                        'questionnaire_type_id' => $this->questionnaireTypeId($questionnaireId),
+                        'questionnaire_id' => $questionnaireId ?: null,
+                        'subject_id' => null,
+                        'teacher_id' => $target->id,
+                        'answers' => json_encode($data['answers']),
+                        'comments' => json_encode(! empty($data['comments']) ? ['text' => $data['comments']] : []),
+                        'overall_average' => $avg,
+                        'submitted_at' => now(),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+
+                    if (Schema::hasColumn('evaluation_submissions', 'school_year')) {
+                        $submissionPayload['school_year'] = $data['school_year'];
+                    }
+
+                    if (Schema::hasColumn('evaluation_submissions', 'term')) {
+                        $submissionPayload['term'] = $data['term'];
+                    }
+
+                    $submissionId = (int) DB::table('evaluation_submissions')->insertGetId($submissionPayload);
+
+                    $submissionIds = collect($student->evaluation_submission_ids ?? [])
+                        ->map(fn ($id) => (int) $id)
+                        ->push($submissionId)
+                        ->unique()
+                        ->values()
+                        ->all();
+
+                    $student->forceFill([
+                        'evaluation_submission_ids' => $submissionIds,
+                    ])->save();
+                });
+            } catch (Throwable $exception) {
+                report($exception);
+
+                return back()->withErrors(['message' => 'Evaluation could not be saved. Please try again.']);
+            }
+
+            return redirect()->route('portal.student.dashboard')->with('success', 'Evaluation submitted. Thank you!');
+        }
+
+        if ($data['category'] === 'employee_evaluation') {
+            if (! Schema::hasColumn('evaluation_submissions', 'employee_id')) {
+                return back()->withErrors(['message' => 'Employee evaluation storage is not available. Please run the latest migrations.']);
+            }
+
+            $evaluatee = Employee::query()
+                ->where('id', (int) ($data['evaluatee_id'] ?? 0))
+                ->where('branch_id', $student->branch_id)
+                ->where('is_deleted', 0)
+                ->where('is_activated', 1)
+                ->first();
+
+            if (! $evaluatee) {
+                return redirect()->route('portal.student.dashboard')
+                    ->with('error', 'Employee not found in your assigned branch.');
+            }
+
+            $questionnaireId = $evaluatee->questionnaire_id ? (int) $evaluatee->questionnaire_id : null;
+            $allowedQuestionIds = $this->questionnaireQuestions($questionnaireId)
+                ->pluck('question_id')
+                ->map(fn ($id) => (int) $id);
+
+            if ($allowedQuestionIds->isEmpty()) {
+                return redirect()->route('portal.student.dashboard')
+                    ->with('error', 'No questionnaire is assigned to this employee yet.');
+            }
+
+            $submittedQuestionIds = collect($data['answers'])
+                ->pluck('question_id')
+                ->map(fn ($id) => (int) $id);
+
+            if ($submittedQuestionIds->diff($allowedQuestionIds)->isNotEmpty()) {
+                return back()->withErrors(['message' => 'Submitted answers do not match the assigned questionnaire.']);
+            }
+
+            if ($this->studentHasEmployeeSubmission($student, (int) $data['academic_year_id'], $questionnaireId, (int) $evaluatee->id)) {
+                return redirect()->route('portal.student.dashboard')
+                    ->with('error', 'You have already submitted this employee evaluation.');
+            }
+
+            $ratings = array_column($data['answers'], 'rating');
+            $avg = count($ratings) ? round(array_sum($ratings) / count($ratings), 2) : 0;
+            $newItems = collect($data['answers'])
+                ->groupBy('question_id')
+                ->map(fn ($group) => round($group->avg('rating'), 2))
+                ->toArray();
+
+            try {
+                DB::transaction(function () use ($student, $evaluatee, $data, $questionnaireId, $avg, $newItems) {
+                    $submissionPayload = [
+                        'branch_id' => $student->branch_id,
+                        'academic_year_id' => $data['academic_year_id'],
+                        'questionnaire_type_id' => $this->questionnaireTypeId($questionnaireId),
+                        'questionnaire_id' => $questionnaireId,
+                        'subject_id' => null,
+                        'employee_id' => $evaluatee->id,
+                        'answers' => json_encode($data['answers']),
+                        'comments' => json_encode(! empty($data['comments']) ? ['text' => $data['comments']] : []),
+                        'overall_average' => $avg,
+                        'submitted_at' => now(),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+
+                    if (Schema::hasColumn('evaluation_submissions', 'school_year')) {
+                        $submissionPayload['school_year'] = $data['school_year'];
+                    }
+
+                    if (Schema::hasColumn('evaluation_submissions', 'term')) {
+                        $submissionPayload['term'] = $data['term'];
+                    }
+
+                    $submissionId = (int) DB::table('evaluation_submissions')->insertGetId($submissionPayload);
+
+                    $submissionIds = collect($student->evaluation_submission_ids ?? [])
+                        ->map(fn ($id) => (int) $id)
+                        ->push($submissionId)
+                        ->unique()
+                        ->values()
+                        ->all();
+
+                    $student->forceFill([
+                        'evaluation_submission_ids' => $submissionIds,
+                    ])->save();
+
+                    if (Schema::hasTable('ratings_employee')) {
+                        $existing = DB::table('ratings_employee')
+                            ->where('academic_year_id', $data['academic_year_id'])
+                            ->where('employee_id', $evaluatee->id)
+                            ->first();
+
+                        if ($existing) {
+                            $count = ((int) $existing->submission_count) + 1;
+                            $previous = json_decode($existing->item_ratings ?? '{}', true) ?: [];
+                            $combined = [];
+
+                            foreach (array_unique(array_merge(array_keys($previous), array_keys($newItems))) as $questionId) {
+                                $combined[$questionId] = round((($previous[$questionId] ?? 0) * ($count - 1) + ($newItems[$questionId] ?? 0)) / $count, 2);
+                            }
+
+                            $overall = count($combined) ? round(array_sum($combined) / count($combined), 2) : 0;
+
+                            DB::table('ratings_employee')->where('id', $existing->id)->update([
+                                'submission_count' => $count,
+                                'item_ratings' => json_encode($combined),
+                                'overall_ratings' => json_encode(['average' => $overall]),
+                                'updated_at' => now(),
+                            ]);
+                        } else {
+                            $overall = count($newItems) ? round(array_sum($newItems) / count($newItems), 2) : 0;
+
+                            DB::table('ratings_employee')->insert([
+                                'academic_year_id' => $data['academic_year_id'],
+                                'employee_id' => $evaluatee->id,
+                                'submission_count' => 1,
+                                'item_ratings' => json_encode($newItems),
+                                'overall_ratings' => json_encode(['average' => $overall]),
+                                'created_at' => now(),
+                                'updated_at' => now(),
+                            ]);
+                        }
+                    }
+                });
+            } catch (Throwable $exception) {
+                report($exception);
+
+                return back()->withErrors(['message' => 'Evaluation could not be saved. Please try again.']);
+            }
+
+            return redirect()->route('portal.student.dashboard')->with('success', 'Employee feedback submitted. Thank you!');
+        }
+
         $subjectSectionId = (int) ($data['subject_section_id'] ?? 0);
         $subjectId = (int) ($data['subject_id'] ?? 0);
         $subjectSection = null;
@@ -889,6 +1584,8 @@ class StudentPortalController extends Controller
 
         $cycle = $this->activeCycle();
         $subjects     = [];
+        $programChairs = [];
+        $employees = [];
         $evaluations  = [];
         $archive      = [];
 
@@ -972,6 +1669,11 @@ class StudentPortalController extends Controller
         $evaluations = $studentEvaluationRecords['current'];
         $archive = $studentEvaluationRecords['archive'];
 
+        $programChairs = $this->programChairTargets($student, $cycle);
+        $submittedProgramChairForms = $this->submittedProgramChairForms($student, $programChairs, $cycle);
+        $employees = $this->branchEmployeesForStudent($student, $cycle);
+        $submittedEmployeeForms = $this->submittedEmployeeForms($student, $employees, $cycle);
+
         $evaluationForms = collect($subjects)
             ->filter(fn ($subject) => ! empty($subject['can_evaluate']) && empty($subject['already_evaluated']))
             ->mapWithKeys(function ($subject) use ($cycle) {
@@ -985,6 +1687,7 @@ class StudentPortalController extends Controller
                 return [(string) ($subject['section_id'] ?? $subject['course_id']) => [
                     'category' => 'teacher_subject',
                     'questionnaireId' => $questionnaireId,
+                    'questionnaireTypeId' => $this->questionnaireTypeId($questionnaireId),
                     'evaluatee' => [
                         'id' => $subject['teacher_id'] ?? null,
                         'name' => $subject['teacher_name'] ?? '',
@@ -1007,6 +1710,12 @@ class StudentPortalController extends Controller
             })
             ->toArray();
 
+        $evaluationForms = array_merge(
+            $evaluationForms,
+            $this->evaluationFormsForProgramChairs($programChairs, $cycle, $submittedProgramChairForms),
+            $this->evaluationFormsForEmployees($employees, $cycle, $submittedEmployeeForms),
+        );
+
         return Inertia::render('Student/Dashboard', [
             'student'     => [
                 'id'          => $student->id,
@@ -1023,6 +1732,8 @@ class StudentPortalController extends Controller
                 'is_open'     => (bool) $cycle->is_activated,
             ] : null,
             'subjects'    => $subjects,
+            'programChairs' => $programChairs,
+            'employees' => $employees,
             'evaluations' => $evaluations,
             'archive'     => $archive,
             'evaluationForms' => $evaluationForms,
