@@ -61,9 +61,9 @@ const NAV_ITEMS = {
         { key: "evaluation-section", type: "section", label: "Evaluation" },
         { key: "subjects", label: "My Subjects", icon: "subjects" },
         { key: "program_chairs", label: "Program Chairs", icon: "shield" },
-        { key: "employees", label: "Employees", icon: "briefcase" },
+        { key: "employees", label: "Employee Feedback", icon: "briefcase" },
         { key: "submissions-section", type: "section", label: "Submissions" },
-        { key: "evaluations", label: "My Evaluations", icon: "check-circle" },
+        { key: "evaluations", label: "Evaluation Submissions", icon: "check-circle" },
         { key: "archive", label: "Archive", icon: "archive" },
     ],
     teacher: [

@@ -61,28 +61,68 @@ class EmployeePortalController extends Controller
             return [];
         }
 
-        $totalRatings = [];
-        $count        = $rows->count();
+        $questionBuckets = [];
+        $count           = $rows->count();
 
         foreach ($rows as $row) {
             $answers = json_decode($row->answers ?? '[]', true);
             foreach ($answers as $ans) {
                 $qid = $ans['question_id'] ?? null;
                 if ($qid) {
-                    $totalRatings[$qid] = ($totalRatings[$qid] ?? 0) + ($ans['rating'] ?? 0);
+                    $questionBuckets[$qid] ??= [];
+                    $questionBuckets[$qid][] = (int) ($ans['rating'] ?? 0);
                 }
             }
         }
 
+        $questionIds = collect(array_keys($questionBuckets))
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->values();
+        $questionDetails = $questionIds->isNotEmpty() && Schema::hasTable('question')
+            ? DB::table('question')
+                ->leftJoin('question_class as qc', 'qc.id', '=', 'question.question_class_id')
+                ->whereIn('question.id', $questionIds->all())
+                ->select('question.id', 'question.description', 'qc.name as class_name')
+                ->get()
+                ->keyBy('id')
+            : collect();
+
         $avgRatings = [];
-        foreach ($totalRatings as $qid => $total) {
-            $avgRatings[] = ['question_id' => $qid, 'avg_rating' => round($total / $count, 2)];
+        foreach ($questionBuckets as $qid => $ratings) {
+            $question = $questionDetails->get((int) $qid);
+
+            $avgRatings[] = [
+                'question_id' => (int) $qid,
+                'question_text' => $question->description ?? ('Question #' . $qid),
+                'class_name' => $question->class_name ?? 'General',
+                'avg_rating' => round(array_sum($ratings) / max(1, count($ratings)), 2),
+                'response_count' => count($ratings),
+            ];
         }
+
+        usort($avgRatings, fn ($a, $b) => $a['question_id'] <=> $b['question_id']);
+
+        $classRatings = collect($avgRatings)
+            ->groupBy(fn (array $question) => $question['class_name'] ?: 'General')
+            ->map(function ($questions, string $className) {
+                return [
+                    'class_name' => $className,
+                    'avg_rating' => round($questions->avg('avg_rating'), 2),
+                    'question_count' => $questions->count(),
+                    'response_count' => $questions->sum('response_count'),
+                    'questions' => $questions->values()->all(),
+                ];
+            })
+            ->values()
+            ->all();
 
         return [
             'submission_count' => $count,
             'overall_avg'      => $count > 0 ? round(array_sum(array_column($avgRatings, 'avg_rating')) / max(1, count($avgRatings)), 2) : 0,
+            'latest_submitted_at' => $rows->max('submitted_at'),
             'per_question'     => $avgRatings,
+            'class_ratings'    => $classRatings,
         ];
     }
 

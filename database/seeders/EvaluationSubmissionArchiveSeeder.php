@@ -19,10 +19,11 @@ class EvaluationSubmissionArchiveSeeder extends Seeder
         }
 
         $olderAcademicYearId = $this->ensureAcademicYear(2024, 2025, '1st Semester');
+        $olderSecondSemesterAcademicYearId = $this->ensureAcademicYear(2024, 2025, '2nd Semester');
         $activeAcademicYearId = $this->activeAcademicYearId();
 
-        $this->deleteExistingPreviewRows(array_filter([1, $olderAcademicYearId, $activeAcademicYearId]));
-        $this->deleteExistingPeerRatingRows(array_filter([1, $olderAcademicYearId, $activeAcademicYearId]));
+        $this->deleteExistingPreviewRows(array_filter([1, $olderAcademicYearId, $olderSecondSemesterAcademicYearId, $activeAcademicYearId]));
+        $this->deleteExistingPeerRatingRows(array_filter([1, $olderAcademicYearId, $olderSecondSemesterAcademicYearId, $activeAcademicYearId]));
 
         $now = now();
         $submissionIdsByTeacher = [
@@ -333,6 +334,10 @@ class EvaluationSubmissionArchiveSeeder extends Seeder
         }
 
         $this->seedMultipageRatingFolderPreview($olderAcademicYearId, $now);
+        $this->seedStudentArchiveOverview(12, 1, $now);
+        $this->seedStudentArchiveOverview(12, $olderSecondSemesterAcademicYearId, $now->copy()->subMonths(5));
+        $this->seedEmployeeArchiveOverview(1, 1, $now);
+        $this->seedEmployeeArchiveOverview(1, $olderSecondSemesterAcademicYearId, $now->copy()->subMonths(5));
 
         if ($activeAcademicYearId) {
             $this->seedActivePeerSubmissions($activeAcademicYearId, $now);
@@ -568,6 +573,128 @@ class EvaluationSubmissionArchiveSeeder extends Seeder
 
         foreach ($rows as $rating) {
             $this->insertPeerRating($rating);
+        }
+    }
+
+    private function seedStudentArchiveOverview(int $studentId, int $academicYearId, mixed $now): void
+    {
+        if (! Schema::hasTable('student') || ! DB::table('student')->where('id', $studentId)->exists()) {
+            return;
+        }
+
+        $rows = [
+            [
+                'branch_id' => 3,
+                'academic_year_id' => $academicYearId,
+                'questionnaire_type_id' => 1,
+                'questionnaire_id' => 2,
+                'subject_id' => 14,
+                'teacher_id' => 20,
+                'answers' => [1 => 5, 6 => 5, 2 => 4, 5 => 5],
+                'submitted_at' => $now->copy()->subMonths(4)->subDays(5),
+            ],
+            [
+                'branch_id' => 3,
+                'academic_year_id' => $academicYearId,
+                'questionnaire_type_id' => 3,
+                'questionnaire_id' => 6,
+                'teacher_id' => 19,
+                'answers' => [1 => 4, 6 => 5, 2 => 5, 4 => 4, 5 => 5],
+                'submitted_at' => $now->copy()->subMonths(4)->subDays(3),
+            ],
+            [
+                'branch_id' => 3,
+                'academic_year_id' => $academicYearId,
+                'questionnaire_type_id' => 4,
+                'questionnaire_id' => 8,
+                'employee_id' => 5,
+                'answers' => [1 => 5, 6 => 4, 2 => 4, 4 => 5, 5 => 4],
+                'submitted_at' => $now->copy()->subMonths(4)->subDay(),
+            ],
+        ];
+        $submissionIds = [];
+
+        foreach ($rows as $row) {
+            $ratings = $row['answers'];
+            $average = round(array_sum($ratings) / count($ratings), 2);
+            $submittedAt = $row['submitted_at'];
+            unset($row['submitted_at'], $row['answers']);
+
+            $submissionIds[] = $this->insertSubmission(array_merge($row, [
+                'answers' => $this->answers($ratings),
+                'overall_average' => $average,
+                'submitted_at' => $submittedAt,
+                'created_at' => $submittedAt,
+                'updated_at' => $submittedAt,
+            ]));
+        }
+
+        $student = DB::table('student')->where('id', $studentId)->first();
+        $existingIds = json_decode((string) ($student->evaluation_submission_ids ?? '[]'), true) ?: [];
+
+        DB::table('student')->where('id', $studentId)->update([
+            'evaluation_submission_ids' => json_encode(collect($existingIds)
+                ->merge($submissionIds)
+                ->map(fn ($id) => (int) $id)
+                ->filter()
+                ->unique()
+                ->values()
+                ->all()),
+        ]);
+    }
+
+    private function seedEmployeeArchiveOverview(int $employeeId, int $academicYearId, mixed $now): void
+    {
+        if (! Schema::hasTable('employee') || ! DB::table('employee')->where('id', $employeeId)->exists()) {
+            return;
+        }
+
+        $rows = [
+            [
+                'branch_id' => 2,
+                'academic_year_id' => $academicYearId,
+                'questionnaire_type_id' => 4,
+                'questionnaire_id' => 7,
+                'employee_id' => $employeeId,
+                'category' => 'employee_evaluation',
+                'answers' => [1 => 5, 6 => 4, 2 => 5, 4 => 4, 5 => 5],
+                'submitted_at' => $now->copy()->subMonths(3)->subDays(8),
+            ],
+            [
+                'branch_id' => 2,
+                'academic_year_id' => $academicYearId,
+                'questionnaire_type_id' => 4,
+                'questionnaire_id' => 7,
+                'employee_id' => $employeeId,
+                'category' => 'employee_evaluation',
+                'answers' => [1 => 4, 6 => 5, 2 => 4, 4 => 5, 5 => 4],
+                'submitted_at' => $now->copy()->subMonths(3)->subDays(4),
+            ],
+            [
+                'branch_id' => 2,
+                'academic_year_id' => $academicYearId,
+                'questionnaire_type_id' => 4,
+                'questionnaire_id' => 7,
+                'employee_id' => $employeeId,
+                'category' => 'employee_evaluation',
+                'answers' => [1 => 5, 6 => 5, 2 => 4, 4 => 4, 5 => 5],
+                'submitted_at' => $now->copy()->subMonths(3)->subDay(),
+            ],
+        ];
+
+        foreach ($rows as $row) {
+            $ratings = $row['answers'];
+            $average = round(array_sum($ratings) / count($ratings), 2);
+            $submittedAt = $row['submitted_at'];
+            unset($row['submitted_at'], $row['answers']);
+
+            $this->insertSubmission(array_merge($row, [
+                'answers' => $this->answers($ratings),
+                'overall_average' => $average,
+                'submitted_at' => $submittedAt,
+                'created_at' => $submittedAt,
+                'updated_at' => $submittedAt,
+            ]));
         }
     }
 
