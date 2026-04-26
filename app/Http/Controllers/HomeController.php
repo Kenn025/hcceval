@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\LandingPageFeature;
 use App\Models\LandingPageFeatureSection;
+use App\Models\LandingPageBottomCtaSection;
 use App\Models\LandingPageContactSection;
 use App\Models\LandingPageFaq;
 use App\Models\LandingPageFaqSection;
@@ -36,6 +37,7 @@ class HomeController extends Controller
             'testimonialsSection' => $this->testimonialsSection(),
             'faqSection' => $this->faqSection(),
             'contactSection' => $this->contactSection(),
+            'bottomCtaSection' => $this->bottomCtaSection(),
         ]);
     }
 
@@ -479,6 +481,36 @@ class HomeController extends Controller
             'form_message_label' => $section->form_message_label ?: $defaults['form_message_label'],
             'form_message_placeholder' => $section->form_message_placeholder ?: $defaults['form_message_placeholder'],
             'form_button_label' => $section->form_button_label ?: $defaults['form_button_label'],
+        ];
+    }
+
+    private function bottomCtaSection(): array
+    {
+        $defaults = [
+            'title_text' => 'Ready to Transform Evaluation?',
+            'subtitle_text' => 'Join institutions already using MCH-PEMS for comprehensive performance evaluation.',
+            'primary_button_label' => 'Sign in',
+            'primary_button_target' => 'login',
+            'secondary_button_label' => 'Contact Us',
+            'secondary_button_target' => 'contact',
+        ];
+
+        if (! Schema::hasTable('landing_page_bottom_cta_sections')) {
+            return $defaults;
+        }
+
+        $section = LandingPageBottomCtaSection::query()->first();
+        if (! $section) {
+            return $defaults;
+        }
+
+        return [
+            'title_text' => $section->title_text ?: $defaults['title_text'],
+            'subtitle_text' => $section->subtitle_text ?: $defaults['subtitle_text'],
+            'primary_button_label' => $section->primary_button_label ?: $defaults['primary_button_label'],
+            'primary_button_target' => $section->primary_button_target ?: $defaults['primary_button_target'],
+            'secondary_button_label' => $section->secondary_button_label ?: $defaults['secondary_button_label'],
+            'secondary_button_target' => $section->secondary_button_target ?: $defaults['secondary_button_target'],
         ];
     }
 }

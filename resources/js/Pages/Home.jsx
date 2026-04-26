@@ -14,6 +14,7 @@ export default function Home({
     testimonialsSection = null,
     faqSection = null,
     contactSection = null,
+    bottomCtaSection = null,
 }) {
     const [showSecretTeamCard, setShowSecretTeamCard] = useState(false);
     const secretSequence = useRef(["h", "e", "s", "o", "y", "a", "m"]);
@@ -145,6 +146,7 @@ export default function Home({
                 testimonialsSection={testimonialsSection}
                 faqSection={faqSection}
                 contactSection={contactSection}
+                bottomCtaSection={bottomCtaSection}
             />
         </>
     );

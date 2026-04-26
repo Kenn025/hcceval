@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\LandingPageBottomCtaSection;
 use App\Models\LandingPageFeature;
 use App\Models\LandingPageFeatureSection;
 use App\Models\LandingPageContactSection;
@@ -78,6 +79,14 @@ class LandingPageHeaderController extends Controller
         'form_message_label' => 'Message',
         'form_message_placeholder' => 'How can we help?',
         'form_button_label' => 'Send Message',
+    ];
+    private const DEFAULT_BOTTOM_CTA_SECTION = [
+        'title_text' => 'Ready to Transform Evaluation?',
+        'subtitle_text' => 'Join institutions already using MCH-PEMS for comprehensive performance evaluation.',
+        'primary_button_label' => 'Sign in',
+        'primary_button_target' => 'login',
+        'secondary_button_label' => 'Contact Us',
+        'secondary_button_target' => 'contact',
     ];
     private const DEFAULT_ROLES = [
         [
@@ -255,6 +264,7 @@ class LandingPageHeaderController extends Controller
             'testimonialsSection' => $this->testimonialsSectionData(),
             'faqSection' => $this->faqSectionData(),
             'contactSection' => $this->contactSectionData(),
+            'bottomCtaSection' => $this->bottomCtaSectionData(),
             'filters' => [
                 'search' => $search,
                 'per_page' => $perPage,
@@ -1119,6 +1129,33 @@ class LandingPageHeaderController extends Controller
         return back()->with('success', 'Contact section updated successfully.');
     }
 
+    public function updateBottomCtaSection(Request $request)
+    {
+        if (! Schema::hasTable('landing_page_bottom_cta_sections')) {
+            return back()->withErrors([
+                'bottom_cta_section' => 'Bottom CTA section table is not available yet. Please run migrations first.',
+            ]);
+        }
+
+        $validated = $request->validate([
+            'title_text' => 'required|string|max:255',
+            'subtitle_text' => 'required|string|max:1000',
+            'primary_button_label' => 'required|string|max:120',
+            'primary_button_target' => 'required|string|max:150',
+            'secondary_button_label' => 'required|string|max:120',
+            'secondary_button_target' => 'required|string|max:150',
+        ]);
+
+        $section = LandingPageBottomCtaSection::query()->first();
+        if (! $section) {
+            $section = LandingPageBottomCtaSection::query()->create(self::DEFAULT_BOTTOM_CTA_SECTION);
+        }
+
+        $section->update($validated);
+
+        return back()->with('success', 'Bottom CTA section updated successfully.');
+    }
+
     private function rolesSectionData(): array
     {
         $defaultRoles = collect(self::DEFAULT_ROLES)
@@ -1349,6 +1386,27 @@ class LandingPageHeaderController extends Controller
             'form_message_label' => $section->form_message_label ?: self::DEFAULT_CONTACT_SECTION['form_message_label'],
             'form_message_placeholder' => $section->form_message_placeholder ?: self::DEFAULT_CONTACT_SECTION['form_message_placeholder'],
             'form_button_label' => $section->form_button_label ?: self::DEFAULT_CONTACT_SECTION['form_button_label'],
+        ];
+    }
+
+    private function bottomCtaSectionData(): array
+    {
+        if (! Schema::hasTable('landing_page_bottom_cta_sections')) {
+            return self::DEFAULT_BOTTOM_CTA_SECTION;
+        }
+
+        $section = LandingPageBottomCtaSection::query()->first();
+        if (! $section) {
+            return self::DEFAULT_BOTTOM_CTA_SECTION;
+        }
+
+        return [
+            'title_text' => $section->title_text ?: self::DEFAULT_BOTTOM_CTA_SECTION['title_text'],
+            'subtitle_text' => $section->subtitle_text ?: self::DEFAULT_BOTTOM_CTA_SECTION['subtitle_text'],
+            'primary_button_label' => $section->primary_button_label ?: self::DEFAULT_BOTTOM_CTA_SECTION['primary_button_label'],
+            'primary_button_target' => $section->primary_button_target ?: self::DEFAULT_BOTTOM_CTA_SECTION['primary_button_target'],
+            'secondary_button_label' => $section->secondary_button_label ?: self::DEFAULT_BOTTOM_CTA_SECTION['secondary_button_label'],
+            'secondary_button_target' => $section->secondary_button_target ?: self::DEFAULT_BOTTOM_CTA_SECTION['secondary_button_target'],
         ];
     }
 

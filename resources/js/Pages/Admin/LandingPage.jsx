@@ -156,6 +156,25 @@ function normalizeContactSection(contactSection = {}) {
     };
 }
 
+function normalizeBottomCtaSection(bottomCtaSection = {}) {
+    return {
+        title_text: String(bottomCtaSection.title_text ?? "").trim(),
+        subtitle_text: String(bottomCtaSection.subtitle_text ?? "").trim(),
+        primary_button_label: String(
+            bottomCtaSection.primary_button_label ?? "",
+        ).trim(),
+        primary_button_target: String(
+            bottomCtaSection.primary_button_target ?? "",
+        ).trim(),
+        secondary_button_label: String(
+            bottomCtaSection.secondary_button_label ?? "",
+        ).trim(),
+        secondary_button_target: String(
+            bottomCtaSection.secondary_button_target ?? "",
+        ).trim(),
+    };
+}
+
 function normalizeStatKey(value) {
     return String(value ?? "")
         .trim()
@@ -255,6 +274,14 @@ export default function LandingPage({
         form_message_placeholder: "",
         form_button_label: "",
     },
+    bottomCtaSection = {
+        title_text: "",
+        subtitle_text: "",
+        primary_button_label: "",
+        primary_button_target: "",
+        secondary_button_label: "",
+        secondary_button_target: "",
+    },
 }) {
     const canEditStats =
         (statsSection ?? []).length > 0 &&
@@ -280,6 +307,7 @@ export default function LandingPage({
     const [testimonialsModalOpen, setTestimonialsModalOpen] = useState(false);
     const [faqModalOpen, setFaqModalOpen] = useState(false);
     const [contactModalOpen, setContactModalOpen] = useState(false);
+    const [bottomCtaModalOpen, setBottomCtaModalOpen] = useState(false);
     const [pendingFaqScrollToIndex, setPendingFaqScrollToIndex] =
         useState(null);
     const [testimonialAction, setTestimonialAction] = useState({
@@ -301,6 +329,7 @@ export default function LandingPage({
     const initialTestimonialsSnapshotRef = useRef("{}");
     const initialFaqSnapshotRef = useRef("{}");
     const initialContactSnapshotRef = useRef("{}");
+    const initialBottomCtaSnapshotRef = useRef("{}");
 
     const { data, setData, errors, processing, reset, clearErrors } = useForm({
         headers: [],
@@ -426,6 +455,21 @@ export default function LandingPage({
         form_message_label: "",
         form_message_placeholder: "",
         form_button_label: "",
+    });
+    const {
+        data: bottomCtaData,
+        setData: setBottomCtaData,
+        errors: bottomCtaErrors,
+        processing: bottomCtaProcessing,
+        reset: resetBottomCta,
+        clearErrors: clearBottomCtaErrors,
+    } = useForm({
+        title_text: "",
+        subtitle_text: "",
+        primary_button_label: "",
+        primary_button_target: "",
+        secondary_button_label: "",
+        secondary_button_target: "",
     });
 
     const openEdit = () => {
@@ -660,6 +704,25 @@ export default function LandingPage({
         );
         setContactModalOpen(true);
     };
+    const openBottomCtaEdit = () => {
+        clearBottomCtaErrors();
+        const nextBottomCtaData = {
+            title_text: bottomCtaSection?.title_text ?? "",
+            subtitle_text: bottomCtaSection?.subtitle_text ?? "",
+            primary_button_label: bottomCtaSection?.primary_button_label ?? "",
+            primary_button_target:
+                bottomCtaSection?.primary_button_target ?? "",
+            secondary_button_label:
+                bottomCtaSection?.secondary_button_label ?? "",
+            secondary_button_target:
+                bottomCtaSection?.secondary_button_target ?? "",
+        };
+        setBottomCtaData(nextBottomCtaData);
+        initialBottomCtaSnapshotRef.current = JSON.stringify(
+            normalizeBottomCtaSection(nextBottomCtaData),
+        );
+        setBottomCtaModalOpen(true);
+    };
     const closeHowItWorksModal = () => {
         resetHowItWorks();
         setHowItWorksModalOpen(false);
@@ -683,6 +746,11 @@ export default function LandingPage({
         resetContact();
         setContactModalOpen(false);
         clearContactErrors();
+    };
+    const closeBottomCtaModal = () => {
+        resetBottomCta();
+        setBottomCtaModalOpen(false);
+        clearBottomCtaErrors();
     };
 
     const updateRow = (index, key, value) => {
@@ -1420,6 +1488,37 @@ export default function LandingPage({
             route("admin.landing-page.contact-section.update"),
             contactData,
             { onSuccess: closeContactModal },
+        );
+    };
+    const hasEmptyBottomCtaRequiredFields = useMemo(() => {
+        const requiredFields = [
+            bottomCtaData.title_text,
+            bottomCtaData.subtitle_text,
+            bottomCtaData.primary_button_label,
+            bottomCtaData.primary_button_target,
+            bottomCtaData.secondary_button_label,
+            bottomCtaData.secondary_button_target,
+        ];
+        return requiredFields.some(
+            (value) => String(value ?? "").trim() === "",
+        );
+    }, [bottomCtaData]);
+    const hasBottomCtaSectionChanges = useMemo(() => {
+        const currentSnapshot = JSON.stringify(
+            normalizeBottomCtaSection(bottomCtaData),
+        );
+        return currentSnapshot !== initialBottomCtaSnapshotRef.current;
+    }, [bottomCtaData]);
+    const submitBottomCtaSection = (event) => {
+        event.preventDefault();
+        if (hasEmptyBottomCtaRequiredFields || !hasBottomCtaSectionChanges) {
+            return;
+        }
+
+        router.put(
+            route("admin.landing-page.bottom-cta-section.update"),
+            bottomCtaData,
+            { onSuccess: closeBottomCtaModal },
         );
     };
     const updateTestimonialStatus = (testimonialId, status) => {
@@ -2168,6 +2267,75 @@ export default function LandingPage({
                                         {contactSection?.form_button_label ||
                                             "Send Message"}
                                     </p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section className="mb-4 rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-5">
+                    <h2 className="text-base font-semibold text-slate-900">
+                        Bottom CTA
+                    </h2>
+                    <button
+                        type="button"
+                        onClick={openBottomCtaEdit}
+                        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                    >
+                        Edit
+                    </button>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="min-w-full">
+                        <thead>
+                            <tr className="border-b border-slate-100 bg-slate-50/70 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                <th className="px-4 py-3 sm:px-5">Field</th>
+                                <th className="px-4 py-3 sm:px-5">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody className="text-sm text-slate-700">
+                            <tr className="border-b border-slate-100">
+                                <td className="px-4 py-3 font-medium sm:px-5">
+                                    Title
+                                </td>
+                                <td className="px-4 py-3 sm:px-5">
+                                    {bottomCtaSection?.title_text || "-"}
+                                </td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                                <td className="px-4 py-3 font-medium sm:px-5">
+                                    Subtitle
+                                </td>
+                                <td className="px-4 py-3 sm:px-5">
+                                    {bottomCtaSection?.subtitle_text || "-"}
+                                </td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                                <td className="px-4 py-3 font-medium sm:px-5">
+                                    Primary Button
+                                </td>
+                                <td className="px-4 py-3 sm:px-5">
+                                    {bottomCtaSection?.primary_button_label ||
+                                        "-"}{" "}
+                                    (
+                                    {bottomCtaSection?.primary_button_target ||
+                                        "-"}
+                                    )
+                                </td>
+                            </tr>
+                            <tr>
+                                <td className="px-4 py-3 font-medium sm:px-5">
+                                    Secondary Button
+                                </td>
+                                <td className="px-4 py-3 sm:px-5">
+                                    {bottomCtaSection?.secondary_button_label ||
+                                        "-"}{" "}
+                                    (
+                                    {bottomCtaSection?.secondary_button_target ||
+                                        "-"}
+                                    )
                                 </td>
                             </tr>
                         </tbody>
@@ -4032,6 +4200,190 @@ export default function LandingPage({
                                     <button
                                         type="button"
                                         onClick={closeFaqModal}
+                                        className="w-full rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700 md:w-[180px]"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {bottomCtaModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div
+                        className="absolute inset-0 bg-slate-950/40"
+                        onClick={closeBottomCtaModal}
+                    />
+                    <div
+                        className="relative w-full max-w-3xl rounded-xl bg-white p-6 shadow-2xl"
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div className="mb-4 flex items-center justify-between">
+                            <h3 className="text-base font-semibold text-slate-900">
+                                Edit Bottom CTA Section
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={closeBottomCtaModal}
+                                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                                aria-label="Close modal"
+                            >
+                                <svg
+                                    className="h-5 w-5"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={2}
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M6 18L18 6M6 6l12 12"
+                                    />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <form
+                            onSubmit={submitBottomCtaSection}
+                            className="space-y-4"
+                        >
+                            <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
+                                <FormField
+                                    label="Title"
+                                    error={bottomCtaErrors.title_text}
+                                    required
+                                >
+                                    <TextInput
+                                        value={bottomCtaData.title_text}
+                                        onChange={(event) =>
+                                            setBottomCtaData(
+                                                "title_text",
+                                                event.target.value,
+                                            )
+                                        }
+                                    />
+                                </FormField>
+                                <FormField
+                                    label="Subtitle"
+                                    error={bottomCtaErrors.subtitle_text}
+                                    required
+                                >
+                                    <TextareaInput
+                                        value={bottomCtaData.subtitle_text}
+                                        onChange={(event) =>
+                                            setBottomCtaData(
+                                                "subtitle_text",
+                                                event.target.value,
+                                            )
+                                        }
+                                        rows={2}
+                                    />
+                                </FormField>
+
+                                <div className="grid gap-3 md:grid-cols-2">
+                                    <FormField
+                                        label="Primary Button Label"
+                                        error={
+                                            bottomCtaErrors.primary_button_label
+                                        }
+                                        required
+                                    >
+                                        <TextInput
+                                            value={
+                                                bottomCtaData.primary_button_label
+                                            }
+                                            onChange={(event) =>
+                                                setBottomCtaData(
+                                                    "primary_button_label",
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                    </FormField>
+                                    <FormField
+                                        label="Primary Button Target"
+                                        error={
+                                            bottomCtaErrors.primary_button_target
+                                        }
+                                        required
+                                    >
+                                        <TextInput
+                                            value={
+                                                bottomCtaData.primary_button_target
+                                            }
+                                            onChange={(event) =>
+                                                setBottomCtaData(
+                                                    "primary_button_target",
+                                                    event.target.value,
+                                                )
+                                            }
+                                            placeholder="login"
+                                        />
+                                    </FormField>
+                                </div>
+
+                                <div className="grid gap-3 md:grid-cols-2">
+                                    <FormField
+                                        label="Secondary Button Label"
+                                        error={
+                                            bottomCtaErrors.secondary_button_label
+                                        }
+                                        required
+                                    >
+                                        <TextInput
+                                            value={
+                                                bottomCtaData.secondary_button_label
+                                            }
+                                            onChange={(event) =>
+                                                setBottomCtaData(
+                                                    "secondary_button_label",
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                    </FormField>
+                                    <FormField
+                                        label="Secondary Button Target"
+                                        error={
+                                            bottomCtaErrors.secondary_button_target
+                                        }
+                                        required
+                                    >
+                                        <TextInput
+                                            value={
+                                                bottomCtaData.secondary_button_target
+                                            }
+                                            onChange={(event) =>
+                                                setBottomCtaData(
+                                                    "secondary_button_target",
+                                                    event.target.value,
+                                                )
+                                            }
+                                            placeholder="contact"
+                                        />
+                                    </FormField>
+                                </div>
+                            </div>
+
+                            <div className="pt-2">
+                                <div className="flex w-full flex-col gap-3 md:flex-row-reverse md:justify-start">
+                                    <SubmitButton
+                                        processing={bottomCtaProcessing}
+                                        disabled={
+                                            hasEmptyBottomCtaRequiredFields ||
+                                            !hasBottomCtaSectionChanges
+                                        }
+                                        className="w-full md:w-[180px]"
+                                    >
+                                        Save Changes
+                                    </SubmitButton>
+                                    <button
+                                        type="button"
+                                        onClick={closeBottomCtaModal}
                                         className="w-full rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700 md:w-[180px]"
                                     >
                                         Cancel

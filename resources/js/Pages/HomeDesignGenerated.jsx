@@ -161,6 +161,7 @@ function App({
     testimonialsSection: customTestimonialsSection = null,
     faqSection: customFaqSection = null,
     contactSection: customContactSection = null,
+    bottomCtaSection: customBottomCtaSection = null,
 }) {
     const [isDarkMode, setIsDarkMode] = useState(() => {
         if (typeof window === "undefined") return false;
@@ -615,6 +616,19 @@ function App({
                 contactSection.phone_value || defaultContactSection.phone_value,
         },
     ];
+    const defaultBottomCtaSection = {
+        title_text: "Ready to Transform Evaluation?",
+        subtitle_text:
+            "Join institutions already using MCH-PEMS for comprehensive performance evaluation.",
+        primary_button_label: "Sign in",
+        primary_button_target: "login",
+        secondary_button_label: "Contact Us",
+        secondary_button_target: "contact",
+    };
+    const bottomCtaSection =
+        customBottomCtaSection && typeof customBottomCtaSection === "object"
+            ? { ...defaultBottomCtaSection, ...customBottomCtaSection }
+            : defaultBottomCtaSection;
     const defaultTestimonialsSection = {
         badge_text: "Testimonials",
         title_text: "What Users Say",
@@ -2852,12 +2866,15 @@ function App({
                                 className:
                                     "text-3xl md:text-4xl font-bold mb-6",
                                 style: { color: "var(--text-primary)" },
-                                children: "Ready to Transform Evaluation?",
+                                children:
+                                    bottomCtaSection.title_text ||
+                                    "Ready to Transform Evaluation?",
                             }),
                             /* @__PURE__ */ jsx("p", {
                                 className: "mb-8 max-w-xl mx-auto",
                                 style: { color: "var(--text-secondary)" },
                                 children:
+                                    bottomCtaSection.subtitle_text ||
                                     "Join institutions already using MCH-PEMS for comprehensive performance evaluation.",
                             }),
                             /* @__PURE__ */ jsxs("div", {
@@ -2865,18 +2882,30 @@ function App({
                                     "flex flex-wrap justify-center gap-4",
                                 children: [
                                     /* @__PURE__ */ jsx("button", {
-                                        onClick: goToLogin,
+                                        onClick: () =>
+                                            handleHeroCtaClick(
+                                                bottomCtaSection.primary_button_target,
+                                                goToLogin,
+                                            ),
                                         className:
                                             "neumorphic-btn px-8 py-4 font-bold text-white",
                                         style: { background: "var(--accent)" },
-                                        children: "Get Started Free",
+                                        children:
+                                            bottomCtaSection.primary_button_label ||
+                                            "Sign in",
                                     }),
                                     /* @__PURE__ */ jsx("button", {
-                                        onClick: () => scrollTo("contact"),
+                                        onClick: () =>
+                                            handleHeroCtaClick(
+                                                bottomCtaSection.secondary_button_target,
+                                                () => scrollTo("contact"),
+                                            ),
                                         className:
                                             "neumorphic-btn px-8 py-4 font-bold",
                                         style: { color: "var(--text-primary)" },
-                                        children: "Contact Us",
+                                        children:
+                                            bottomCtaSection.secondary_button_label ||
+                                            "Contact Us",
                                     }),
                                 ],
                             }),
