@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\AssignmentController;
 use App\Http\Controllers\Admin\BulkImportController;
 use App\Http\Controllers\Admin\GlobalSearchController;
 use App\Http\Controllers\Admin\BranchController;
+use App\Http\Controllers\Admin\LandingPageHeaderController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DepartmentController;
 use App\Http\Controllers\Admin\EmployeeController;
@@ -179,6 +180,13 @@ Route::middleware('auth')->group(function () {
         Route::delete('/admin/admin-users/{admin}', [AdminUserController::class, 'destroy']);
 
         Route::get('/admin/audit-logs', [AuditLogController::class, 'index'])->name('admin.audit-logs');
+        Route::middleware('role:superadmin')->group(function () {
+            Route::get('/admin/landing-page', [LandingPageHeaderController::class, 'index'])->name('admin.landing-page');
+            Route::post('/admin/landing-page', [LandingPageHeaderController::class, 'store']);
+            Route::put('/admin/landing-page/bulk-update', [LandingPageHeaderController::class, 'bulkUpdate'])->name('admin.landing-page.bulk-update');
+            Route::put('/admin/landing-page/{landingPageHeader}', [LandingPageHeaderController::class, 'update']);
+            Route::delete('/admin/landing-page/{landingPageHeader}', [LandingPageHeaderController::class, 'destroy']);
+        });
     });
 
     // Bulk CSV imports
@@ -248,4 +256,4 @@ Route::prefix('portal')->name('portal.')->group(function () {
     });
 });
 
-require __DIR__.'/auth.php';
+require __DIR__ . '/auth.php';

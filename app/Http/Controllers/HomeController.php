@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\LandingPageHeader;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
@@ -13,6 +14,7 @@ class HomeController extends Controller
     {
         return Inertia::render('Home', [
             'stats' => $this->stats(),
+            'headerLinks' => $this->headerLinks(),
         ]);
     }
 
@@ -56,5 +58,43 @@ class HomeController extends Controller
             ->where('is_deleted', 0)
             ->where('is_activated', 1)
             ->count();
+    }
+
+    private function headerLinks(): array
+    {
+        $defaults = [
+            ['label' => 'Home', 'target' => 'home', 'item_type' => 'link', 'sort_order' => 1, 'is_active' => true],
+            ['label' => 'Features', 'target' => 'features', 'item_type' => 'link', 'sort_order' => 2, 'is_active' => true],
+            ['label' => 'Roles', 'target' => 'roles', 'item_type' => 'link', 'sort_order' => 3, 'is_active' => true],
+            ['label' => 'How It Works', 'target' => 'how-it-works', 'item_type' => 'link', 'sort_order' => 4, 'is_active' => true],
+            ['label' => 'FAQ', 'target' => 'faq', 'item_type' => 'link', 'sort_order' => 5, 'is_active' => true],
+            ['label' => 'Brand Logo', 'target' => 'graduation', 'item_type' => 'logo', 'sort_order' => 0, 'is_active' => true],
+            ['label' => 'Brand Title', 'target' => 'MCH-PEMS', 'item_type' => 'brand_title', 'sort_order' => 0, 'is_active' => true],
+            ['label' => 'Brand Subtitle', 'target' => 'Evaluation System', 'item_type' => 'brand_subtitle', 'sort_order' => 0, 'is_active' => true],
+            ['label' => 'Theme Toggle', 'target' => 'Theme Toggle', 'item_type' => 'toggle', 'sort_order' => 6, 'is_active' => true],
+            ['label' => 'Sign In Button', 'target' => 'Sign In', 'item_type' => 'signin', 'sort_order' => 7, 'is_active' => true],
+        ];
+
+        if (! Schema::hasTable('landing_page_headers')) {
+            return $defaults;
+        }
+
+        $links = LandingPageHeader::query()
+            ->where('is_active', 1)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get(['id', 'label', 'target', 'item_type', 'sort_order', 'is_active'])
+            ->map(fn(LandingPageHeader $header) => [
+                'id' => $header->id,
+                'label' => $header->label,
+                'target' => $header->target,
+                'item_type' => $header->item_type,
+                'sort_order' => $header->sort_order,
+                'is_active' => (bool) $header->is_active,
+            ])
+            ->values()
+            ->all();
+
+        return count($links) > 0 ? $links : $defaults;
     }
 }

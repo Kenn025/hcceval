@@ -73,7 +73,11 @@ function NavItem({ item, activeRoute, collapsed, onClick }) {
 }
 
 function NavGroup({ group, activeRoute, collapsed, onItemClick }) {
-    const hasActive = group.items.some((i) =>
+    const role = usePage().props.auth?.role ?? "admin";
+    const visibleItems = group.items.filter(
+        (item) => !item.roles || item.roles.includes(role),
+    );
+    const hasActive = visibleItems.some((i) =>
         routeIsActive(i.route, activeRoute),
     );
     const [open, setOpen] = useState(hasActive);
@@ -85,7 +89,7 @@ function NavGroup({ group, activeRoute, collapsed, onItemClick }) {
     if (collapsed) {
         return (
             <div className="flex flex-col items-center gap-1">
-                {group.items.map((item) => (
+                {visibleItems.map((item) => (
                     <NavItem
                         key={item.route}
                         item={item}
@@ -137,7 +141,7 @@ function NavGroup({ group, activeRoute, collapsed, onItemClick }) {
 
             {open && (
                 <div className="ml-4 mt-0.5 space-y-0.5 border-l border-white/10 pl-3">
-                    {group.items.map((item) => {
+                    {visibleItems.map((item) => {
                         const isActive = routeIsActive(item.route, activeRoute);
                         return (
                             <Link
@@ -405,7 +409,10 @@ export default function AdminLayout({
 
                     <div className="mx-3 mb-4 rounded-2xl bg-blue-950/45 px-3 py-3 ring-1 ring-white/10">
                         <div className="flex items-center gap-2 text-blue-200">
-                            <AppIcon name="calendar" className="h-4 w-4 shrink-0" />
+                            <AppIcon
+                                name="calendar"
+                                className="h-4 w-4 shrink-0"
+                            />
                             <span className="text-[10px] font-semibold uppercase tracking-widest">
                                 Active Academic Year
                             </span>
@@ -447,24 +454,36 @@ export default function AdminLayout({
                             )}
 
                             <div className="space-y-0.5">
-                                {section.items?.map((item) => (
-                                    <NavItem
-                                        key={item.route}
-                                        item={item}
-                                        activeRoute={activeRoute}
-                                        collapsed={sidebarCollapsed}
-                                        onClick={closeMobile}
-                                    />
-                                ))}
-                                {section.groups?.map((group) => (
-                                    <NavGroup
-                                        key={group.title}
-                                        group={group}
-                                        activeRoute={activeRoute}
-                                        collapsed={sidebarCollapsed}
-                                        onItemClick={closeMobile}
-                                    />
-                                ))}
+                                {section.items
+                                    ?.filter(
+                                        (item) =>
+                                            !item.roles ||
+                                            item.roles.includes(role),
+                                    )
+                                    .map((item) => (
+                                        <NavItem
+                                            key={item.route}
+                                            item={item}
+                                            activeRoute={activeRoute}
+                                            collapsed={sidebarCollapsed}
+                                            onClick={closeMobile}
+                                        />
+                                    ))}
+                                {section.groups
+                                    ?.filter(
+                                        (group) =>
+                                            !group.roles ||
+                                            group.roles.includes(role),
+                                    )
+                                    .map((group) => (
+                                        <NavGroup
+                                            key={group.title}
+                                            group={group}
+                                            activeRoute={activeRoute}
+                                            collapsed={sidebarCollapsed}
+                                            onItemClick={closeMobile}
+                                        />
+                                    ))}
                             </div>
                         </div>
                     ))}

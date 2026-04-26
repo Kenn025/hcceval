@@ -91,6 +91,7 @@ return [
                 ['label' => 'Academic Year', 'route' => 'admin.evaluation-cycle', 'icon' => 'calendar'],
                 ['label' => 'Admin Users', 'route' => 'admin.admin-users', 'icon' => 'shield'],
                 ['label' => 'Audit Logs', 'route' => 'admin.audit-logs', 'icon' => 'logs'],
+                ['label' => 'Landing Page', 'route' => 'admin.landing-page', 'icon' => 'dashboard', 'roles' => ['superadmin']],
             ],
         ],
     ],
@@ -324,6 +325,12 @@ return [
             'eyebrow' => 'System Controls',
             'icon' => 'shield',
             'source' => ['admin/includes/admin_access.php'],
+        ],
+        'admin.landing-page' => [
+            'title' => 'Landing Page',
+            'description' => 'Manage the public landing page header navigation links and their display order.',
+            'eyebrow' => 'System Controls',
+            'icon' => 'dashboard',
         ],
     ],
     'migration' => [

@@ -4,7 +4,7 @@ import HomeDesignGenerated from './HomeDesignGenerated';
 import SecretTeamCard from '@/Components/SecretTeamCard';
 import '../../css/homepage-design.css';
 
-export default function Home({ stats = [] }) {
+export default function Home({ stats = [], headerLinks = [] }) {
     const [showSecretTeamCard, setShowSecretTeamCard] = useState(false);
     const secretSequence = useRef(['h', 'e', 's', 'o', 'y', 'a', 'm']);
     const typedSequence = useRef([]);
@@ -121,6 +121,7 @@ export default function Home({ stats = [] }) {
                 loginSubmitUrl={route('login.submit')}
                 registerUrl={route('register')}
                 stats={stats}
+                headerLinks={headerLinks}
             />
         </>
     );

@@ -118,11 +118,23 @@ const ProgressRing = ({
         ],
     });
 };
+const isImageTarget = (value) => {
+    const target = String(value ?? "").trim();
+    if (!target) return false;
+
+    return (
+        target.startsWith("/storage/") ||
+        target.startsWith("http://") ||
+        target.startsWith("https://") ||
+        /\.(png|jpe?g|gif|webp|svg|bmp|ico)(\?.*)?$/i.test(target)
+    );
+};
 function App({
     loginUrl = "/login",
     loginSubmitUrl = "/login",
     registerUrl = "/register",
     stats: homepageStats = [],
+    headerLinks: customHeaderLinks = [],
 }) {
     const [isDarkMode, setIsDarkMode] = useState(() => {
         if (typeof window === "undefined") return false;
@@ -394,7 +406,57 @@ function App({
         document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
         setMenuOpen(false);
     };
-    const navSections = ["home", "features", "roles", "how-it-works", "faq"];
+    const defaultHeaderItems = [
+        { id: "logo-default", label: "Brand Logo", target: "graduation", item_type: "logo", sort_order: 0, is_active: true },
+        { id: "title-default", label: "Brand Title", target: "MCH-PEMS", item_type: "brand_title", sort_order: 0, is_active: true },
+        { id: "subtitle-default", label: "Brand Subtitle", target: "Evaluation System", item_type: "brand_subtitle", sort_order: 0, is_active: true },
+        { id: "link-home", label: "Home", target: "home", item_type: "link", sort_order: 1, is_active: true },
+        { id: "link-features", label: "Features", target: "features", item_type: "link", sort_order: 2, is_active: true },
+        { id: "link-roles", label: "Roles", target: "roles", item_type: "link", sort_order: 3, is_active: true },
+        { id: "link-how", label: "How It Works", target: "how-it-works", item_type: "link", sort_order: 4, is_active: true },
+        { id: "link-faq", label: "FAQ", target: "faq", item_type: "link", sort_order: 5, is_active: true },
+        { id: "toggle-default", label: "Theme Toggle", target: "Theme Toggle", item_type: "toggle", sort_order: 6, is_active: true },
+        { id: "signin-default", label: "Sign In Button", target: "Sign In", item_type: "signin", sort_order: 7, is_active: true },
+    ];
+    const headerItems =
+        Array.isArray(customHeaderLinks) && customHeaderLinks.length > 0
+            ? customHeaderLinks
+            : defaultHeaderItems;
+    const activeHeaderItems = headerItems
+        .filter((item) => item && item.is_active !== false)
+        .sort((a, b) => {
+            const left = Number(a?.sort_order ?? 0);
+            const right = Number(b?.sort_order ?? 0);
+            if (left !== right) return left - right;
+            return String(a?.label ?? "").localeCompare(String(b?.label ?? ""));
+        });
+    const navSections = activeHeaderItems
+        .filter((item) => (item.item_type ?? "link") === "link")
+        .map((link, index) => ({
+            id: link.id ?? `section-${link.target}-${index}`,
+            label: link.label,
+            target: link.target,
+        }));
+    const logoItem = activeHeaderItems.find((item) => item.item_type === "logo");
+    const brandTitleItem = activeHeaderItems.find((item) => item.item_type === "brand_title");
+    const brandSubtitleItem = activeHeaderItems.find((item) => item.item_type === "brand_subtitle");
+    const toggleItem = activeHeaderItems.find((item) => item.item_type === "toggle");
+    const signInItem = activeHeaderItems.find((item) => item.item_type === "signin");
+    const brandLogoIcon = String(logoItem?.target || "graduation");
+    const brandLogoIsImage = isImageTarget(brandLogoIcon);
+    const brandTitle = String(brandTitleItem?.target || "MCH-PEMS");
+    const brandSubtitle = String(brandSubtitleItem?.target || "Evaluation System");
+    const showThemeToggle = Boolean(toggleItem);
+    const showSignInButton = Boolean(signInItem);
+    const signInLabel = String(signInItem?.target || "Sign In");
+    const handleNavLinkClick = (link) => {
+        if (!link) return;
+
+        scrollTo(link.target);
+    };
+    const handleBrandClick = () => {
+        window.location.assign("/");
+    };
     const islandExpanded = isIslandExpanded || menuOpen;
     return /* @__PURE__ */ jsxs("div", {
         className:
@@ -405,7 +467,8 @@ function App({
                 className: "fixed z-50 w-full px-3 pointer-events-none",
                 style: { top: "calc(env(safe-area-inset-top, 0px) + 10px)" },
                 children: /* @__PURE__ */ jsxs("div", {
-                    className: "mx-auto w-full max-w-[980px] pointer-events-auto",
+                    className:
+                        "mx-auto w-full max-w-[980px] pointer-events-auto",
                     children: [
                         /* @__PURE__ */ jsxs("div", {
                             className: `mx-auto transition-all duration-300 ${islandExpanded ? "w-full" : "w-[min(92vw,540px)]"}`,
@@ -414,9 +477,11 @@ function App({
                                     className:
                                         "homepage-glass-header rounded-[999px] border px-3 py-2 sm:px-4 sm:py-3 flex items-center justify-between gap-2 transition-all duration-300",
                                     children: [
-                                        /* @__PURE__ */ jsxs("div", {
+                                        /* @__PURE__ */ jsxs("button", {
+                                            type: "button",
+                                            onClick: handleBrandClick,
                                             className:
-                                                "flex items-center gap-3 min-w-0",
+                                                "flex items-center gap-3 min-w-0 rounded-full text-left transition-all hover:opacity-90",
                                             children: [
                                                 /* @__PURE__ */ jsx("div", {
                                                     className:
@@ -429,15 +494,21 @@ function App({
                                                             ? "rgba(148, 163, 184, 0.24)"
                                                             : "rgba(148, 163, 184, 0.28)",
                                                     },
-                                                    children:
-                                                        /* @__PURE__ */ jsx(
-                                                            AppIcon,
-                                                            {
-                                                                name: "graduation",
-                                                                className: "h-5 w-5",
-                                                                strokeWidth: 1.9,
-                                                            },
-                                                        ),
+                                                    children: brandLogoIsImage
+                                                        ? /* @__PURE__ */ jsx("img", {
+                                                              src: brandLogoIcon,
+                                                              alt: `${brandTitle} logo`,
+                                                              className: "h-10 w-10 rounded-full object-cover",
+                                                          })
+                                                        : /* @__PURE__ */ jsx(
+                                                              AppIcon,
+                                                              {
+                                                                  name: brandLogoIcon,
+                                                                  className:
+                                                                      "h-5 w-5",
+                                                                  strokeWidth: 1.9,
+                                                              },
+                                                          ),
                                                 }),
                                                 /* @__PURE__ */ jsxs("div", {
                                                     className: `overflow-hidden transition-all duration-300 ${islandExpanded ? "max-w-[180px] opacity-100" : "max-w-0 opacity-0 sm:max-w-[140px] sm:opacity-100"}`,
@@ -450,7 +521,7 @@ function App({
                                                                 style: {
                                                                     color: "var(--text-primary)",
                                                                 },
-                                                                children: "MCH-PEMS",
+                                                                children: brandTitle,
                                                             },
                                                         ),
                                                         /* @__PURE__ */ jsx(
@@ -461,8 +532,7 @@ function App({
                                                                 style: {
                                                                     color: "var(--text-secondary)",
                                                                 },
-                                                                children:
-                                                                    "Evaluation System",
+                                                                children: brandSubtitle,
                                                             },
                                                         ),
                                                     ],
@@ -471,60 +541,58 @@ function App({
                                         }),
                                         /* @__PURE__ */ jsx("div", {
                                             className: `hidden lg:flex items-center gap-2 overflow-hidden transition-all duration-300 ${isIslandExpanded ? "max-w-[520px] opacity-100 translate-x-0" : "max-w-0 opacity-0 -translate-x-2 pointer-events-none"}`,
-                                            children: navSections.map(
-                                                (section) =>
-                                                    /* @__PURE__ */ jsx(
-                                                        "button",
-                                                        {
-                                                            onClick: () =>
-                                                                scrollTo(
-                                                                    section,
-                                                                ),
-                                                            className:
-                                                                "homepage-nav-chip px-4 py-2 rounded-full text-sm font-medium capitalize transition-all duration-300 hover:scale-[1.01]",
-                                                            style: {
-                                                                color: "var(--text-secondary)",
-                                                                background: isDarkMode
+                                            children: navSections.map((link) =>
+                                                /* @__PURE__ */ jsx(
+                                                    "button",
+                                                    {
+                                                        onClick: () =>
+                                                            handleNavLinkClick(
+                                                                link,
+                                                            ),
+                                                        className:
+                                                            "homepage-nav-chip px-4 py-2 rounded-full text-sm font-medium capitalize transition-all duration-300 hover:scale-[1.01]",
+                                                        style: {
+                                                            color: "var(--text-secondary)",
+                                                            background:
+                                                                isDarkMode
                                                                     ? "rgba(30, 41, 59, 0.66)"
                                                                     : "rgba(255, 255, 255, 0.72)",
-                                                                border: "1px solid var(--border)",
-                                                            },
-                                                            children:
-                                                                section.replace(
-                                                                    "-",
-                                                                    " ",
-                                                                ),
+                                                            border: "1px solid var(--border)",
                                                         },
-                                                        section,
-                                                    ),
+                                                        children: link.label,
+                                                    },
+                                                    link.id,
+                                                ),
                                             ),
                                         }),
                                         /* @__PURE__ */ jsxs("div", {
                                             className:
                                                 "flex items-center justify-end gap-2 sm:gap-3",
                                             children: [
-                                                /* @__PURE__ */ jsx(
-                                                    ThemeToggle,
-                                                    {
-                                                        isDark: isDarkMode,
-                                                        onToggle: () =>
-                                                            setIsDarkMode(
-                                                                !isDarkMode,
-                                                            ),
-                                                    },
-                                                ),
-                                                /* @__PURE__ */ jsx("button", {
-                                                    onClick: goToLogin,
-                                                    className: `hidden sm:inline-flex px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 ${isIslandExpanded ? "opacity-100" : "lg:opacity-0 lg:pointer-events-none"}`,
-                                                    style: {
-                                                        color: "var(--accent)",
-                                                        background: isDarkMode
-                                                            ? "rgba(30, 41, 59, 0.66)"
-                                                            : "rgba(255, 255, 255, 0.72)",
-                                                        border: "1px solid var(--border)",
-                                                    },
-                                                    children: "Sign In",
-                                                }),
+                                                showThemeToggle &&
+                                                    /* @__PURE__ */ jsx(
+                                                        ThemeToggle,
+                                                        {
+                                                            isDark: isDarkMode,
+                                                            onToggle: () =>
+                                                                setIsDarkMode(
+                                                                    !isDarkMode,
+                                                                ),
+                                                        },
+                                                    ),
+                                                showSignInButton &&
+                                                    /* @__PURE__ */ jsx("button", {
+                                                        onClick: goToLogin,
+                                                        className: `hidden sm:inline-flex px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 ${isIslandExpanded ? "opacity-100" : "lg:opacity-0 lg:pointer-events-none"}`,
+                                                        style: {
+                                                            color: "var(--accent)",
+                                                            background: isDarkMode
+                                                                ? "rgba(30, 41, 59, 0.66)"
+                                                                : "rgba(255, 255, 255, 0.72)",
+                                                            border: "1px solid var(--border)",
+                                                        },
+                                                        children: signInLabel,
+                                                    }),
                                                 /* @__PURE__ */ jsx("button", {
                                                     className:
                                                         "lg:hidden w-10 h-10 rounded-full flex items-center justify-center",
@@ -543,7 +611,8 @@ function App({
                                                         /* @__PURE__ */ jsx(
                                                             "svg",
                                                             {
-                                                                className: "w-5 h-5",
+                                                                className:
+                                                                    "w-5 h-5",
                                                                 fill: "none",
                                                                 stroke: "currentColor",
                                                                 viewBox:
@@ -584,43 +653,43 @@ function App({
                                             WebkitBackdropFilter: "blur(18px)",
                                         },
                                         children: [
-                                            navSections.map((section) =>
+                                            navSections.map((link) =>
                                                 /* @__PURE__ */ jsx(
                                                     "button",
                                                     {
                                                         onClick: () =>
-                                                            scrollTo(section),
+                                                            handleNavLinkClick(
+                                                                link,
+                                                            ),
                                                         className:
                                                             "homepage-nav-chip w-full text-left px-4 py-3 mb-2 rounded-2xl capitalize font-medium",
                                                         style: {
                                                             color: "var(--text-primary)",
-                                                            background: isDarkMode
-                                                                ? "rgba(30, 41, 59, 0.66)"
-                                                                : "rgba(255, 255, 255, 0.72)",
+                                                            background:
+                                                                isDarkMode
+                                                                    ? "rgba(30, 41, 59, 0.66)"
+                                                                    : "rgba(255, 255, 255, 0.72)",
                                                             border: "1px solid var(--border)",
                                                         },
-                                                        children:
-                                                            section.replace(
-                                                                "-",
-                                                                " ",
-                                                            ),
+                                                        children: link.label,
                                                     },
-                                                    section,
+                                                    link.id,
                                                 ),
                                             ),
-                                            /* @__PURE__ */ jsx("button", {
-                                                onClick: goToLogin,
-                                                className:
-                                                    "w-full px-4 py-3 rounded-2xl text-sm font-semibold",
-                                                style: {
-                                                    color: "var(--accent)",
-                                                    background: isDarkMode
-                                                        ? "rgba(30, 41, 59, 0.66)"
-                                                        : "rgba(255, 255, 255, 0.72)",
-                                                    border: "1px solid var(--border)",
-                                                },
-                                                children: "Sign In",
-                                            }),
+                                            showSignInButton &&
+                                                /* @__PURE__ */ jsx("button", {
+                                                    onClick: goToLogin,
+                                                    className:
+                                                        "w-full px-4 py-3 rounded-2xl text-sm font-semibold",
+                                                    style: {
+                                                        color: "var(--accent)",
+                                                        background: isDarkMode
+                                                            ? "rgba(30, 41, 59, 0.66)"
+                                                            : "rgba(255, 255, 255, 0.72)",
+                                                        border: "1px solid var(--border)",
+                                                    },
+                                                    children: signInLabel,
+                                                }),
                                         ],
                                     }),
                             ],
@@ -674,535 +743,597 @@ function App({
                                     },
                                 }),
                                 /* @__PURE__ */ jsxs("div", {
-                                    className:
-                                        "relative z-10 px-4 pt-36 pb-16",
-                                    children: [
-                        /* @__PURE__ */ jsxs("div", {
-                            className:
-                                "flex justify-center",
-                            children: [
-                                /* @__PURE__ */ jsxs("div", {
-                                    className:
-                                        "animate-slide-up max-w-4xl mx-auto text-center flex flex-col items-center",
+                                    className: "relative z-10 px-4 pt-36 pb-16",
                                     children: [
                                         /* @__PURE__ */ jsxs("div", {
-                                            className:
-                                                "neumorphic-inline px-4 py-2 rounded-full inline-flex items-center gap-2 mb-8 neumorphic-flat",
+                                            className: "flex justify-center",
                                             children: [
-                                                /* @__PURE__ */ jsx("span", {
+                                                /* @__PURE__ */ jsxs("div", {
                                                     className:
-                                                        "w-2 h-2 rounded-full animate-pulse",
-                                                    style: {
-                                                        backgroundColor:
-                                                            "#00ff00",
-                                                    },
-                                                }),
-                                                /* @__PURE__ */ jsx("span", {
-                                                    className:
-                                                        "text-sm font-medium",
-                                                    style: {
-                                                        color: "var(--accent)",
-                                                    },
-                                                    children:
-                                                        "Thesis Project 2026",
-                                                }),
-                                            ],
-                                        }),
-                                        /* @__PURE__ */ jsxs("h1", {
-                                            className:
-                                                "text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight",
-                                            style: {
-                                                color: "var(--text-primary)",
-                                            },
-                                            children: [
-                                                "Web-Based",
-                                                /* @__PURE__ */ jsx("br", {}),
-                                                /* @__PURE__ */ jsx("span", {
-                                                    style: {
-                                                        color: "var(--accent)",
-                                                    },
-                                                    children: "Multicampus",
-                                                }),
-                                                /* @__PURE__ */ jsx("br", {}),
-                                                "Performance",
-                                                /* @__PURE__ */ jsx("br", {}),
-                                                "Evaluation System",
-                                            ],
-                                        }),
-                                        /* @__PURE__ */ jsx("p", {
-                                            className:
-                                                "text-lg mb-8 max-w-3xl mx-auto",
-                                            style: {
-                                                color: "var(--text-secondary)",
-                                            },
-                                            children:
-                                                "A comprehensive holistic computerized faculty-peer-student-admin performance evaluation management system connecting all stakeholders.",
-                                        }),
-                                        /* @__PURE__ */ jsxs("div", {
-                                            className:
-                                                "flex flex-wrap gap-4 mb-12 justify-center",
-                                            children: [
-                                                /* @__PURE__ */ jsxs("button", {
-                                                    onClick: goToLogin,
-                                                    className:
-                                                        "neumorphic-btn px-8 py-4 font-bold text-white flex items-center gap-2",
-                                                    style: {
-                                                        background:
-                                                            "var(--accent)",
-                                                    },
+                                                        "animate-slide-up max-w-4xl mx-auto text-center flex flex-col items-center",
                                                     children: [
-                                                        /* @__PURE__ */ jsx(
-                                                            "span",
+                                                        /* @__PURE__ */ jsxs(
+                                                            "div",
                                                             {
-                                                                children:
-                                                                    "Start Evaluating",
+                                                                className:
+                                                                    "neumorphic-inline px-4 py-2 rounded-full inline-flex items-center gap-2 mb-8 neumorphic-flat",
+                                                                children: [
+                                                                    /* @__PURE__ */ jsx(
+                                                                        "span",
+                                                                        {
+                                                                            className:
+                                                                                "w-2 h-2 rounded-full animate-pulse",
+                                                                            style: {
+                                                                                backgroundColor:
+                                                                                    "#00ff00",
+                                                                            },
+                                                                        },
+                                                                    ),
+                                                                    /* @__PURE__ */ jsx(
+                                                                        "span",
+                                                                        {
+                                                                            className:
+                                                                                "text-sm font-medium",
+                                                                            style: {
+                                                                                color: "var(--accent)",
+                                                                            },
+                                                                            children:
+                                                                                "Thesis Project 2026",
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                            },
+                                                        ),
+                                                        /* @__PURE__ */ jsxs(
+                                                            "h1",
+                                                            {
+                                                                className:
+                                                                    "text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight",
+                                                                style: {
+                                                                    color: "var(--text-primary)",
+                                                                },
+                                                                children: [
+                                                                    "Web-Based",
+                                                                    /* @__PURE__ */ jsx(
+                                                                        "br",
+                                                                        {},
+                                                                    ),
+                                                                    /* @__PURE__ */ jsx(
+                                                                        "span",
+                                                                        {
+                                                                            style: {
+                                                                                color: "var(--accent)",
+                                                                            },
+                                                                            children:
+                                                                                "Multicampus",
+                                                                        },
+                                                                    ),
+                                                                    /* @__PURE__ */ jsx(
+                                                                        "br",
+                                                                        {},
+                                                                    ),
+                                                                    "Performance",
+                                                                    /* @__PURE__ */ jsx(
+                                                                        "br",
+                                                                        {},
+                                                                    ),
+                                                                    "Evaluation System",
+                                                                ],
                                                             },
                                                         ),
                                                         /* @__PURE__ */ jsx(
-                                                            "svg",
+                                                            "p",
                                                             {
                                                                 className:
-                                                                    "w-5 h-5",
-                                                                fill: "none",
-                                                                stroke: "currentColor",
-                                                                viewBox:
-                                                                    "0 0 24 24",
+                                                                    "text-lg mb-8 max-w-3xl mx-auto",
+                                                                style: {
+                                                                    color: "var(--text-secondary)",
+                                                                },
                                                                 children:
-                                                                    /* @__PURE__ */ jsx(
-                                                                        "path",
+                                                                    "A comprehensive holistic computerized faculty-peer-student-admin performance evaluation management system connecting all stakeholders.",
+                                                            },
+                                                        ),
+                                                        /* @__PURE__ */ jsxs(
+                                                            "div",
+                                                            {
+                                                                className:
+                                                                    "flex flex-wrap gap-4 mb-12 justify-center",
+                                                                children: [
+                                                                    /* @__PURE__ */ jsxs(
+                                                                        "button",
                                                                         {
-                                                                            strokeLinecap:
-                                                                                "round",
-                                                                            strokeLinejoin:
-                                                                                "round",
-                                                                            strokeWidth: 2,
-                                                                            d: "M13 7l5 5m0 0l-5 5m5-5H6",
+                                                                            onClick:
+                                                                                goToLogin,
+                                                                            className:
+                                                                                "neumorphic-btn px-8 py-4 font-bold text-white flex items-center gap-2",
+                                                                            style: {
+                                                                                background:
+                                                                                    "var(--accent)",
+                                                                            },
+                                                                            children:
+                                                                                [
+                                                                                    /* @__PURE__ */ jsx(
+                                                                                        "span",
+                                                                                        {
+                                                                                            children:
+                                                                                                "Start Evaluating",
+                                                                                        },
+                                                                                    ),
+                                                                                    /* @__PURE__ */ jsx(
+                                                                                        "svg",
+                                                                                        {
+                                                                                            className:
+                                                                                                "w-5 h-5",
+                                                                                            fill: "none",
+                                                                                            stroke: "currentColor",
+                                                                                            viewBox:
+                                                                                                "0 0 24 24",
+                                                                                            children:
+                                                                                                /* @__PURE__ */ jsx(
+                                                                                                    "path",
+                                                                                                    {
+                                                                                                        strokeLinecap:
+                                                                                                            "round",
+                                                                                                        strokeLinejoin:
+                                                                                                            "round",
+                                                                                                        strokeWidth: 2,
+                                                                                                        d: "M13 7l5 5m0 0l-5 5m5-5H6",
+                                                                                                    },
+                                                                                                ),
+                                                                                        },
+                                                                                    ),
+                                                                                ],
                                                                         },
                                                                     ),
+                                                                    /* @__PURE__ */ jsx(
+                                                                        "button",
+                                                                        {
+                                                                            onClick:
+                                                                                () =>
+                                                                                    scrollTo(
+                                                                                        "how-it-works",
+                                                                                    ),
+                                                                            className:
+                                                                                "neumorphic-btn px-8 py-4 font-bold",
+                                                                            style: {
+                                                                                color: "var(--text-primary)",
+                                                                            },
+                                                                            children:
+                                                                                "Learn More",
+                                                                        },
+                                                                    ),
+                                                                ],
                                                             },
                                                         ),
                                                     ],
                                                 }),
-                                                /* @__PURE__ */ jsx("button", {
-                                                    onClick: () =>
-                                                        scrollTo(
-                                                            "how-it-works",
+                                                /* @__PURE__ */ jsx("div", {
+                                                    className: "hidden",
+                                                    children:
+                                                        /* @__PURE__ */ jsxs(
+                                                            "div",
+                                                            {
+                                                                className:
+                                                                    "relative animate-float",
+                                                                children: [
+                                                                    /* @__PURE__ */ jsxs(
+                                                                        "div",
+                                                                        {
+                                                                            className:
+                                                                                "neumorphic p-8 rounded-3xl",
+                                                                            children:
+                                                                                [
+                                                                                    /* @__PURE__ */ jsxs(
+                                                                                        "div",
+                                                                                        {
+                                                                                            className:
+                                                                                                "neumorphic-inset p-6 rounded-2xl mb-6",
+                                                                                            children:
+                                                                                                [
+                                                                                                    /* @__PURE__ */ jsxs(
+                                                                                                        "div",
+                                                                                                        {
+                                                                                                            className:
+                                                                                                                "flex items-center gap-4 mb-4",
+                                                                                                            children:
+                                                                                                                [
+                                                                                                                    /* @__PURE__ */ jsx(
+                                                                                                                        "div",
+                                                                                                                        {
+                                                                                                                            className:
+                                                                                                                                "w-16 h-16 neumorphic-circle flex items-center justify-center text-2xl",
+                                                                                                                            style: {
+                                                                                                                                color: "var(--accent)",
+                                                                                                                            },
+                                                                                                                            children:
+                                                                                                                                /* @__PURE__ */ jsx(
+                                                                                                                                    AppIcon,
+                                                                                                                                    {
+                                                                                                                                        name: "teachers",
+                                                                                                                                        className:
+                                                                                                                                            "h-8 w-8",
+                                                                                                                                        strokeWidth: 1.9,
+                                                                                                                                    },
+                                                                                                                                ),
+                                                                                                                        },
+                                                                                                                    ),
+                                                                                                                    /* @__PURE__ */ jsxs(
+                                                                                                                        "div",
+                                                                                                                        {
+                                                                                                                            children:
+                                                                                                                                [
+                                                                                                                                    /* @__PURE__ */ jsx(
+                                                                                                                                        "h3",
+                                                                                                                                        {
+                                                                                                                                            className:
+                                                                                                                                                "font-bold",
+                                                                                                                                            style: {
+                                                                                                                                                color: "var(--text-primary)",
+                                                                                                                                            },
+                                                                                                                                            children:
+                                                                                                                                                "Dr. Juan Cruz",
+                                                                                                                                        },
+                                                                                                                                    ),
+                                                                                                                                    /* @__PURE__ */ jsx(
+                                                                                                                                        "p",
+                                                                                                                                        {
+                                                                                                                                            className:
+                                                                                                                                                "text-sm",
+                                                                                                                                            style: {
+                                                                                                                                                color: "var(--text-secondary)",
+                                                                                                                                            },
+                                                                                                                                            children:
+                                                                                                                                                "Faculty Evaluation",
+                                                                                                                                        },
+                                                                                                                                    ),
+                                                                                                                                ],
+                                                                                                                        },
+                                                                                                                    ),
+                                                                                                                ],
+                                                                                                        },
+                                                                                                    ),
+                                                                                                    /* @__PURE__ */ jsxs(
+                                                                                                        "div",
+                                                                                                        {
+                                                                                                            className:
+                                                                                                                "space-y-3",
+                                                                                                            children:
+                                                                                                                [
+                                                                                                                    /* @__PURE__ */ jsxs(
+                                                                                                                        "div",
+                                                                                                                        {
+                                                                                                                            children:
+                                                                                                                                [
+                                                                                                                                    /* @__PURE__ */ jsxs(
+                                                                                                                                        "div",
+                                                                                                                                        {
+                                                                                                                                            className:
+                                                                                                                                                "flex justify-between text-sm mb-1",
+                                                                                                                                            children:
+                                                                                                                                                [
+                                                                                                                                                    /* @__PURE__ */ jsx(
+                                                                                                                                                        "span",
+                                                                                                                                                        {
+                                                                                                                                                            style: {
+                                                                                                                                                                color: "var(--text-secondary)",
+                                                                                                                                                            },
+                                                                                                                                                            children:
+                                                                                                                                                                "Teaching Quality",
+                                                                                                                                                        },
+                                                                                                                                                    ),
+                                                                                                                                                    /* @__PURE__ */ jsx(
+                                                                                                                                                        "span",
+                                                                                                                                                        {
+                                                                                                                                                            style: {
+                                                                                                                                                                color: "var(--accent)",
+                                                                                                                                                            },
+                                                                                                                                                            children:
+                                                                                                                                                                "92%",
+                                                                                                                                                        },
+                                                                                                                                                    ),
+                                                                                                                                                ],
+                                                                                                                                        },
+                                                                                                                                    ),
+                                                                                                                                    /* @__PURE__ */ jsx(
+                                                                                                                                        "div",
+                                                                                                                                        {
+                                                                                                                                            className:
+                                                                                                                                                "progress-bar",
+                                                                                                                                            children:
+                                                                                                                                                /* @__PURE__ */ jsx(
+                                                                                                                                                    "div",
+                                                                                                                                                    {
+                                                                                                                                                        className:
+                                                                                                                                                            "progress-fill",
+                                                                                                                                                        style: {
+                                                                                                                                                            width: "92%",
+                                                                                                                                                        },
+                                                                                                                                                    },
+                                                                                                                                                ),
+                                                                                                                                        },
+                                                                                                                                    ),
+                                                                                                                                ],
+                                                                                                                        },
+                                                                                                                    ),
+                                                                                                                    /* @__PURE__ */ jsxs(
+                                                                                                                        "div",
+                                                                                                                        {
+                                                                                                                            children:
+                                                                                                                                [
+                                                                                                                                    /* @__PURE__ */ jsxs(
+                                                                                                                                        "div",
+                                                                                                                                        {
+                                                                                                                                            className:
+                                                                                                                                                "flex justify-between text-sm mb-1",
+                                                                                                                                            children:
+                                                                                                                                                [
+                                                                                                                                                    /* @__PURE__ */ jsx(
+                                                                                                                                                        "span",
+                                                                                                                                                        {
+                                                                                                                                                            style: {
+                                                                                                                                                                color: "var(--text-secondary)",
+                                                                                                                                                            },
+                                                                                                                                                            children:
+                                                                                                                                                                "Student Engagement",
+                                                                                                                                                        },
+                                                                                                                                                    ),
+                                                                                                                                                    /* @__PURE__ */ jsx(
+                                                                                                                                                        "span",
+                                                                                                                                                        {
+                                                                                                                                                            style: {
+                                                                                                                                                                color: "var(--accent)",
+                                                                                                                                                            },
+                                                                                                                                                            children:
+                                                                                                                                                                "88%",
+                                                                                                                                                        },
+                                                                                                                                                    ),
+                                                                                                                                                ],
+                                                                                                                                        },
+                                                                                                                                    ),
+                                                                                                                                    /* @__PURE__ */ jsx(
+                                                                                                                                        "div",
+                                                                                                                                        {
+                                                                                                                                            className:
+                                                                                                                                                "progress-bar",
+                                                                                                                                            children:
+                                                                                                                                                /* @__PURE__ */ jsx(
+                                                                                                                                                    "div",
+                                                                                                                                                    {
+                                                                                                                                                        className:
+                                                                                                                                                            "progress-fill",
+                                                                                                                                                        style: {
+                                                                                                                                                            width: "88%",
+                                                                                                                                                        },
+                                                                                                                                                    },
+                                                                                                                                                ),
+                                                                                                                                        },
+                                                                                                                                    ),
+                                                                                                                                ],
+                                                                                                                        },
+                                                                                                                    ),
+                                                                                                                    /* @__PURE__ */ jsxs(
+                                                                                                                        "div",
+                                                                                                                        {
+                                                                                                                            children:
+                                                                                                                                [
+                                                                                                                                    /* @__PURE__ */ jsxs(
+                                                                                                                                        "div",
+                                                                                                                                        {
+                                                                                                                                            className:
+                                                                                                                                                "flex justify-between text-sm mb-1",
+                                                                                                                                            children:
+                                                                                                                                                [
+                                                                                                                                                    /* @__PURE__ */ jsx(
+                                                                                                                                                        "span",
+                                                                                                                                                        {
+                                                                                                                                                            style: {
+                                                                                                                                                                color: "var(--text-secondary)",
+                                                                                                                                                            },
+                                                                                                                                                            children:
+                                                                                                                                                                "Research Output",
+                                                                                                                                                        },
+                                                                                                                                                    ),
+                                                                                                                                                    /* @__PURE__ */ jsx(
+                                                                                                                                                        "span",
+                                                                                                                                                        {
+                                                                                                                                                            style: {
+                                                                                                                                                                color: "var(--accent)",
+                                                                                                                                                            },
+                                                                                                                                                            children:
+                                                                                                                                                                "95%",
+                                                                                                                                                        },
+                                                                                                                                                    ),
+                                                                                                                                                ],
+                                                                                                                                        },
+                                                                                                                                    ),
+                                                                                                                                    /* @__PURE__ */ jsx(
+                                                                                                                                        "div",
+                                                                                                                                        {
+                                                                                                                                            className:
+                                                                                                                                                "progress-bar",
+                                                                                                                                            children:
+                                                                                                                                                /* @__PURE__ */ jsx(
+                                                                                                                                                    "div",
+                                                                                                                                                    {
+                                                                                                                                                        className:
+                                                                                                                                                            "progress-fill",
+                                                                                                                                                        style: {
+                                                                                                                                                            width: "95%",
+                                                                                                                                                        },
+                                                                                                                                                    },
+                                                                                                                                                ),
+                                                                                                                                        },
+                                                                                                                                    ),
+                                                                                                                                ],
+                                                                                                                        },
+                                                                                                                    ),
+                                                                                                                ],
+                                                                                                        },
+                                                                                                    ),
+                                                                                                ],
+                                                                                        },
+                                                                                    ),
+                                                                                    /* @__PURE__ */ jsxs(
+                                                                                        "div",
+                                                                                        {
+                                                                                            className:
+                                                                                                "flex justify-around",
+                                                                                            children:
+                                                                                                [
+                                                                                                    /* @__PURE__ */ jsxs(
+                                                                                                        "div",
+                                                                                                        {
+                                                                                                            className:
+                                                                                                                "text-center",
+                                                                                                            children:
+                                                                                                                [
+                                                                                                                    /* @__PURE__ */ jsx(
+                                                                                                                        "div",
+                                                                                                                        {
+                                                                                                                            className:
+                                                                                                                                "text-2xl font-bold",
+                                                                                                                            style: {
+                                                                                                                                color: "var(--accent)",
+                                                                                                                            },
+                                                                                                                            children:
+                                                                                                                                "4",
+                                                                                                                        },
+                                                                                                                    ),
+                                                                                                                    /* @__PURE__ */ jsx(
+                                                                                                                        "div",
+                                                                                                                        {
+                                                                                                                            className:
+                                                                                                                                "text-xs",
+                                                                                                                            style: {
+                                                                                                                                color: "var(--text-secondary)",
+                                                                                                                            },
+                                                                                                                            children:
+                                                                                                                                "Roles",
+                                                                                                                        },
+                                                                                                                    ),
+                                                                                                                ],
+                                                                                                        },
+                                                                                                    ),
+                                                                                                    /* @__PURE__ */ jsxs(
+                                                                                                        "div",
+                                                                                                        {
+                                                                                                            className:
+                                                                                                                "text-center",
+                                                                                                            children:
+                                                                                                                [
+                                                                                                                    /* @__PURE__ */ jsx(
+                                                                                                                        "div",
+                                                                                                                        {
+                                                                                                                            className:
+                                                                                                                                "text-2xl font-bold",
+                                                                                                                            style: {
+                                                                                                                                color: "var(--accent)",
+                                                                                                                            },
+                                                                                                                            children:
+                                                                                                                                "12+",
+                                                                                                                        },
+                                                                                                                    ),
+                                                                                                                    /* @__PURE__ */ jsx(
+                                                                                                                        "div",
+                                                                                                                        {
+                                                                                                                            className:
+                                                                                                                                "text-xs",
+                                                                                                                            style: {
+                                                                                                                                color: "var(--text-secondary)",
+                                                                                                                            },
+                                                                                                                            children:
+                                                                                                                                "Campuses",
+                                                                                                                        },
+                                                                                                                    ),
+                                                                                                                ],
+                                                                                                        },
+                                                                                                    ),
+                                                                                                    /* @__PURE__ */ jsxs(
+                                                                                                        "div",
+                                                                                                        {
+                                                                                                            className:
+                                                                                                                "text-center",
+                                                                                                            children:
+                                                                                                                [
+                                                                                                                    /* @__PURE__ */ jsx(
+                                                                                                                        "div",
+                                                                                                                        {
+                                                                                                                            className:
+                                                                                                                                "text-2xl font-bold",
+                                                                                                                            style: {
+                                                                                                                                color: "var(--accent)",
+                                                                                                                            },
+                                                                                                                            children:
+                                                                                                                                "98%",
+                                                                                                                        },
+                                                                                                                    ),
+                                                                                                                    /* @__PURE__ */ jsx(
+                                                                                                                        "div",
+                                                                                                                        {
+                                                                                                                            className:
+                                                                                                                                "text-xs",
+                                                                                                                            style: {
+                                                                                                                                color: "var(--text-secondary)",
+                                                                                                                            },
+                                                                                                                            children:
+                                                                                                                                "Rate",
+                                                                                                                        },
+                                                                                                                    ),
+                                                                                                                ],
+                                                                                                        },
+                                                                                                    ),
+                                                                                                ],
+                                                                                        },
+                                                                                    ),
+                                                                                ],
+                                                                        },
+                                                                    ),
+                                                                    /* @__PURE__ */ jsx(
+                                                                        "div",
+                                                                        {
+                                                                            className:
+                                                                                "absolute -top-4 -right-4 w-12 h-12 neumorphic-circle flex items-center justify-center animate-pulse-glow",
+                                                                            style: {
+                                                                                color: "var(--accent)",
+                                                                            },
+                                                                            children:
+                                                                                /* @__PURE__ */ jsx(
+                                                                                    AppIcon,
+                                                                                    {
+                                                                                        name: "ratings",
+                                                                                        className:
+                                                                                            "h-6 w-6",
+                                                                                        strokeWidth: 1.9,
+                                                                                    },
+                                                                                ),
+                                                                        },
+                                                                    ),
+                                                                    /* @__PURE__ */ jsx(
+                                                                        "div",
+                                                                        {
+                                                                            className:
+                                                                                "absolute -bottom-4 -left-4 w-10 h-10 neumorphic-circle flex items-center justify-center",
+                                                                            style: {
+                                                                                color: "var(--accent)",
+                                                                            },
+                                                                            children:
+                                                                                /* @__PURE__ */ jsx(
+                                                                                    AppIcon,
+                                                                                    {
+                                                                                        name: "dashboard",
+                                                                                        className:
+                                                                                            "h-5 w-5",
+                                                                                        strokeWidth: 1.9,
+                                                                                    },
+                                                                                ),
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                            },
                                                         ),
-                                                    className:
-                                                        "neumorphic-btn px-8 py-4 font-bold",
-                                                    style: {
-                                                        color: "var(--text-primary)",
-                                                    },
-                                                    children: "Learn More",
                                                 }),
                                             ],
                                         }),
-                                    ],
-                                }),
-                                /* @__PURE__ */ jsx("div", {
-                                    className: "hidden",
-                                    children: /* @__PURE__ */ jsxs("div", {
-                                        className: "relative animate-float",
-                                        children: [
-                                            /* @__PURE__ */ jsxs("div", {
-                                                className:
-                                                    "neumorphic p-8 rounded-3xl",
-                                                children: [
-                                                    /* @__PURE__ */ jsxs(
-                                                        "div",
-                                                        {
-                                                            className:
-                                                                "neumorphic-inset p-6 rounded-2xl mb-6",
-                                                            children: [
-                                                                /* @__PURE__ */ jsxs(
-                                                                    "div",
-                                                                    {
-                                                                        className:
-                                                                            "flex items-center gap-4 mb-4",
-                                                                        children:
-                                                                            [
-                                                                                /* @__PURE__ */ jsx(
-                                                                                    "div",
-                                                                                    {
-                                                                                        className:
-                                                                                            "w-16 h-16 neumorphic-circle flex items-center justify-center text-2xl",
-                                                                                        style: {
-                                                                                            color: "var(--accent)",
-                                                                                        },
-                                                                                        children: /* @__PURE__ */ jsx(
-                                                                                            AppIcon,
-                                                                                            {
-                                                                                                name: "teachers",
-                                                                                                className: "h-8 w-8",
-                                                                                                strokeWidth: 1.9,
-                                                                                            },
-                                                                                        ),
-                                                                                    },
-                                                                                ),
-                                                                                /* @__PURE__ */ jsxs(
-                                                                                    "div",
-                                                                                    {
-                                                                                        children:
-                                                                                            [
-                                                                                                /* @__PURE__ */ jsx(
-                                                                                                    "h3",
-                                                                                                    {
-                                                                                                        className:
-                                                                                                            "font-bold",
-                                                                                                        style: {
-                                                                                                            color: "var(--text-primary)",
-                                                                                                        },
-                                                                                                        children:
-                                                                                                            "Dr. Juan Cruz",
-                                                                                                    },
-                                                                                                ),
-                                                                                                /* @__PURE__ */ jsx(
-                                                                                                    "p",
-                                                                                                    {
-                                                                                                        className:
-                                                                                                            "text-sm",
-                                                                                                        style: {
-                                                                                                            color: "var(--text-secondary)",
-                                                                                                        },
-                                                                                                        children:
-                                                                                                            "Faculty Evaluation",
-                                                                                                    },
-                                                                                                ),
-                                                                                            ],
-                                                                                    },
-                                                                                ),
-                                                                            ],
-                                                                    },
-                                                                ),
-                                                                /* @__PURE__ */ jsxs(
-                                                                    "div",
-                                                                    {
-                                                                        className:
-                                                                            "space-y-3",
-                                                                        children:
-                                                                            [
-                                                                                /* @__PURE__ */ jsxs(
-                                                                                    "div",
-                                                                                    {
-                                                                                        children:
-                                                                                            [
-                                                                                                /* @__PURE__ */ jsxs(
-                                                                                                    "div",
-                                                                                                    {
-                                                                                                        className:
-                                                                                                            "flex justify-between text-sm mb-1",
-                                                                                                        children:
-                                                                                                            [
-                                                                                                                /* @__PURE__ */ jsx(
-                                                                                                                    "span",
-                                                                                                                    {
-                                                                                                                        style: {
-                                                                                                                            color: "var(--text-secondary)",
-                                                                                                                        },
-                                                                                                                        children:
-                                                                                                                            "Teaching Quality",
-                                                                                                                    },
-                                                                                                                ),
-                                                                                                                /* @__PURE__ */ jsx(
-                                                                                                                    "span",
-                                                                                                                    {
-                                                                                                                        style: {
-                                                                                                                            color: "var(--accent)",
-                                                                                                                        },
-                                                                                                                        children:
-                                                                                                                            "92%",
-                                                                                                                    },
-                                                                                                                ),
-                                                                                                            ],
-                                                                                                    },
-                                                                                                ),
-                                                                                                /* @__PURE__ */ jsx(
-                                                                                                    "div",
-                                                                                                    {
-                                                                                                        className:
-                                                                                                            "progress-bar",
-                                                                                                        children:
-                                                                                                            /* @__PURE__ */ jsx(
-                                                                                                                "div",
-                                                                                                                {
-                                                                                                                    className:
-                                                                                                                        "progress-fill",
-                                                                                                                    style: {
-                                                                                                                        width: "92%",
-                                                                                                                    },
-                                                                                                                },
-                                                                                                            ),
-                                                                                                    },
-                                                                                                ),
-                                                                                            ],
-                                                                                    },
-                                                                                ),
-                                                                                /* @__PURE__ */ jsxs(
-                                                                                    "div",
-                                                                                    {
-                                                                                        children:
-                                                                                            [
-                                                                                                /* @__PURE__ */ jsxs(
-                                                                                                    "div",
-                                                                                                    {
-                                                                                                        className:
-                                                                                                            "flex justify-between text-sm mb-1",
-                                                                                                        children:
-                                                                                                            [
-                                                                                                                /* @__PURE__ */ jsx(
-                                                                                                                    "span",
-                                                                                                                    {
-                                                                                                                        style: {
-                                                                                                                            color: "var(--text-secondary)",
-                                                                                                                        },
-                                                                                                                        children:
-                                                                                                                            "Student Engagement",
-                                                                                                                    },
-                                                                                                                ),
-                                                                                                                /* @__PURE__ */ jsx(
-                                                                                                                    "span",
-                                                                                                                    {
-                                                                                                                        style: {
-                                                                                                                            color: "var(--accent)",
-                                                                                                                        },
-                                                                                                                        children:
-                                                                                                                            "88%",
-                                                                                                                    },
-                                                                                                                ),
-                                                                                                            ],
-                                                                                                    },
-                                                                                                ),
-                                                                                                /* @__PURE__ */ jsx(
-                                                                                                    "div",
-                                                                                                    {
-                                                                                                        className:
-                                                                                                            "progress-bar",
-                                                                                                        children:
-                                                                                                            /* @__PURE__ */ jsx(
-                                                                                                                "div",
-                                                                                                                {
-                                                                                                                    className:
-                                                                                                                        "progress-fill",
-                                                                                                                    style: {
-                                                                                                                        width: "88%",
-                                                                                                                    },
-                                                                                                                },
-                                                                                                            ),
-                                                                                                    },
-                                                                                                ),
-                                                                                            ],
-                                                                                    },
-                                                                                ),
-                                                                                /* @__PURE__ */ jsxs(
-                                                                                    "div",
-                                                                                    {
-                                                                                        children:
-                                                                                            [
-                                                                                                /* @__PURE__ */ jsxs(
-                                                                                                    "div",
-                                                                                                    {
-                                                                                                        className:
-                                                                                                            "flex justify-between text-sm mb-1",
-                                                                                                        children:
-                                                                                                            [
-                                                                                                                /* @__PURE__ */ jsx(
-                                                                                                                    "span",
-                                                                                                                    {
-                                                                                                                        style: {
-                                                                                                                            color: "var(--text-secondary)",
-                                                                                                                        },
-                                                                                                                        children:
-                                                                                                                            "Research Output",
-                                                                                                                    },
-                                                                                                                ),
-                                                                                                                /* @__PURE__ */ jsx(
-                                                                                                                    "span",
-                                                                                                                    {
-                                                                                                                        style: {
-                                                                                                                            color: "var(--accent)",
-                                                                                                                        },
-                                                                                                                        children:
-                                                                                                                            "95%",
-                                                                                                                    },
-                                                                                                                ),
-                                                                                                            ],
-                                                                                                    },
-                                                                                                ),
-                                                                                                /* @__PURE__ */ jsx(
-                                                                                                    "div",
-                                                                                                    {
-                                                                                                        className:
-                                                                                                            "progress-bar",
-                                                                                                        children:
-                                                                                                            /* @__PURE__ */ jsx(
-                                                                                                                "div",
-                                                                                                                {
-                                                                                                                    className:
-                                                                                                                        "progress-fill",
-                                                                                                                    style: {
-                                                                                                                        width: "95%",
-                                                                                                                    },
-                                                                                                                },
-                                                                                                            ),
-                                                                                                    },
-                                                                                                ),
-                                                                                            ],
-                                                                                    },
-                                                                                ),
-                                                                            ],
-                                                                    },
-                                                                ),
-                                                            ],
-                                                        },
-                                                    ),
-                                                    /* @__PURE__ */ jsxs(
-                                                        "div",
-                                                        {
-                                                            className:
-                                                                "flex justify-around",
-                                                            children: [
-                                                                /* @__PURE__ */ jsxs(
-                                                                    "div",
-                                                                    {
-                                                                        className:
-                                                                            "text-center",
-                                                                        children:
-                                                                            [
-                                                                                /* @__PURE__ */ jsx(
-                                                                                    "div",
-                                                                                    {
-                                                                                        className:
-                                                                                            "text-2xl font-bold",
-                                                                                        style: {
-                                                                                            color: "var(--accent)",
-                                                                                        },
-                                                                                        children:
-                                                                                            "4",
-                                                                                    },
-                                                                                ),
-                                                                                /* @__PURE__ */ jsx(
-                                                                                    "div",
-                                                                                    {
-                                                                                        className:
-                                                                                            "text-xs",
-                                                                                        style: {
-                                                                                            color: "var(--text-secondary)",
-                                                                                        },
-                                                                                        children:
-                                                                                            "Roles",
-                                                                                    },
-                                                                                ),
-                                                                            ],
-                                                                    },
-                                                                ),
-                                                                /* @__PURE__ */ jsxs(
-                                                                    "div",
-                                                                    {
-                                                                        className:
-                                                                            "text-center",
-                                                                        children:
-                                                                            [
-                                                                                /* @__PURE__ */ jsx(
-                                                                                    "div",
-                                                                                    {
-                                                                                        className:
-                                                                                            "text-2xl font-bold",
-                                                                                        style: {
-                                                                                            color: "var(--accent)",
-                                                                                        },
-                                                                                        children:
-                                                                                            "12+",
-                                                                                    },
-                                                                                ),
-                                                                                /* @__PURE__ */ jsx(
-                                                                                    "div",
-                                                                                    {
-                                                                                        className:
-                                                                                            "text-xs",
-                                                                                        style: {
-                                                                                            color: "var(--text-secondary)",
-                                                                                        },
-                                                                                        children:
-                                                                                            "Campuses",
-                                                                                    },
-                                                                                ),
-                                                                            ],
-                                                                    },
-                                                                ),
-                                                                /* @__PURE__ */ jsxs(
-                                                                    "div",
-                                                                    {
-                                                                        className:
-                                                                            "text-center",
-                                                                        children:
-                                                                            [
-                                                                                /* @__PURE__ */ jsx(
-                                                                                    "div",
-                                                                                    {
-                                                                                        className:
-                                                                                            "text-2xl font-bold",
-                                                                                        style: {
-                                                                                            color: "var(--accent)",
-                                                                                        },
-                                                                                        children:
-                                                                                            "98%",
-                                                                                    },
-                                                                                ),
-                                                                                /* @__PURE__ */ jsx(
-                                                                                    "div",
-                                                                                    {
-                                                                                        className:
-                                                                                            "text-xs",
-                                                                                        style: {
-                                                                                            color: "var(--text-secondary)",
-                                                                                        },
-                                                                                        children:
-                                                                                            "Rate",
-                                                                                    },
-                                                                                ),
-                                                                            ],
-                                                                    },
-                                                                ),
-                                                            ],
-                                                        },
-                                                    ),
-                                                ],
-                                            }),
-                                            /* @__PURE__ */ jsx("div", {
-                                                className:
-                                                    "absolute -top-4 -right-4 w-12 h-12 neumorphic-circle flex items-center justify-center animate-pulse-glow",
-                                                style: {
-                                                    color: "var(--accent)",
-                                                },
-                                                children: /* @__PURE__ */ jsx(
-                                                    AppIcon,
-                                                    {
-                                                        name: "ratings",
-                                                        className: "h-6 w-6",
-                                                        strokeWidth: 1.9,
-                                                    },
-                                                ),
-                                            }),
-                                            /* @__PURE__ */ jsx("div", {
-                                                className:
-                                                    "absolute -bottom-4 -left-4 w-10 h-10 neumorphic-circle flex items-center justify-center",
-                                                style: {
-                                                    color: "var(--accent)",
-                                                },
-                                                children: /* @__PURE__ */ jsx(
-                                                    AppIcon,
-                                                    {
-                                                        name: "dashboard",
-                                                        className: "h-5 w-5",
-                                                        strokeWidth: 1.9,
-                                                    },
-                                                ),
-                                            }),
-                                        ],
-                                    }),
-                                }),
-                            ],
-                        }),
                                     ],
                                 }),
                             ],
@@ -1496,11 +1627,11 @@ function App({
                                     ],
                                 }),
                                 /* @__PURE__ */ jsxs(NeuCard, {
-                                    className: "animate-slide-up h-full flex flex-col",
+                                    className:
+                                        "animate-slide-up h-full flex flex-col",
                                     children: [
                                         /* @__PURE__ */ jsx("h3", {
-                                            className:
-                                                "text-lg font-bold mb-3",
+                                            className: "text-lg font-bold mb-3",
                                             style: {
                                                 color: "var(--text-primary)",
                                             },
@@ -1835,7 +1966,8 @@ function App({
                                     ],
                                 }),
                                 /* @__PURE__ */ jsx("div", {
-                                    className: "flex justify-center gap-2.5 mt-4",
+                                    className:
+                                        "flex justify-center gap-2.5 mt-4",
                                     children: testimonials.map((_, i) =>
                                         /* @__PURE__ */ jsx(
                                             "button",
@@ -2017,14 +2149,16 @@ function App({
                                                                 style: {
                                                                     color: "var(--accent)",
                                                                 },
-                                                                children: /* @__PURE__ */ jsx(
-                                                                    AppIcon,
-                                                                    {
-                                                                        name: item.icon,
-                                                                        className: "h-6 w-6",
-                                                                        strokeWidth: 1.9,
-                                                                    },
-                                                                ),
+                                                                children:
+                                                                    /* @__PURE__ */ jsx(
+                                                                        AppIcon,
+                                                                        {
+                                                                            name: item.icon,
+                                                                            className:
+                                                                                "h-6 w-6",
+                                                                            strokeWidth: 1.9,
+                                                                        },
+                                                                    ),
                                                             },
                                                         ),
                                                         /* @__PURE__ */ jsxs(
@@ -2216,7 +2350,8 @@ function App({
                                                                 AppIcon,
                                                                 {
                                                                     name: "graduation",
-                                                                    className: "h-6 w-6",
+                                                                    className:
+                                                                        "h-6 w-6",
                                                                     strokeWidth: 1.9,
                                                                 },
                                                             ),
@@ -2459,23 +2594,17 @@ function App({
                                         style: {
                                             color: "var(--text-secondary)",
                                         },
-                                        children: /* @__PURE__ */ jsxs(
-                                            "span",
-                                            {
-                                                className:
-                                                    "inline-flex items-center gap-2",
-                                                children: [
-                                                    /* @__PURE__ */ jsx(
-                                                        "input",
-                                                        {
-                                                            type: "checkbox",
-                                                            name: "remember",
-                                                        },
-                                                    ),
-                                                    "Remember me",
-                                                ],
-                                            },
-                                        ),
+                                        children: /* @__PURE__ */ jsxs("span", {
+                                            className:
+                                                "inline-flex items-center gap-2",
+                                            children: [
+                                                /* @__PURE__ */ jsx("input", {
+                                                    type: "checkbox",
+                                                    name: "remember",
+                                                }),
+                                                "Remember me",
+                                            ],
+                                        }),
                                     }),
                                     /* @__PURE__ */ jsxs("div", {
                                         children: [
@@ -2804,8 +2933,7 @@ function App({
                                                 style: {
                                                     color: "var(--text-primary)",
                                                 },
-                                                children:
-                                                    "Confirm Password",
+                                                children: "Confirm Password",
                                             }),
                                             /* @__PURE__ */ jsx("input", {
                                                 type: "password",
