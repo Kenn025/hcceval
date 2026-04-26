@@ -71,6 +71,12 @@ class RatingsController extends Controller
     {
         $request->merge(['school_year' => '']);
         $subjectRatingContext = $this->subjectRatingContext($request);
+        $request->merge([
+            'branch_id' => $subjectRatingContext['selectedBranchId'],
+            'department_id' => $subjectRatingContext['selectedDepartmentId'],
+            'program_id' => $subjectRatingContext['selectedProgramId'],
+            'strand_id' => $subjectRatingContext['selectedStrandId'],
+        ]);
         $ratings = $this->subjectQuery($request)
             ->orderByDesc('rs.id')
             ->paginate(20)
@@ -518,11 +524,11 @@ class RatingsController extends Controller
             ->orderBy('name')
             ->get();
 
-        $selectedProgramId = $educationType === 'college' && $programs->contains('id', $requestedProgramId)
-            ? $requestedProgramId
+        $selectedProgramId = $educationType === 'college'
+            ? ($programs->contains('id', $requestedProgramId) ? $requestedProgramId : $programs->first()?->id)
             : null;
-        $selectedStrandId = $educationType === 'shs' && $strands->contains('id', $requestedStrandId)
-            ? $requestedStrandId
+        $selectedStrandId = $educationType === 'shs'
+            ? ($strands->contains('id', $requestedStrandId) ? $requestedStrandId : $strands->first()?->id)
             : null;
 
         $subjects = DB::table('subject as s')
@@ -548,25 +554,7 @@ class RatingsController extends Controller
             ->orderBy('s.name')
             ->get();
 
-        $ratings = DB::table('ratings_subject as rs')
-            ->leftJoin('employee as e', 'rs.employee_id', '=', 'e.id')
-            ->leftJoin('academic_year as ay', 'rs.academic_year_id', '=', 'ay.id')
-            ->select(
-                'rs.id as rating_id',
-                'rs.subject_id',
-                'rs.employee_id',
-                'rs.submission_count',
-                DB::raw("TRIM(CONCAT(e.firstname, ' ', COALESCE(e.middlename, ''), ' ', e.lastname)) as teacher_name"),
-                DB::raw("COALESCE(e.role, 'Teacher') as teacher_role"),
-                DB::raw("JSON_UNQUOTE(JSON_EXTRACT(rs.overall_ratings, '$.average')) as overall_rating"),
-                DB::raw("CONCAT(ay.from_year, '-', ay.to_year) as school_year"),
-                'ay.term as semester'
-            )
-            ->where('rs.is_archived', $archived ? 1 : 0)
-            ->when($subjects->isNotEmpty(), fn ($query) => $query->whereIn('rs.subject_id', $subjects->pluck('id')))
-            ->when($subjects->isEmpty(), fn ($query) => $query->whereRaw('1 = 0'))
-            ->when($schoolYear, fn ($query) => $query->whereRaw("CONCAT(ay.from_year, '-', ay.to_year) = ?", [$schoolYear]))
-            ->get()
+        $ratings = $this->subjectSubmissionRatings($subjects->pluck('id')->all(), $schoolYear)
             ->groupBy('subject_id');
 
         $assignedTeacherIds = $subjects
@@ -582,15 +570,20 @@ class RatingsController extends Controller
 
         $subjectItems = $subjects->map(function (object $subject) use ($ratings, $teacherNames) {
             $teacherCards = collect();
+            $subjectLevelRating = ($ratings[$subject->id] ?? collect())->firstWhere('employee_id', null);
 
             foreach ($this->decodeIdList($subject->teacher_id) as $teacherId) {
-                $matchingRating = ($ratings[$subject->id] ?? collect())->firstWhere('employee_id', $teacherId);
+                $matchingRating = ($ratings[$subject->id] ?? collect())->firstWhere('employee_id', $teacherId) ?? $subjectLevelRating;
                 $teacher = $teacherNames[$teacherId] ?? null;
 
                 $teacherCards->push($this->subjectTeacherCard($teacherId, $teacher?->name, $teacher?->role, $matchingRating));
             }
 
             foreach (($ratings[$subject->id] ?? collect()) as $rating) {
+                if ($rating->employee_id === null) {
+                    continue;
+                }
+
                 if ($teacherCards->contains(fn (array $card) => (int) ($card['teacher_id'] ?? 0) === (int) $rating->employee_id)) {
                     continue;
                 }
@@ -636,6 +629,117 @@ class RatingsController extends Controller
         ];
     }
 
+    private function subjectSubmissionRatings(array $subjectIds, string $schoolYear = ''): Collection
+    {
+        $subjectIds = collect($subjectIds)
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($subjectIds->isEmpty() || ! Schema::hasTable('evaluation_submissions')) {
+            return collect();
+        }
+
+        $hasTeacherId = Schema::hasColumn('evaluation_submissions', 'teacher_id');
+        $selects = [
+            'es.id',
+            'es.subject_id',
+            'es.questionnaire_id',
+            'es.answers',
+            DB::raw("CONCAT(ay.from_year, '-', ay.to_year) as school_year"),
+            'ay.term as semester',
+        ];
+
+        if ($hasTeacherId) {
+            $selects[] = 'es.teacher_id';
+            $selects[] = DB::raw("TRIM(COALESCE(CONCAT(t.firstname, ' ', COALESCE(t.middlename, ''), ' ', t.lastname), CONCAT(e.firstname, ' ', COALESCE(e.middlename, ''), ' ', e.lastname))) as teacher_name");
+            $selects[] = DB::raw("COALESCE(t.role, e.role, 'Teacher') as teacher_role");
+        } else {
+            $selects[] = DB::raw('NULL as teacher_id');
+            $selects[] = DB::raw('NULL as teacher_name');
+            $selects[] = DB::raw("'Teacher' as teacher_role");
+        }
+
+        $query = DB::table('evaluation_submissions as es')
+            ->leftJoin('academic_year as ay', 'es.academic_year_id', '=', 'ay.id')
+            ->select($selects)
+            ->whereIn('es.subject_id', $subjectIds->all())
+            ->when($schoolYear, fn ($query) => $query->whereRaw("CONCAT(ay.from_year, '-', ay.to_year) = ?", [$schoolYear]));
+
+        if ($hasTeacherId) {
+            $query
+                ->leftJoin('teacher as t', 'es.teacher_id', '=', 't.id')
+                ->leftJoin('employee as e', 'es.teacher_id', '=', 'e.id')
+                ->whereNotNull('es.teacher_id');
+        }
+
+        $rows = $query->get();
+        $questionnaireDetails = $this->peerQuestionnaireDetails(
+            $rows
+                ->pluck('questionnaire_id')
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values()
+                ->all()
+        );
+
+        return $rows
+            ->groupBy(fn (object $row) => ((int) $row->subject_id) . ':' . ((int) $row->teacher_id))
+            ->map(function (Collection $rows) use ($questionnaireDetails) {
+                $first = $rows->first();
+                $questionBuckets = [];
+
+                $ratings = $rows->flatMap(function (object $row) use (&$questionBuckets) {
+                    $answers = json_decode((string) ($row->answers ?? '[]'), true);
+
+                    if (! is_array($answers)) {
+                        return [];
+                    }
+
+                    return collect($answers)->map(function ($answer) use (&$questionBuckets) {
+                        $questionId = (int) ($answer['question_id'] ?? 0);
+                        $rating = $answer['rating'] ?? null;
+
+                        if (! $questionId || ! is_numeric($rating)) {
+                            return null;
+                        }
+
+                        $questionBuckets[$questionId] ??= [];
+                        $questionBuckets[$questionId][] = (float) $rating;
+
+                        return (float) $rating;
+                    })->filter(fn ($rating) => $rating !== null)->all();
+                });
+                $questionRatings = collect($questionBuckets)
+                    ->mapWithKeys(fn (array $values, int $questionId) => [
+                        (string) $questionId => [
+                            'average' => count($values) ? round(array_sum($values) / count($values), 2) : null,
+                            'count' => count($values),
+                        ],
+                    ])
+                    ->all();
+                $questionnaireId = $first->questionnaire_id ? (int) $first->questionnaire_id : null;
+
+                return (object) [
+                    'rating_id' => $first->id ?? null,
+                    'subject_id' => $first->subject_id ?? null,
+                    'employee_id' => $first->teacher_id ?? null,
+                    'submission_count' => $rows->count(),
+                    'teacher_name' => $first->teacher_name ?? null,
+                    'teacher_role' => $first->teacher_role ?? 'Teacher',
+                    'overall_rating' => $ratings->isNotEmpty() ? round($ratings->avg(), 2) : null,
+                    'school_year' => $first->school_year ?? null,
+                    'semester' => $first->semester ?? null,
+                    'questionnaire_id' => $questionnaireId,
+                    'questionnaire' => $questionnaireId ? ($questionnaireDetails[$questionnaireId] ?? null) : null,
+                    'question_ratings' => $questionRatings,
+                ];
+            })
+            ->values();
+    }
+
     private function decodeIdList(mixed $value): array
     {
         if (is_string($value)) {
@@ -661,6 +765,9 @@ class RatingsController extends Controller
             'submission_count' => (int) ($rating->submission_count ?? 0),
             'school_year' => $rating->school_year ?? null,
             'semester' => $rating->semester ?? null,
+            'questionnaire_id' => $rating->questionnaire_id ?? null,
+            'questionnaire' => $rating->questionnaire ?? null,
+            'question_ratings' => $rating->question_ratings ?? [],
         ];
     }
 

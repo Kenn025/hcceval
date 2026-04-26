@@ -50,8 +50,20 @@ class AssignmentController extends Controller
     private function renderAssignmentsPage(Request $request, string $assignmentType)
     {
         $search = (string) ($request->input('search') ?? '');
-        $branchId = $request->filled('branch_id') ? (int) $request->input('branch_id') : null;
+        $scopedBranchId = $this->scopedBranchId();
+        $requestedBranchId = $request->integer('branch_id');
         $typeCode = self::TYPE_CODE_MAP[$assignmentType] ?? self::TYPE_CODE_MAP['student-teacher'];
+
+        $branches = DB::table('branch')
+            ->select('id', 'code', 'name')
+            ->where('is_deleted', 0)
+            ->where('is_activated', 1)
+            ->where('code', '!=', 'OVERALL')
+            ->when($scopedBranchId, fn ($query) => $query->where('id', $scopedBranchId))
+            ->orderBy('name')
+            ->get();
+        $branchId = $scopedBranchId
+            ?? ($branches->contains('id', $requestedBranchId) ? $requestedBranchId : $branches->first()?->id);
 
         $assignments = $this->baseQuery($search)
             ->where('qt.code', $typeCode)
@@ -157,13 +169,6 @@ class AssignmentController extends Controller
             ];
         })->values();
 
-        $branches = DB::table('branch')
-            ->select('id', 'code', 'name')
-            ->where('is_deleted', 0)
-            ->where('is_activated', 1)
-            ->orderBy('name')
-            ->get();
-
         $departments = DB::table('department')
             ->select('id', 'code', 'name', 'branch_id', 'is_activated')
             ->where('is_deleted', 0)
@@ -173,8 +178,9 @@ class AssignmentController extends Controller
             ->get();
         $departmentIds = $departments->pluck('id')->all();
 
-        $employeeDepartments = Schema::hasTable('employee_department')
-            ? DB::table('employee_department')
+        $employeeDepartmentTable = $this->employeeDepartmentTable();
+        $employeeDepartments = $employeeDepartmentTable
+            ? DB::table($employeeDepartmentTable)
                 ->select('id', 'code', 'name', 'branch_id', 'is_activated')
                 ->where('is_deleted', 0)
                 ->where('is_activated', 1)
@@ -252,6 +258,37 @@ class AssignmentController extends Controller
             ])
             ->values();
 
+        $employees = Schema::hasTable('employee') && Schema::hasColumn('employee', 'employee_department_id')
+            ? DB::table('employee')
+                ->select(
+                    'id',
+                    'code',
+                    'firstname',
+                    'middlename',
+                    'lastname',
+                    'role',
+                    'branch_id',
+                    'employee_department_id',
+                    'is_activated'
+                )
+                ->where('is_deleted', 0)
+                ->where('is_activated', 1)
+                ->when($branchId, fn ($query) => $query->where('branch_id', $branchId))
+                ->orderBy('lastname')
+                ->orderBy('firstname')
+                ->get()
+                ->map(fn ($employee) => [
+                    'id' => $employee->id,
+                    'code' => $employee->code,
+                    'name' => trim(collect([$employee->firstname, $employee->middlename, $employee->lastname])->filter()->implode(' ')),
+                    'role' => $employee->role,
+                    'branch_id' => $employee->branch_id,
+                    'employee_department_id' => $employee->employee_department_id,
+                    'is_activated' => $employee->is_activated,
+                ])
+                ->values()
+            : collect();
+
         $selectedQuestionnaires = $this->buildSelectedQuestionnaireMap($typeCode, $branchId);
         $customSubjectGroups = $this->buildCustomSubjectGroups();
 
@@ -268,6 +305,7 @@ class AssignmentController extends Controller
             'yearLevels'     => $yearLevels,
             'subjects'       => $subjects,
             'faculty'        => $faculty,
+            'employees'      => $employees,
             'selectedQuestionnaires' => $selectedQuestionnaires,
             'customSubjectGroups' => $customSubjectGroups,
         ]);
@@ -531,6 +569,8 @@ class AssignmentController extends Controller
 
     private function validateDistributionScope(Request $request): array
     {
+        $employeeDepartmentTable = $this->employeeDepartmentTable() ?? 'employee_department';
+
         return $request->validate([
             'branch_id'        => 'nullable|integer|exists:branch,id',
             'department_id'    => 'nullable|integer|exists:department,id',
@@ -541,8 +581,21 @@ class AssignmentController extends Controller
             'year_level_ids'   => 'nullable|array',
             'year_level_ids.*' => 'integer|exists:education_level,id',
             'teacher_id'       => 'nullable|integer|exists:teacher,id',
-            'employee_department_id' => 'nullable|integer|exists:employee_department,id',
+            'employee_department_id' => "nullable|integer|exists:{$employeeDepartmentTable},id",
         ]);
+    }
+
+    private function employeeDepartmentTable(): ?string
+    {
+        if (Schema::hasTable('employee_departments')) {
+            return 'employee_departments';
+        }
+
+        if (Schema::hasTable('employee_department')) {
+            return 'employee_department';
+        }
+
+        return null;
     }
 
     private function buildDistributionItems(array $validated): string
@@ -923,6 +976,28 @@ class AssignmentController extends Controller
         );
     }
 
+    private function applyQuestionnaireToScopedEmployees(int $employeeDepartmentId, int $questionnaireId, ?int $branchId = null): int
+    {
+        if (
+            $employeeDepartmentId <= 0
+            || $questionnaireId <= 0
+            || ! Schema::hasTable('employee')
+            || ! Schema::hasColumn('employee', 'employee_department_id')
+            || ! Schema::hasColumn('employee', 'questionnaire_id')
+        ) {
+            return 0;
+        }
+
+        return DB::table('employee')
+            ->where('employee_department_id', $employeeDepartmentId)
+            ->where('is_deleted', 0)
+            ->when($branchId, fn ($query) => $query->where('branch_id', $branchId))
+            ->update([
+                'questionnaire_id' => $questionnaireId,
+                'updated_at' => now(),
+            ]);
+    }
+
     private function syncPeerTeacherQuestionnaires(int $departmentId, array $items, ?int $fallbackQuestionnaireId = null): int
     {
         $scopeConfig = $this->peerScopeConfig($departmentId);
@@ -1137,9 +1212,21 @@ class AssignmentController extends Controller
             );
         }
 
-        $message = $validated['assignment_type'] === 'student-teacher'
-            ? 'Questionnaire selected and applied to ' . $updatedSubjects . ' scoped subject' . ($updatedSubjects === 1 ? '.' : 's.')
-            : 'Questionnaire selected.';
+        $updatedEmployees = 0;
+
+        if ($validated['assignment_type'] === 'employee' && $validated['scope_type'] === 'employee-department') {
+            $updatedEmployees = $this->applyQuestionnaireToScopedEmployees(
+                $scopeId,
+                (int) $validated['questionnaire_id'],
+                !empty($validated['branch_id']) ? (int) $validated['branch_id'] : null,
+            );
+        }
+
+        $message = match ($validated['assignment_type']) {
+            'student-teacher' => 'Questionnaire selected and applied to ' . $updatedSubjects . ' scoped subject' . ($updatedSubjects === 1 ? '.' : 's.'),
+            'employee' => 'Questionnaire selected and applied to ' . $updatedEmployees . ' scoped employee' . ($updatedEmployees === 1 ? '.' : 's.'),
+            default => 'Questionnaire selected.',
+        };
 
         return back()->with('success', $message);
     }

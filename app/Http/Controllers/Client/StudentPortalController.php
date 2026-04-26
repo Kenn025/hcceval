@@ -190,9 +190,16 @@ class StudentPortalController extends Controller
         }
 
         $items = json_decode($questionnaire->items ?? '{}', true) ?: [];
-        $questionIds = collect($items['scale_questions'] ?? [])
-            ->flatMap(fn ($group) => collect($group['questions'] ?? [])->map(fn ($id) => (int) $id))
-            ->filter()
+        $questionEntries = collect($items['scale_questions'] ?? [])
+            ->flatMap(fn ($group) => collect($group['questions'] ?? [])->map(fn ($id) => [
+                'question_id' => (int) $id,
+                'class_name' => $group['class_name'] ?? '',
+                'weight_percentage' => $group['weight_percentage'] ?? null,
+            ]))
+            ->filter(fn ($entry) => ! empty($entry['question_id']))
+            ->values();
+        $questionIds = $questionEntries
+            ->pluck('question_id')
             ->unique()
             ->values();
 
@@ -202,6 +209,11 @@ class StudentPortalController extends Controller
                 ->map(fn ($id) => (int) $id)
                 ->unique()
                 ->values();
+            $questionEntries = $questionIds->map(fn ($id) => [
+                'question_id' => $id,
+                'class_name' => '',
+                'weight_percentage' => null,
+            ]);
         }
 
         if ($questionIds->isEmpty()) {
@@ -216,8 +228,15 @@ class StudentPortalController extends Controller
             ->get()
             ->keyBy('question_id');
 
-        return $questionIds
-            ->map(fn ($questionId) => $questions->get($questionId))
+        return $questionEntries
+            ->map(function ($entry) use ($questions) {
+                $question = $questions->get($entry['question_id']);
+
+                return $question ? (object) array_merge((array) $question, [
+                    'class_name' => $entry['class_name'],
+                    'weight_percentage' => $entry['weight_percentage'],
+                ]) : null;
+            })
             ->filter()
             ->values();
     }
@@ -743,7 +762,7 @@ class StudentPortalController extends Controller
         $avg = count($ratings) ? round(array_sum($ratings) / count($ratings), 2) : 0;
 
         try {
-            DB::transaction(function () use ($student, $subjectSection, $data, $questionnaireId) {
+            DB::transaction(function () use ($student, $subjectSection, $data, $questionnaireId, $terms) {
                 $questionnaireTypeId = $this->questionnaireTypeId($questionnaireId);
                 $comments = $data['comments'] ?? null;
                 $submissionPayload = [
@@ -760,6 +779,14 @@ class StudentPortalController extends Controller
 
                 if (Schema::hasColumn('evaluation_submissions', 'teacher_id')) {
                     $submissionPayload['teacher_id'] = $subjectSection->teacher_employee_id ?: null;
+                }
+
+                if (Schema::hasColumn('evaluation_submissions', 'school_year')) {
+                    $submissionPayload['school_year'] = $data['school_year'];
+                }
+
+                if (Schema::hasColumn('evaluation_submissions', 'term')) {
+                    $submissionPayload['term'] = $terms[0] ?? $data['term'];
                 }
 
                 $submissionId = (int) DB::table('evaluation_submissions')->insertGetId($submissionPayload);

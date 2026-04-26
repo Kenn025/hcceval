@@ -72,8 +72,6 @@ export default function EmployeeEvaluateForm({ category, evaluatee, questions, c
             category,
             evaluatee_id:     evaluatee.id,
             academic_year_id: cycle.id,
-            school_year:      cycle.school_year,
-            term:             cycle.term ?? cycle.semester,
             answers: Object.entries(answers).map(([qid, rating]) => ({
                 question_id: parseInt(qid, 10),
                 rating,

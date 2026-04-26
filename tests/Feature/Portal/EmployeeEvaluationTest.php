@@ -136,12 +136,8 @@ class EmployeeEvaluationTest extends TestCase
         $response->assertRedirect(route('portal.employee.dashboard'));
 
         $this->assertDatabaseHas('evaluation_submissions', [
-            'evaluator_id'   => $ids['evaluator_id'],
-            'evaluator_type' => 'employee',
-            'evaluatee_id'   => $ids['evaluatee_id'],
-            'category'       => 'peer_employee',
-            'school_year'    => '2026-2027',
-            'term'           => '1st Sem',
+            'employee_id'       => $ids['evaluatee_id'],
+            'academic_year_id'  => $ids['cycle_id'],
         ]);
 
         $row = DB::table('ratings_employee')
@@ -205,9 +201,8 @@ class EmployeeEvaluationTest extends TestCase
         $second->assertSessionHas('error');
 
         $count = DB::table('evaluation_submissions')
-            ->where('evaluator_id', $ids['evaluator_id'])
-            ->where('evaluatee_id', $ids['evaluatee_id'])
-            ->where('school_year', '2026-2027')
+            ->where('employee_id', $ids['evaluatee_id'])
+            ->where('academic_year_id', $ids['cycle_id'])
             ->count();
 
         $this->assertSame(1, $count, 'duplicate submission should be blocked');

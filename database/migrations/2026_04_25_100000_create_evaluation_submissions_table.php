@@ -15,8 +15,14 @@ return new class extends Migration
             $table->unsignedBigInteger('questionnaire_type_id')->nullable();
             $table->unsignedBigInteger('questionnaire_id')->nullable();
             $table->unsignedBigInteger('subject_id')->nullable();
+            $table->unsignedBigInteger('teacher_id')->nullable();
+            $table->unsignedBigInteger('employee_id')->nullable();
+            $table->string('category', 64)->nullable();
+            $table->boolean('is_other')->default(false);
             $table->json('answers');
             $table->json('comments')->nullable();
+            $table->decimal('overall_average', 5, 2)->nullable();
+            $table->timestamp('submitted_at')->nullable();
             $table->timestamps();
 
             $table->index('branch_id', 'es_branch_idx');
@@ -24,6 +30,9 @@ return new class extends Migration
             $table->index('questionnaire_type_id', 'es_questionnaire_type_idx');
             $table->index('questionnaire_id', 'es_questionnaire_idx');
             $table->index('subject_id', 'es_subject_idx');
+            $table->index('teacher_id', 'es_teacher_idx');
+            $table->index('employee_id', 'es_employee_idx');
+            $table->index('category', 'es_category_idx');
         });
     }
 

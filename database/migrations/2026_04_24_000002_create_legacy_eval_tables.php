@@ -89,17 +89,21 @@ return new class extends Migration
             $table->string('code', 50)->unique();
             $table->unsignedBigInteger('department_id')->nullable();
             $table->unsignedBigInteger('program_id')->nullable();
+            $table->unsignedBigInteger('strand_id')->nullable();
             $table->string('year_level', 50);
             $table->string('section', 50);
             $table->json('teacher_id')->nullable();
             $table->json('subject_id')->nullable();
+            $table->json('subject_teacher_map')->nullable();
             $table->boolean('is_activated')->default(true);
             $table->boolean('is_deleted')->default(false);
             $table->timestamps();
             $table->index('department_id');
             $table->index('program_id');
+            $table->index('strand_id');
             $table->foreign('department_id')->references('id')->on('department')->nullOnDelete()->cascadeOnUpdate();
             $table->foreign('program_id')->references('id')->on('program')->nullOnDelete()->cascadeOnUpdate();
+            $table->foreign('strand_id')->references('id')->on('strand')->nullOnDelete()->cascadeOnUpdate();
         });
 
         Schema::create('teacher', function (Blueprint $table) {
@@ -110,6 +114,8 @@ return new class extends Migration
             $table->string('lastname', 100);
             $table->string('role', 100)->nullable();
             $table->json('personal_info')->nullable();
+            $table->json('evaluation_submission_ids')->nullable();
+            $table->json('assigned_subject_ids')->nullable();
             $table->string('email', 150)->unique();
             $table->string('password', 255);
             $table->unsignedBigInteger('branch_id')->nullable();
@@ -131,6 +137,20 @@ return new class extends Migration
             $table->foreign('strand_id')->references('id')->on('strand')->nullOnDelete()->cascadeOnUpdate();
         });
 
+        Schema::create('employee_department', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('branch_id')->nullable();
+            $table->string('code', 50)->unique();
+            $table->string('name', 150);
+            $table->text('description')->nullable();
+            $table->boolean('is_activated')->default(true);
+            $table->boolean('is_deleted')->default(false);
+            $table->timestamps();
+
+            $table->index('branch_id');
+            $table->foreign('branch_id')->references('id')->on('branch')->nullOnDelete()->cascadeOnUpdate();
+        });
+
         Schema::create('employee', function (Blueprint $table) {
             $table->id();
             $table->string('code', 50)->unique();
@@ -142,6 +162,7 @@ return new class extends Migration
             $table->string('email', 150)->unique();
             $table->string('password', 255);
             $table->unsignedBigInteger('department_id')->nullable();
+            $table->unsignedBigInteger('employee_department_id')->nullable();
             $table->unsignedBigInteger('program_id')->nullable();
             $table->unsignedBigInteger('strand_id')->nullable();
             $table->unsignedBigInteger('branch_id')->nullable();
@@ -151,10 +172,12 @@ return new class extends Migration
             $table->timestamps();
             $table->index('branch_id');
             $table->index('department_id');
+            $table->index('employee_department_id');
             $table->index('program_id');
             $table->index('strand_id');
             $table->index('questionnaire_id');
             $table->foreign('department_id')->references('id')->on('department')->nullOnDelete()->cascadeOnUpdate();
+            $table->foreign('employee_department_id')->references('id')->on('employee_department')->nullOnDelete()->cascadeOnUpdate();
             $table->foreign('program_id')->references('id')->on('program')->nullOnDelete()->cascadeOnUpdate();
             $table->foreign('strand_id')->references('id')->on('strand')->nullOnDelete()->cascadeOnUpdate();
             $table->foreign('branch_id')->references('id')->on('branch')->nullOnDelete()->cascadeOnUpdate();
@@ -391,18 +414,21 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('academic_year_id')->nullable();
             $table->unsignedBigInteger('subject_id')->nullable();
-            $table->unsignedBigInteger('teacher_id')->nullable();
+            $table->unsignedBigInteger('employee_id')->nullable();
             $table->integer('submission_count')->default(0);
+            $table->boolean('is_archived')->default(false);
+            $table->timestamp('archived_at')->nullable();
             $table->json('item_ratings')->nullable();
             $table->json('comments')->nullable();
             $table->json('overall_ratings')->nullable();
             $table->timestamps();
             $table->index('academic_year_id');
             $table->index('subject_id');
-            $table->index('teacher_id');
+            $table->index('employee_id');
+            $table->index('is_archived');
             $table->foreign('academic_year_id')->references('id')->on('academic_year')->nullOnDelete()->cascadeOnUpdate();
             $table->foreign('subject_id')->references('id')->on('subject')->nullOnDelete()->cascadeOnUpdate();
-            $table->foreign('teacher_id')->references('id')->on('teacher')->nullOnDelete()->cascadeOnUpdate();
+            $table->foreign('employee_id')->references('id')->on('employee')->nullOnDelete()->cascadeOnUpdate();
         });
 
         Schema::create('ratings_peer', function (Blueprint $table) {
@@ -410,12 +436,15 @@ return new class extends Migration
             $table->unsignedBigInteger('academic_year_id')->nullable();
             $table->unsignedBigInteger('teacher_id')->nullable();
             $table->integer('submission_count')->default(0);
+            $table->boolean('is_archived')->default(false);
+            $table->timestamp('archived_at')->nullable();
             $table->json('item_ratings')->nullable();
             $table->json('comments')->nullable();
             $table->json('overall_ratings')->nullable();
             $table->timestamps();
             $table->index('academic_year_id');
             $table->index('teacher_id');
+            $table->index('is_archived');
             $table->foreign('academic_year_id')->references('id')->on('academic_year')->nullOnDelete()->cascadeOnUpdate();
             $table->foreign('teacher_id')->references('id')->on('teacher')->nullOnDelete()->cascadeOnUpdate();
         });
@@ -425,12 +454,15 @@ return new class extends Migration
             $table->unsignedBigInteger('academic_year_id')->nullable();
             $table->unsignedBigInteger('employee_id')->nullable();
             $table->integer('submission_count')->default(0);
+            $table->boolean('is_archived')->default(false);
+            $table->timestamp('archived_at')->nullable();
             $table->json('item_ratings')->nullable();
             $table->json('comments')->nullable();
             $table->json('overall_ratings')->nullable();
             $table->timestamps();
             $table->index('academic_year_id');
             $table->index('employee_id');
+            $table->index('is_archived');
             $table->foreign('academic_year_id')->references('id')->on('academic_year')->nullOnDelete()->cascadeOnUpdate();
             $table->foreign('employee_id')->references('id')->on('employee')->nullOnDelete()->cascadeOnUpdate();
         });
@@ -438,16 +470,19 @@ return new class extends Migration
         Schema::create('ratings_head', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('academic_year_id')->nullable();
-            $table->unsignedBigInteger('teacher_id')->nullable();
+            $table->unsignedBigInteger('employee_id')->nullable();
             $table->integer('submission_count')->default(0);
+            $table->boolean('is_archived')->default(false);
+            $table->timestamp('archived_at')->nullable();
             $table->json('item_ratings')->nullable();
             $table->json('comments')->nullable();
             $table->json('overall_ratings')->nullable();
             $table->timestamps();
             $table->index('academic_year_id');
-            $table->index('teacher_id');
+            $table->index('employee_id');
+            $table->index('is_archived');
             $table->foreign('academic_year_id')->references('id')->on('academic_year')->nullOnDelete()->cascadeOnUpdate();
-            $table->foreign('teacher_id')->references('id')->on('teacher')->nullOnDelete()->cascadeOnUpdate();
+            $table->foreign('employee_id')->references('id')->on('employee')->nullOnDelete()->cascadeOnUpdate();
         });
 
         Schema::create('ratings_branch', function (Blueprint $table) {
@@ -455,12 +490,15 @@ return new class extends Migration
             $table->unsignedBigInteger('academic_year_id')->nullable();
             $table->unsignedBigInteger('branch_id')->nullable();
             $table->integer('submission_count')->default(0);
+            $table->boolean('is_archived')->default(false);
+            $table->timestamp('archived_at')->nullable();
             $table->json('item_ratings')->nullable();
             $table->json('comments')->nullable();
             $table->json('overall_ratings')->nullable();
             $table->timestamps();
             $table->index('academic_year_id');
             $table->index('branch_id');
+            $table->index('is_archived');
             $table->foreign('academic_year_id')->references('id')->on('academic_year')->nullOnDelete()->cascadeOnUpdate();
             $table->foreign('branch_id')->references('id')->on('branch')->nullOnDelete()->cascadeOnUpdate();
         });
@@ -546,6 +584,7 @@ return new class extends Migration
         Schema::dropIfExists('subject');
         Schema::dropIfExists('student');
         Schema::dropIfExists('employee');
+        Schema::dropIfExists('employee_department');
         Schema::dropIfExists('teacher');
         Schema::dropIfExists('education_level');
         Schema::dropIfExists('strand');

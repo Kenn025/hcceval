@@ -41,7 +41,7 @@ class EmployeePortalController extends Controller
         };
     }
 
-    private function ratingsForCycle(int $employeeId, string $schoolYear, array $terms): array
+    private function ratingsForCycle(int $employeeId, int $academicYearId): array
     {
         if (! Schema::hasTable('evaluation_submissions')) {
             return [];
@@ -53,9 +53,8 @@ class EmployeePortalController extends Controller
                 'es.answers',
                 'es.submitted_at'
             )
-            ->where('es.evaluatee_id', $employeeId)
-            ->where('es.school_year', $schoolYear)
-            ->whereIn('es.term', $terms)
+            ->where('es.academic_year_id', $academicYearId)
+            ->when(Schema::hasColumn('evaluation_submissions', 'employee_id'), fn ($query) => $query->where('es.employee_id', $employeeId))
             ->get();
 
         if ($rows->isEmpty()) {
@@ -87,7 +86,7 @@ class EmployeePortalController extends Controller
         ];
     }
 
-    private function pendingTargets(int $employeeId, string $schoolYear, array $terms): array
+    private function pendingTargets(int $employeeId, int $academicYearId): array
     {
         if (! Schema::hasTable('evaluation_submissions')) {
             return [];
@@ -99,11 +98,11 @@ class EmployeePortalController extends Controller
         }
 
         $submitted = DB::table('evaluation_submissions')
-            ->where('evaluator_id', $employeeId)
-            ->where('evaluator_type', 'employee')
-            ->where('school_year', $schoolYear)
-            ->whereIn('term', $terms)
-            ->pluck('evaluatee_id', 'id')
+            ->where('academic_year_id', $academicYearId)
+            ->when(Schema::hasColumn('evaluation_submissions', 'employee_id'), fn ($query) => $query->whereNotNull('employee_id'))
+            ->pluck('employee_id')
+            ->map(fn ($id) => (int) $id)
+            ->filter()
             ->values()
             ->toArray();
 
@@ -184,8 +183,6 @@ class EmployeePortalController extends Controller
             'category'          => 'required|in:peer_employee,head',
             'evaluatee_id'      => 'required|integer',
             'academic_year_id'  => 'required|integer',
-            'school_year'       => 'required|string|max:20',
-            'term'              => 'required|string|max:50',
             'answers'           => 'required|array|min:1',
             'answers.*.question_id' => 'required|integer',
             'answers.*.rating'      => 'required|integer|between:1,5',
@@ -197,12 +194,9 @@ class EmployeePortalController extends Controller
         }
 
         $already = DB::table('evaluation_submissions')
-            ->where('evaluator_id', $employeeId)
-            ->where('evaluator_type', 'employee')
-            ->where('evaluatee_id', $data['evaluatee_id'])
-            ->where('school_year', $data['school_year'])
-            ->where('term', $data['term'])
-            ->where('category', $data['category'])
+            ->where('academic_year_id', $data['academic_year_id'])
+            ->when(Schema::hasColumn('evaluation_submissions', 'employee_id'), fn ($query) => $query->where('employee_id', $data['evaluatee_id']))
+            ->when(Schema::hasColumn('evaluation_submissions', 'category'), fn ($query) => $query->where('category', $data['category']))
             ->exists();
 
         if ($already) {
@@ -212,23 +206,31 @@ class EmployeePortalController extends Controller
         $ratings = array_column($data['answers'], 'rating');
         $avg     = count($ratings) ? round(array_sum($ratings) / count($ratings), 2) : 0;
 
-        DB::table('evaluation_submissions')->insert([
-            'evaluator_id'      => $employeeId,
-            'evaluator_type'    => 'employee',
-            'evaluatee_id'      => $data['evaluatee_id'],
-            'evaluatee_type'    => 'employee',
-            'category'          => $data['category'],
-            'subject_section_id'=> null,
+        $submissionPayload = [
             'academic_year_id'  => $data['academic_year_id'],
-            'school_year'       => $data['school_year'],
-            'term'              => $data['term'],
             'answers'           => json_encode($data['answers']),
             'comments'          => json_encode(($data['comments'] ?? null) ? ['text' => $data['comments']] : []),
-            'overall_average'   => $avg,
-            'submitted_at'      => now(),
             'created_at'        => now(),
             'updated_at'        => now(),
-        ]);
+        ];
+
+        if (Schema::hasColumn('evaluation_submissions', 'employee_id')) {
+            $submissionPayload['employee_id'] = $data['evaluatee_id'];
+        }
+
+        if (Schema::hasColumn('evaluation_submissions', 'category')) {
+            $submissionPayload['category'] = $data['category'];
+        }
+
+        if (Schema::hasColumn('evaluation_submissions', 'overall_average')) {
+            $submissionPayload['overall_average'] = $avg;
+        }
+
+        if (Schema::hasColumn('evaluation_submissions', 'submitted_at')) {
+            $submissionPayload['submitted_at'] = now();
+        }
+
+        DB::table('evaluation_submissions')->insert($submissionPayload);
 
         $targetTable = $data['category'] === 'head' ? 'ratings_head' : 'ratings_employee';
         $targetCol   = 'employee_id';
@@ -285,10 +287,7 @@ class EmployeePortalController extends Controller
         $archiveFolders = [];
 
         if ($cycle) {
-            [$termA, $termB] = $this->termOptions($cycle->term ?? null);
-            $schoolYear      = trim("{$cycle->from_year}-{$cycle->to_year}");
-
-            $currentRatings = $this->ratingsForCycle($employeeId, $schoolYear, [$termA, $termB]);
+            $currentRatings = $this->ratingsForCycle($employeeId, (int) $cycle->id);
 
             $pastCycles = DB::table('academic_year')
                 ->where('is_activated', 0)
@@ -297,9 +296,8 @@ class EmployeePortalController extends Controller
                 ->get();
 
             foreach ($pastCycles as $pastCycle) {
-                [$ptA, $ptB] = $this->termOptions($pastCycle->term ?? null);
                 $pastYear    = trim("{$pastCycle->from_year}-{$pastCycle->to_year}");
-                $ratings     = $this->ratingsForCycle($employeeId, $pastYear, [$ptA, $ptB]);
+                $ratings     = $this->ratingsForCycle($employeeId, (int) $pastCycle->id);
 
                 if (! empty($ratings)) {
                     $archiveFolders[] = [

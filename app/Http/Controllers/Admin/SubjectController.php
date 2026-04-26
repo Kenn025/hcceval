@@ -9,6 +9,7 @@ use App\Models\Program;
 use App\Models\Strand;
 use App\Models\Subject;
 use App\Models\Teacher;
+use App\Services\TeacherAssignedSubjectSync;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -17,6 +18,10 @@ use Inertia\Inertia;
 
 class SubjectController extends Controller
 {
+    public function __construct(private readonly TeacherAssignedSubjectSync $teacherAssignedSubjectSync)
+    {
+    }
+
     public function index(Request $request, string $educationType = 'college')
     {
         $search = $request->input('search', '');
@@ -172,6 +177,7 @@ class SubjectController extends Controller
         $validated['code'] = $this->generateSubjectCode($validated);
 
         Subject::create($validated);
+        $this->teacherAssignedSubjectSync->syncAll();
 
         return back()->with('success', 'Subject created successfully.');
     }
@@ -182,6 +188,7 @@ class SubjectController extends Controller
         $validated['code'] = $subject->code ?: $this->generateSubjectCode($validated, $subject->id);
 
         $subject->update($validated);
+        $this->teacherAssignedSubjectSync->syncAll();
 
         return back()->with('success', 'Subject updated successfully.');
     }
@@ -189,6 +196,7 @@ class SubjectController extends Controller
     public function destroy(Subject $subject)
     {
         $subject->update(['is_deleted' => 1]);
+        $this->teacherAssignedSubjectSync->syncAll();
 
         return back()->with('success', 'Subject deleted.');
     }

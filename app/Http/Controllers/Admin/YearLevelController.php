@@ -10,6 +10,7 @@ use App\Models\Program;
 use App\Models\Strand;
 use App\Models\Subject;
 use App\Models\Teacher;
+use App\Services\TeacherAssignedSubjectSync;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -18,6 +19,10 @@ use Inertia\Inertia;
 
 class YearLevelController extends Controller
 {
+    public function __construct(private readonly TeacherAssignedSubjectSync $teacherAssignedSubjectSync)
+    {
+    }
+
     private const SUBJECT_TYPE_MAP = [
         'college' => 'college',
         'senior-high' => 'shs',
@@ -196,6 +201,7 @@ class YearLevelController extends Controller
         $validated['code'] = $this->generateEducationLevelCode($validated);
 
         EducationLevel::create($validated);
+        $this->teacherAssignedSubjectSync->syncAll();
 
         return back()->with('success', 'Year level created successfully.');
     }
@@ -206,6 +212,7 @@ class YearLevelController extends Controller
         $validated['code'] = $yearLevel->code ?: $this->generateEducationLevelCode($validated, $yearLevel->id);
 
         $yearLevel->update($validated);
+        $this->teacherAssignedSubjectSync->syncAll();
 
         return back()->with('success', 'Year level updated successfully.');
     }
@@ -213,6 +220,7 @@ class YearLevelController extends Controller
     public function destroy(EducationLevel $yearLevel)
     {
         $yearLevel->update(['is_deleted' => 1]);
+        $this->teacherAssignedSubjectSync->syncAll();
 
         return back()->with('success', 'Year level deleted.');
     }
