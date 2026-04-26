@@ -576,7 +576,7 @@ class TeacherPortalController extends Controller
             ->unique()
             ->values();
 
-        $selects = ['id', 'academic_year_id', 'questionnaire_type_id', 'questionnaire_id', 'answers', 'created_at', 'updated_at'];
+        $selects = ['id', 'academic_year_id', 'questionnaire_type_id', 'questionnaire_id', 'answers', 'comments', 'created_at', 'updated_at'];
 
         foreach (['teacher_id', 'employee_id', 'subject_id', 'category', 'overall_average', 'submitted_at', 'is_other'] as $column) {
             if (Schema::hasColumn('evaluation_submissions', $column)) {
@@ -658,6 +658,56 @@ class TeacherPortalController extends Controller
             return [];
         }
 
+        $questionIds = $submittedRows
+            ->merge($subjectRatingRows)
+            ->merge($peerRatingRows)
+            ->pluck('answers')
+            ->flatMap(function ($answers) {
+                $decoded = json_decode((string) $answers, true);
+
+                if (! is_array($decoded)) {
+                    return [];
+                }
+
+                return collect($decoded)
+                    ->pluck('question_id')
+                    ->map(fn ($id) => (int) $id)
+                    ->filter();
+            })
+            ->unique()
+            ->values();
+
+        $questionTexts = $questionIds->isNotEmpty() && Schema::hasTable('question')
+            ? DB::table('question')
+                ->whereIn('id', $questionIds->all())
+                ->pluck('description', 'id')
+            : collect();
+        $ratingQuestions = function (Collection $rows) use ($questionTexts): array {
+            return $rows
+                ->flatMap(function ($row) {
+                    $decoded = json_decode((string) ($row->answers ?? '[]'), true);
+
+                    return is_array($decoded) ? $decoded : [];
+                })
+                ->filter(fn ($answer) => is_array($answer) && ! empty($answer['question_id']) && isset($answer['rating']))
+                ->groupBy(fn ($answer) => (int) $answer['question_id'])
+                ->map(function (Collection $answers, int $questionId) use ($questionTexts) {
+                    $ratings = $answers
+                        ->pluck('rating')
+                        ->map(fn ($rating) => (float) $rating)
+                        ->filter(fn ($rating) => $rating > 0);
+
+                    return [
+                        'question_id' => $questionId,
+                        'question_text' => $questionTexts->get($questionId, 'Question #' . $questionId),
+                        'rating' => $ratings->isNotEmpty() ? round($ratings->avg(), 2) : null,
+                        'count' => $ratings->count(),
+                    ];
+                })
+                ->values()
+                ->all();
+        };
+
         $teacherNames = Teacher::query()
             ->whereIn('id', $submittedRows->pluck('teacher_id')->filter()->unique()->values()->all())
             ->get(['id', 'firstname', 'middlename', 'lastname', 'role'])
@@ -715,21 +765,38 @@ class TeacherPortalController extends Controller
                 ? $employeeNames->get((int) ($row->employee_id ?? 0))
                 : $teacherNames->get((int) ($row->teacher_id ?? 0));
             $average = $row->overall_average ?? $this->averageFromAnswers($row->answers ?? null);
+            $answers = collect(json_decode((string) ($row->answers ?? '[]'), true) ?: [])
+                ->filter(fn ($answer) => is_array($answer))
+                ->map(function (array $answer) use ($questionTexts) {
+                    $questionId = (int) ($answer['question_id'] ?? 0);
+
+                    return [
+                        'question_id' => $questionId,
+                        'question_text' => $questionTexts->get($questionId, 'Question #' . $questionId),
+                        'rating' => isset($answer['rating']) ? (int) $answer['rating'] : null,
+                    ];
+                })
+                ->values()
+                ->all();
+            $comments = json_decode((string) ($row->comments ?? '[]'), true);
 
             $folders[$periodId]['submitted'][$category][] = [
                 'id' => (int) $row->id,
                 'evaluatee_name' => $target?->full_name ?: 'Evaluation target',
                 'role' => $target?->role ?? '',
+                'category' => $category,
                 'questionnaire_title' => $questionnaires->get((int) ($row->questionnaire_id ?? 0), 'Questionnaire'),
                 'rating' => $average,
                 'percentage' => $average !== null ? round(((float) $average / 5) * 100, 2) : null,
+                'answers' => $answers,
+                'comments' => is_array($comments) ? trim((string) ($comments['text'] ?? '')) : '',
                 'submitted_at' => $row->submitted_at ?? $row->updated_at ?? $row->created_at,
             ];
         }
 
         $subjectRatingRows
             ->groupBy(fn ($row) => (int) $row->academic_year_id . ':' . (int) $row->subject_id)
-            ->each(function (Collection $rows, string $key) use (&$folders, $subjects) {
+            ->each(function (Collection $rows, string $key) use (&$folders, $subjects, $ratingQuestions) {
                 [$periodId, $subjectId] = array_map('intval', explode(':', $key));
 
                 if (! isset($folders[$periodId])) {
@@ -749,6 +816,7 @@ class TeacherPortalController extends Controller
                     'submission_count' => $rows->count(),
                     'rating' => $average,
                     'percentage' => $average !== null ? round(($average / 5) * 100, 2) : null,
+                    'questions' => $ratingQuestions($rows),
                     'latest_submitted_at' => optional($rows->sortByDesc(fn ($row) => $row->submitted_at ?? $row->updated_at ?? $row->created_at)->first())->submitted_at
                         ?? optional($rows->sortByDesc(fn ($row) => $row->updated_at ?? $row->created_at)->first())->updated_at
                         ?? optional($rows->sortByDesc('created_at')->first())->created_at,
@@ -757,7 +825,7 @@ class TeacherPortalController extends Controller
 
         $peerRatingRows
             ->groupBy(fn ($row) => (int) $row->academic_year_id . ':' . ((bool) ($row->is_other ?? false) ? 'outside' : 'inside'))
-            ->each(function (Collection $rows, string $key) use (&$folders) {
+            ->each(function (Collection $rows, string $key) use (&$folders, $ratingQuestions) {
                 [$periodId, $scope] = explode(':', $key);
                 $periodId = (int) $periodId;
 
@@ -776,6 +844,7 @@ class TeacherPortalController extends Controller
                     'submission_count' => $rows->count(),
                     'rating' => $average,
                     'percentage' => $average !== null ? round(($average / 5) * 100, 2) : null,
+                    'questions' => $ratingQuestions($rows),
                     'latest_submitted_at' => optional($rows->sortByDesc(fn ($row) => $row->submitted_at ?? $row->updated_at ?? $row->created_at)->first())->submitted_at
                         ?? optional($rows->sortByDesc(fn ($row) => $row->updated_at ?? $row->created_at)->first())->updated_at
                         ?? optional($rows->sortByDesc('created_at')->first())->created_at,

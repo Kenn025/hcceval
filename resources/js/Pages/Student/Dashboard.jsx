@@ -35,6 +35,116 @@ function Badge({ children, color = 'blue' }) {
     );
 }
 
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+}
+
+function formatDate(value) {
+    if (!value) return '-';
+
+    return new Date(value).toLocaleDateString('en-PH', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+    });
+}
+
+function printSubmittedEvaluationReport(evaluation) {
+    if (!evaluation) return;
+
+    const rows = (evaluation.answers ?? []).map((answer, index) => `
+        <tr>
+            <td>${index + 1}</td>
+            <td>${escapeHtml(answer.question_text)}</td>
+            <td>${escapeHtml(answer.rating ?? '-')}</td>
+        </tr>
+    `).join('');
+    const title = evaluation.course_name || evaluation.evaluatee_name || 'Submitted Evaluation';
+    const subtitle = [
+        evaluation.course_code,
+        evaluation.teacher_name || evaluation.evaluatee_name,
+        CATEGORY_LABELS[evaluation.category] ?? evaluation.category,
+    ].filter(Boolean).join(' - ');
+    const period = evaluation.archive_group_label
+        || [evaluation.school_year, evaluation.semester_label].filter(Boolean).join(' - ')
+        || 'Academic year unavailable';
+    const reportWindow = window.open('', '_blank', 'width=960,height=720');
+
+    if (!reportWindow) return;
+
+    reportWindow.document.write(`
+        <!doctype html>
+        <html>
+            <head>
+                <title>${escapeHtml(title)}</title>
+                <style>
+                    * { box-sizing: border-box; }
+                    body { font-family: Arial, sans-serif; color: #0f172a; margin: 32px; }
+                    .header { border-bottom: 2px solid #059669; padding-bottom: 16px; margin-bottom: 20px; }
+                    .eyebrow { color: #047857; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+                    h1 { font-size: 24px; margin: 8px 0 4px; }
+                    .muted { color: #64748b; font-size: 13px; }
+                    .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 18px 0; }
+                    .box { border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; }
+                    .box-label { color: #64748b; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+                    .box-value { font-size: 18px; font-weight: 800; margin-top: 6px; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 18px; }
+                    th, td { border: 1px solid #cbd5e1; padding: 10px; text-align: left; vertical-align: top; font-size: 13px; }
+                    th { background: #ecfdf5; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: #334155; }
+                    .comments { margin-top: 18px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; }
+                    @media print {
+                        body { margin: 18mm; }
+                        .no-print { display: none; }
+                        tr, .box, .comments { break-inside: avoid; }
+                    }
+                </style>
+            </head>
+            <body>
+                <button class="no-print" onclick="window.print()" style="float:right;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;background:white;font-weight:700;">Print / Save PDF</button>
+                <div class="header">
+                    <div class="eyebrow">Submitted Evaluation</div>
+                    <h1>${escapeHtml(title)}</h1>
+                    <div class="muted">${escapeHtml(subtitle)}</div>
+                    <div class="muted">${escapeHtml(period)}</div>
+                </div>
+                <div class="summary">
+                    <div class="box"><div class="box-label">Academic Year</div><div class="box-value">${escapeHtml(period)}</div></div>
+                    <div class="box"><div class="box-label">Submitted</div><div class="box-value">${escapeHtml(formatDate(evaluation.submitted_at))}</div></div>
+                    <div class="box"><div class="box-label">Average</div><div class="box-value">${escapeHtml(evaluation.overall_average ?? '-')}</div></div>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:52px;">#</th>
+                            <th>Questionnaire Item</th>
+                            <th style="width:110px;">Rating</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows || '<tr><td colspan="3">No answer details are available.</td></tr>'}
+                    </tbody>
+                </table>
+                <div class="comments">
+                    <div class="box-label">Comments</div>
+                    <p>${escapeHtml(evaluation.comments || 'No comment provided.')}</p>
+                </div>
+                <script>
+                    window.onload = function () {
+                        window.focus();
+                        window.print();
+                    };
+                </script>
+            </body>
+        </html>
+    `);
+    reportWindow.document.close();
+}
+
 function EmptyState({ icon = 'subjects', message }) {
     return (
         <div className="flex flex-col items-center justify-center py-20 text-slate-400">
@@ -445,7 +555,7 @@ function SubmittedEvaluationModal({ evaluation, open, onClose }) {
                         </div>
                         <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
                             {evaluation.submitted_at && (
-                                <Badge color="blue">{new Date(evaluation.submitted_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })}</Badge>
+                                <Badge color="blue">{formatDate(evaluation.submitted_at)}</Badge>
                             )}
                             {evaluation.overall_average !== null && evaluation.overall_average !== undefined && (
                                 <Badge color="green">Average {evaluation.overall_average}</Badge>

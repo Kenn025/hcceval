@@ -332,8 +332,11 @@ class EvaluationSubmissionArchiveSeeder extends Seeder
             $this->updateTeacherPreviewLinks($teacherId, array_filter($submissionIds));
         }
 
+        $this->seedMultipageRatingFolderPreview($olderAcademicYearId, $now);
+
         if ($activeAcademicYearId) {
             $this->seedActivePeerSubmissions($activeAcademicYearId, $now);
+            $this->seedActiveSubjectRatingPreview($activeAcademicYearId, $now);
         }
 
         $this->seedPeerRatings(1, $olderAcademicYearId, $activeAcademicYearId);
@@ -568,6 +571,76 @@ class EvaluationSubmissionArchiveSeeder extends Seeder
         }
     }
 
+    private function seedMultipageRatingFolderPreview(int $academicYearId, mixed $now): void
+    {
+        $subjects = [
+            3 => [1 => 5, 6 => 5, 2 => 4, 4 => 5, 5 => 4],
+            4 => [1 => 4, 6 => 5, 2 => 5, 4 => 4, 5 => 5],
+            5 => [1 => 5, 6 => 4, 2 => 5, 4 => 5, 5 => 5],
+            6 => [1 => 4, 6 => 4, 2 => 5, 4 => 5, 5 => 4],
+            7 => [1 => 5, 6 => 5, 2 => 5, 4 => 4, 5 => 4],
+            8 => [1 => 4, 6 => 5, 2 => 4, 4 => 5, 5 => 5],
+            9 => [1 => 5, 6 => 4, 2 => 5, 4 => 4, 5 => 5],
+            10 => [1 => 4, 6 => 5, 2 => 5, 4 => 5, 5 => 4],
+            11 => [1 => 5, 6 => 5, 2 => 4, 4 => 4, 5 => 5],
+            12 => [1 => 4, 6 => 4, 2 => 5, 4 => 5, 5 => 5],
+        ];
+
+        foreach ($subjects as $index => $ratings) {
+            $average = round(array_sum($ratings) / count($ratings), 2);
+
+            $this->insertSubmission([
+                'branch_id' => $index >= 7 ? 3 : 2,
+                'academic_year_id' => $academicYearId,
+                'questionnaire_type_id' => 1,
+                'questionnaire_id' => $index >= 7 ? 2 : 1,
+                'subject_id' => $index,
+                'teacher_id' => 1,
+                'category' => 'subject_teacher',
+                'answers' => $this->answers($ratings),
+                'overall_average' => $average,
+                'submitted_at' => $now->copy()->subYear()->subDays(30 - $index),
+                'created_at' => $now->copy()->subYear()->subDays(30 - $index),
+                'updated_at' => $now->copy()->subYear()->subDays(30 - $index),
+            ]);
+        }
+    }
+
+    private function seedActiveSubjectRatingPreview(int $academicYearId, mixed $now): void
+    {
+        $subjects = [
+            13 => [1 => 5, 6 => 5, 2 => 4, 5 => 5],
+            14 => [1 => 4, 6 => 5, 2 => 5, 5 => 4],
+            15 => [1 => 5, 6 => 4, 2 => 5, 5 => 5],
+            16 => [1 => 4, 6 => 4, 2 => 5, 5 => 5],
+            21 => [1 => 5, 6 => 5, 2 => 5, 5 => 4],
+            22 => [1 => 4, 6 => 5, 2 => 4, 5 => 5],
+            25 => [1 => 5, 6 => 4, 2 => 5, 5 => 4],
+            26 => [1 => 4, 6 => 5, 2 => 5, 5 => 5],
+        ];
+
+        foreach ($subjects as $subjectId => $ratings) {
+            $average = round(array_sum($ratings) / count($ratings), 2);
+
+            $this->insertSubmission([
+                'branch_id' => 3,
+                'academic_year_id' => $academicYearId,
+                'questionnaire_type_id' => 1,
+                'questionnaire_id' => 2,
+                'subject_id' => $subjectId,
+                'teacher_id' => 23,
+                'category' => 'subject_teacher',
+                'answers' => $this->answers($ratings),
+                'overall_average' => $average,
+                'submitted_at' => $now->copy()->subHours(12 - ($subjectId % 8)),
+                'created_at' => $now->copy()->subHours(12 - ($subjectId % 8)),
+                'updated_at' => $now->copy()->subHours(12 - ($subjectId % 8)),
+            ]);
+        }
+
+        $this->updateTeacherPreviewLinks(23, []);
+    }
+
     private function insertPeerRating(array $rating): void
     {
         $payload = [
@@ -620,7 +693,7 @@ class EvaluationSubmissionArchiveSeeder extends Seeder
 
         if (Schema::hasColumn('teacher', 'assigned_subject_ids')) {
             $existingSubjectIds = json_decode((string) ($teacher->assigned_subject_ids ?? '[]'), true) ?: [];
-            $subjectIds = $teacherId === 23 ? [13] : [1, 2];
+            $subjectIds = $teacherId === 23 ? [13, 14, 15, 16, 21, 22, 25, 26] : range(1, 12);
 
             $updates['assigned_subject_ids'] = json_encode(collect($existingSubjectIds)
                 ->merge($subjectIds)

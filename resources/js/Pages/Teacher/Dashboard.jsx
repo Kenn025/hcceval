@@ -162,6 +162,139 @@ function printSubjectRatingReport(subject) {
     reportWindow.document.close();
 }
 
+function printAllSubjectRatingsReport(subjects = [], cycle = null) {
+    const ratedSubjects = subjects.filter((subject) => (
+        Number(subject.submission_count ?? 0) > 0
+        && subject.overall_rating !== null
+        && subject.overall_rating !== undefined
+    ));
+
+    if (!ratedSubjects.length) return;
+
+    const subjectSections = ratedSubjects.map((subject, subjectIndex) => {
+        const questions = subject.questions ?? [];
+        const classRatings = subject.class_ratings ?? [];
+        const classRatingMap = new Map(classRatings.map((rating) => [rating.class_name || 'Uncategorized', rating]));
+        let previousClass = '';
+
+        const questionRows = questions.map((question, index) => {
+            const currentClass = question.class_name || '';
+            const classRating = classRatingMap.get(currentClass || 'Uncategorized');
+            const showClass = currentClass && currentClass !== previousClass;
+            previousClass = currentClass;
+
+            return `
+                ${showClass ? `
+                    <tr class="class-row">
+                        <td colspan="5">
+                            <strong>${escapeHtml(currentClass)}</strong>
+                            ${question.weight_percentage != null ? `<span>${escapeHtml(question.weight_percentage)}%</span>` : ''}
+                            <span>Class Rating: ${formatRating(classRating?.average)}</span>
+                            <span>Percentage: ${formatPercentage(classRating?.percentage)}</span>
+                        </td>
+                    </tr>
+                ` : ''}
+                <tr>
+                    <td>${index + 1}</td>
+                    <td>${escapeHtml(question.question_text)}</td>
+                    <td>${formatRating(question.average)}</td>
+                    <td>${question.average !== null && question.average !== undefined ? `${((Number(question.average) / 5) * 100).toFixed(2)}%` : '-'}</td>
+                    <td>${Number(question.count ?? 0)}</td>
+                </tr>
+            `;
+        }).join('');
+
+        return `
+            <section class="subject">
+                <div class="subject-heading">
+                    <div>
+                        <div class="eyebrow">Subject ${subjectIndex + 1}</div>
+                        <h2>${escapeHtml(subject.course_name)}</h2>
+                        <div class="muted">${escapeHtml([subject.course_code, subject.scope_label].filter(Boolean).join(' - ') || 'Subject')}</div>
+                    </div>
+                    <div class="rating">${formatRating(subject.overall_rating)}</div>
+                </div>
+                <div class="summary">
+                    <div class="box"><div class="box-label">School Year</div><div class="box-value">${escapeHtml(subject.school_year || cycle?.school_year || '-')}</div></div>
+                    <div class="box"><div class="box-label">Semester</div><div class="box-value">${escapeHtml(subject.semester || cycle?.semester || '-')}</div></div>
+                    <div class="box"><div class="box-label">Submissions</div><div class="box-value">${escapeHtml(subject.submission_count ?? 0)}</div></div>
+                    <div class="box"><div class="box-label">Percentage</div><div class="box-value">${formatPercentage(subject.overall_percentage ?? (Number(subject.overall_rating) / 5) * 100)}</div></div>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:52px;">#</th>
+                            <th>Questionnaire Item</th>
+                            <th style="width:110px;">Rating</th>
+                            <th style="width:120px;">Percentage</th>
+                            <th style="width:110px;">Responses</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${questionRows || '<tr><td colspan="5">No questionnaire ratings are available for this subject yet.</td></tr>'}
+                    </tbody>
+                </table>
+            </section>
+        `;
+    }).join('');
+
+    const reportWindow = window.open('', '_blank', 'width=960,height=720');
+
+    if (!reportWindow) return;
+
+    reportWindow.document.write(`
+        <!doctype html>
+        <html>
+            <head>
+                <title>My Subject Ratings</title>
+                <style>
+                    * { box-sizing: border-box; }
+                    body { font-family: Arial, sans-serif; color: #0f172a; margin: 32px; }
+                    .header { border-bottom: 2px solid #1d4ed8; padding-bottom: 16px; margin-bottom: 20px; }
+                    .eyebrow { color: #2563eb; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+                    h1 { font-size: 24px; margin: 8px 0 4px; }
+                    h2 { font-size: 18px; margin: 4px 0; }
+                    .muted { color: #64748b; font-size: 13px; }
+                    .subject { margin-top: 24px; padding-top: 18px; border-top: 1px solid #cbd5e1; break-inside: avoid; }
+                    .subject-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+                    .rating { border: 1px solid #bfdbfe; border-radius: 8px; color: #1d4ed8; font-size: 20px; font-weight: 800; padding: 10px 14px; }
+                    .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 14px 0 4px; }
+                    .box { border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; }
+                    .box-label { color: #64748b; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+                    .box-value { font-size: 15px; font-weight: 800; margin-top: 5px; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 18px; }
+                    th, td { border: 1px solid #cbd5e1; padding: 10px; text-align: left; vertical-align: top; font-size: 13px; }
+                    th { background: #eff6ff; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: #334155; }
+                    .class-row td { background: #f8fafc; font-size: 12px; color: #334155; }
+                    .class-row span { margin-left: 12px; color: #475569; }
+                    @media print {
+                        body { margin: 18mm; }
+                        .no-print { display: none; }
+                        tr, .box { break-inside: avoid; }
+                    }
+                </style>
+            </head>
+            <body>
+                <button class="no-print" onclick="window.print()" style="float:right;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;background:white;font-weight:700;">Print / Save PDF</button>
+                <div class="header">
+                    <div class="eyebrow">My Subject Ratings</div>
+                    <h1>Subject Ratings Report</h1>
+                    <div class="muted">${escapeHtml(cycle ? `${cycle.school_year} - ${cycle.semester}` : 'Current evaluation cycle')}</div>
+                    <div class="muted">${ratedSubjects.length} rated subject${ratedSubjects.length === 1 ? '' : 's'} included</div>
+                </div>
+                ${subjectSections}
+                <script>
+                    window.onload = function () {
+                        window.focus();
+                        window.print();
+                    };
+                </script>
+            </body>
+        </html>
+    `);
+    reportWindow.document.close();
+}
+
 function printPeerRatingReport(group) {
     if (!group) return;
 
@@ -206,7 +339,7 @@ function printPeerRatingReport(group) {
                     .eyebrow { color: #2563eb; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
                     h1 { font-size: 24px; margin: 8px 0 4px; }
                     .muted { color: #64748b; font-size: 13px; }
-                    .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 18px 0; }
+                    .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 18px 0; }
                     .box { border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; }
                     .box-label { color: #64748b; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
                     .box-value { font-size: 20px; font-weight: 800; margin-top: 6px; }
@@ -249,6 +382,109 @@ function printPeerRatingReport(group) {
                         ${questionRows || '<tr><td colspan="5">No peer ratings are available yet.</td></tr>'}
                     </tbody>
                 </table>
+                <script>
+                    window.onload = function () {
+                        window.focus();
+                        window.print();
+                    };
+                </script>
+            </body>
+        </html>
+    `);
+    reportWindow.document.close();
+}
+
+function printRatingsFolderTableReport({ rows = [], type, period }) {
+    if (!rows.length) return;
+
+    const label = type === 'subject' ? 'My Subject Ratings' : 'Peer Ratings';
+    const itemHeading = type === 'subject' ? 'Subject' : 'Peer Rating Type';
+    const files = rows.map((row, index) => {
+        const questionRows = (row.questions ?? []).map((question, questionIndex) => `
+            <tr>
+                <td>${questionIndex + 1}</td>
+                <td>${escapeHtml(question.question_text)}</td>
+                <td>${escapeHtml(formatRating(question.rating ?? question.average))}</td>
+                <td>${escapeHtml(question.count ?? 0)}</td>
+            </tr>
+        `).join('');
+
+        return `
+            <section class="file">
+                <div class="file-heading">
+                    <div>
+                        <div class="eyebrow">File ${index + 1}</div>
+                        <h2>${escapeHtml(type === 'subject' ? row.subject : row.scope)}</h2>
+                        ${type === 'subject' && row.code ? `<div class="muted">${escapeHtml(row.code)}</div>` : ''}
+                    </div>
+                    <div class="rating">${escapeHtml(formatRating(row.rating))}</div>
+                </div>
+                <div class="summary">
+                    <div class="box"><div class="box-label">Submissions</div><div class="box-value">${escapeHtml(row.submission_count ?? 0)}</div></div>
+                    <div class="box"><div class="box-label">Rating</div><div class="box-value">${escapeHtml(formatRating(row.rating))}</div></div>
+                    <div class="box"><div class="box-label">Percentage</div><div class="box-value">${escapeHtml(formatPercentage(row.percentage))}</div></div>
+                    <div class="box"><div class="box-label">Latest</div><div class="box-value">${escapeHtml(formatDate(row.latest_submitted_at))}</div></div>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:52px;">#</th>
+                            <th>Question</th>
+                            <th style="width:110px;">Rating</th>
+                            <th style="width:110px;">Responses</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${questionRows || '<tr><td colspan="4">No question-level rating details are available.</td></tr>'}
+                    </tbody>
+                </table>
+            </section>
+        `;
+    }).join('');
+
+    const reportWindow = window.open('', '_blank', 'width=960,height=720');
+
+    if (!reportWindow) return;
+
+    reportWindow.document.write(`
+        <!doctype html>
+        <html>
+            <head>
+                <title>${escapeHtml(label)} - ${escapeHtml(period)}</title>
+                <style>
+                    * { box-sizing: border-box; }
+                    body { font-family: Arial, sans-serif; color: #0f172a; margin: 32px; }
+                    .header { border-bottom: 2px solid #1d4ed8; padding-bottom: 16px; margin-bottom: 20px; }
+                    .eyebrow { color: #2563eb; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+                    h1 { font-size: 24px; margin: 8px 0 4px; }
+                    h2 { font-size: 18px; margin: 4px 0; }
+                    .muted { color: #64748b; font-size: 13px; }
+                    .file { margin-top: 24px; padding-top: 18px; border-top: 1px solid #cbd5e1; break-inside: avoid; }
+                    .file-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+                    .rating { border: 1px solid #bfdbfe; border-radius: 8px; color: #1d4ed8; font-size: 20px; font-weight: 800; padding: 10px 14px; }
+                    .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 14px 0 4px; }
+                    .box { border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; }
+                    .box-label { color: #64748b; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+                    .box-value { font-size: 15px; font-weight: 800; margin-top: 5px; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 18px; }
+                    th, td { border: 1px solid #cbd5e1; padding: 10px; text-align: left; vertical-align: top; font-size: 13px; }
+                    th { background: #eff6ff; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: #334155; }
+                    @media print {
+                        body { margin: 18mm; }
+                        .no-print { display: none; }
+                        tr, .box { break-inside: avoid; }
+                    }
+                </style>
+            </head>
+            <body>
+                <button class="no-print" onclick="window.print()" style="float:right;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;background:white;font-weight:700;">Print / Save PDF</button>
+                <div class="header">
+                    <div class="eyebrow">Ratings File Folder</div>
+                    <h1>${escapeHtml(label)}</h1>
+                    <div class="muted">${escapeHtml(period || '')}</div>
+                    <div class="muted">${rows.length} ${escapeHtml(itemHeading.toLowerCase())}${rows.length === 1 ? '' : 's'} included</div>
+                </div>
+                ${files}
                 <script>
                     window.onload = function () {
                         window.focus();
@@ -600,13 +836,6 @@ function SubjectRatingModal({ subject, open, onClose }) {
                             <div className="flex shrink-0 gap-2">
                                 <button
                                     type="button"
-                                    onClick={() => printSubjectRatingReport(subject)}
-                                    className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700"
-                                >
-                                    Print PDF
-                                </button>
-                                <button
-                                    type="button"
                                     onClick={onClose}
                                     className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-100"
                                 >
@@ -750,6 +979,11 @@ function SubjectRatingsTab({ ratings = [], classes = [], cycle }) {
             return items;
         }, new Map());
     const subjects = ratings.length ? ratings : [...fallbackSubjects.values()];
+    const hasPrintableSubjects = subjects.some((subject) => (
+        Number(subject.submission_count ?? 0) > 0
+        && subject.overall_rating !== null
+        && subject.overall_rating !== undefined
+    ));
 
     if (!subjects.length) {
         return <EmptyState icon="ratings" message="No assigned subjects are available for the active evaluation cycle." />;
@@ -774,6 +1008,18 @@ function SubjectRatingsTab({ ratings = [], classes = [], cycle }) {
                         {cycle ? `${cycle.school_year} - ${cycle.semester}` : 'No active cycle'}
                     </p>
                 </div>
+            </div>
+
+            <div className="flex justify-end">
+                <button
+                    type="button"
+                    onClick={() => printAllSubjectRatingsReport(subjects, cycle)}
+                    disabled={!hasPrintableSubjects}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+                >
+                    <AppIcon name="print" className="h-3.5 w-3.5" />
+                    Print as PDF
+                </button>
             </div>
 
             <div className="space-y-2">
@@ -1037,6 +1283,8 @@ function ArchiveFoldersTab({ folders = [] }) {
     const [activeFolder, setActiveFolder] = useState('submitted');
     const [submittedTab, setSubmittedTab] = useState('peer_teacher');
     const [ratingsTab, setRatingsTab] = useState('subject');
+    const [selectedSubmission, setSelectedSubmission] = useState(null);
+    const [selectedRatingFile, setSelectedRatingFile] = useState(null);
 
     useEffect(() => {
         if (selectedPeriodKey && !folders.some((folder) => folder.key === selectedPeriodKey)) {
@@ -1156,6 +1404,7 @@ function ArchiveFoldersTab({ folders = [] }) {
                                         <th className="px-3 py-2">Rating</th>
                                         <th className="px-3 py-2">Percentage</th>
                                         <th className="px-3 py-2">Submitted</th>
+                                        <th className="px-3 py-2 text-right">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
@@ -1169,6 +1418,16 @@ function ArchiveFoldersTab({ folders = [] }) {
                                             <td className="px-3 py-3 font-semibold text-blue-700">{formatRating(row.rating)}</td>
                                             <td className="px-3 py-3 font-semibold text-indigo-600">{formatPercentage(row.percentage)}</td>
                                             <td className="px-3 py-3 text-slate-500">{formatDate(row.submitted_at)}</td>
+                                            <td className="px-3 py-3 text-right">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSelectedSubmission({ ...row, period: selectedPeriod.label })}
+                                                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                                >
+                                                    <AppIcon name="eye" className="h-3.5 w-3.5" />
+                                                    View
+                                                </button>
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -1180,7 +1439,19 @@ function ArchiveFoldersTab({ folders = [] }) {
                 </div>
             ) : (
                 <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <ArchiveTabs tabs={ratingTabs} activeKey={ratingsTab} onChange={setRatingsTab} />
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <ArchiveTabs tabs={ratingTabs} activeKey={ratingsTab} onChange={setRatingsTab} />
+                        {ratingRows.length > 0 && (
+                            <button
+                                type="button"
+                                onClick={() => printRatingsFolderTableReport({ rows: ratingRows, type: ratingsTab, period: selectedPeriod.label })}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                            >
+                                <AppIcon name="print" className="h-3.5 w-3.5" />
+                                Print as PDF
+                            </button>
+                        )}
+                    </div>
                     <div className="mt-4 overflow-x-auto">
                         {ratingRows.length ? (
                             <table className="min-w-full divide-y divide-slate-100 text-left text-sm">
@@ -1191,6 +1462,7 @@ function ArchiveFoldersTab({ folders = [] }) {
                                         <th className="px-3 py-2">Rating</th>
                                         <th className="px-3 py-2">Percentage</th>
                                         <th className="px-3 py-2">Latest</th>
+                                        <th className="px-3 py-2 text-right">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
@@ -1204,6 +1476,16 @@ function ArchiveFoldersTab({ folders = [] }) {
                                             <td className="px-3 py-3 font-semibold text-blue-700">{formatRating(row.rating)}</td>
                                             <td className="px-3 py-3 font-semibold text-indigo-600">{formatPercentage(row.percentage)}</td>
                                             <td className="px-3 py-3 text-slate-500">{formatDate(row.latest_submitted_at)}</td>
+                                            <td className="px-3 py-3 text-right">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSelectedRatingFile({ ...row, type: ratingsTab, period: selectedPeriod.label })}
+                                                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                                >
+                                                    <AppIcon name="eye" className="h-3.5 w-3.5" />
+                                                    View
+                                                </button>
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -1214,7 +1496,177 @@ function ArchiveFoldersTab({ folders = [] }) {
                     </div>
                 </div>
             )}
+
+            <ArchiveSubmissionModal
+                submission={selectedSubmission}
+                open={Boolean(selectedSubmission)}
+                onClose={() => setSelectedSubmission(null)}
+            />
+            <ArchiveRatingFileModal
+                ratingFile={selectedRatingFile}
+                open={Boolean(selectedRatingFile)}
+                onClose={() => setSelectedRatingFile(null)}
+            />
         </div>
+    );
+}
+
+function ArchiveSubmissionModal({ submission, open, onClose }) {
+    const ratingLabels = { 1: 'Poor', 2: 'Fair', 3: 'Good', 4: 'Very Good', 5: 'Excellent' };
+
+    return (
+        <Modal show={open} maxWidth="2xl" onClose={onClose}>
+            {submission && (
+                <div className="max-h-[86vh] overflow-hidden bg-white">
+                    <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
+                        <div className="flex items-start justify-between gap-4">
+                            <div className="min-w-0">
+                                <p className="text-xs font-semibold uppercase text-blue-600">{CATEGORY_LABELS[submission.category] ?? 'Submitted Evaluation'}</p>
+                                <h3 className="mt-1 truncate text-lg font-bold text-slate-900">{submission.evaluatee_name || 'Evaluation target'}</h3>
+                                <p className="mt-1 text-sm text-slate-500">
+                                    {submission.role || 'Faculty'}
+                                    {submission.questionnaire_title ? ` · ${submission.questionnaire_title}` : ''}
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-100"
+                            >
+                                Close
+                            </button>
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
+                            <span className="rounded-full bg-blue-50 px-2.5 py-1 font-medium text-blue-700 ring-1 ring-blue-200">
+                                Submitted {formatDate(submission.submitted_at)}
+                            </span>
+                            <span className="rounded-full bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700 ring-1 ring-emerald-200">
+                                Rating {formatRating(submission.rating)}
+                            </span>
+                            <span className="rounded-full bg-indigo-50 px-2.5 py-1 font-medium text-indigo-700 ring-1 ring-indigo-200">
+                                {formatPercentage(submission.percentage)}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="max-h-[calc(86vh-132px)] overflow-y-auto px-5 py-4">
+                        {submission.answers?.length ? (
+                            <div className="overflow-x-auto rounded-lg border border-slate-200">
+                                <table className="min-w-full divide-y divide-slate-100 text-left text-sm">
+                                    <thead className="bg-slate-50">
+                                        <tr className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                            <th className="w-14 px-3 py-2">#</th>
+                                            <th className="px-3 py-2">Question</th>
+                                            <th className="w-28 px-3 py-2 text-center">Rating</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {submission.answers.map((answer, index) => (
+                                            <tr key={`${answer.question_id}-${index}`}>
+                                                <td className="px-3 py-3 text-slate-500">{index + 1}</td>
+                                                <td className="px-3 py-3 text-slate-700">{answer.question_text}</td>
+                                                <td className="px-3 py-3">
+                                                    <div className="mx-auto w-20 rounded-lg bg-blue-50 px-2 py-1 text-center text-blue-700 ring-1 ring-blue-200">
+                                                        <span className="block text-sm font-bold">{answer.rating ?? '-'}</span>
+                                                        <span className="block text-[10px] leading-tight">{ratingLabels[answer.rating] ?? 'Rating'}</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : (
+                            <EmptyState icon="archive" message="No answer details are available for this submitted evaluation." />
+                        )}
+
+                        <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                            <p className="text-xs font-semibold uppercase text-slate-400">Comments</p>
+                            <p className="mt-1 text-sm text-slate-700">{submission.comments || 'No comment provided.'}</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </Modal>
+    );
+}
+
+function ArchiveRatingFileModal({ ratingFile, open, onClose }) {
+    const title = ratingFile?.type === 'subject'
+        ? (ratingFile?.subject || 'Subject Rating')
+        : (ratingFile?.scope || 'Peer Rating');
+    const subtitle = ratingFile?.type === 'subject'
+        ? [ratingFile?.code, 'My Subject Ratings'].filter(Boolean).join(' - ')
+        : 'Peer Ratings';
+
+    return (
+        <Modal show={open} maxWidth="2xl" onClose={onClose}>
+            {ratingFile && (
+                <div className="max-h-[86vh] overflow-hidden bg-white">
+                    <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
+                        <div className="flex items-start justify-between gap-4">
+                            <div className="min-w-0">
+                                <p className="text-xs font-semibold uppercase text-blue-600">Ratings File</p>
+                                <h3 className="mt-1 truncate text-lg font-bold text-slate-900">{title}</h3>
+                                <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={onClose}
+                                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-100"
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
+                            <span className="rounded-full bg-slate-100 px-2.5 py-1 font-medium text-slate-700 ring-1 ring-slate-200">
+                                {ratingFile.period}
+                            </span>
+                            <span className="rounded-full bg-blue-50 px-2.5 py-1 font-medium text-blue-700 ring-1 ring-blue-200">
+                                Latest {formatDate(ratingFile.latest_submitted_at)}
+                            </span>
+                            <span className="rounded-full bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700 ring-1 ring-emerald-200">
+                                Rating {formatRating(ratingFile.rating)}
+                            </span>
+                            <span className="rounded-full bg-indigo-50 px-2.5 py-1 font-medium text-indigo-700 ring-1 ring-indigo-200">
+                                {formatPercentage(ratingFile.percentage)}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="max-h-[calc(86vh-132px)] overflow-y-auto px-5 py-4">
+                        {ratingFile.questions?.length ? (
+                            <div className="overflow-x-auto rounded-lg border border-slate-200">
+                                <table className="min-w-full divide-y divide-slate-100 text-left text-sm">
+                                    <thead className="bg-slate-50">
+                                        <tr className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                            <th className="w-14 px-3 py-2">#</th>
+                                            <th className="px-3 py-2">Question</th>
+                                            <th className="w-28 px-3 py-2 text-center">Rating</th>
+                                            <th className="w-28 px-3 py-2 text-center">Responses</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {ratingFile.questions.map((question, index) => (
+                                            <tr key={`${question.question_id}-${index}`}>
+                                                <td className="px-3 py-3 text-slate-500">{index + 1}</td>
+                                                <td className="px-3 py-3 text-slate-700">{question.question_text}</td>
+                                                <td className="px-3 py-3 text-center font-semibold text-blue-700">{formatRating(question.rating)}</td>
+                                                <td className="px-3 py-3 text-center text-slate-500">{question.count ?? 0}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : (
+                            <EmptyState icon="ratings" message="No question-level rating details are available for this file." />
+                        )}
+                    </div>
+                </div>
+            )}
+        </Modal>
     );
 }
 
