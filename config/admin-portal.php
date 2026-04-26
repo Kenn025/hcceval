@@ -73,8 +73,8 @@ return [
             'items' => [
                 ['label' => 'Subject Ratings', 'route' => 'admin.subject-ratings', 'icon' => 'ratings'],
                 ['label' => 'Peer Ratings', 'route' => 'admin.peer-ratings', 'icon' => 'group'],
-                ['label' => 'Employee Ratings', 'route' => 'admin.employee-ratings', 'icon' => 'briefcase'],
                 ['label' => 'School Heads Ratings', 'route' => 'admin.head-ratings', 'icon' => 'shield'],
+                ['label' => 'Employee Ratings', 'route' => 'admin.employee-ratings', 'icon' => 'briefcase'],
                 ['label' => 'Branch Ratings', 'route' => 'admin.branch-ratings', 'icon' => 'branches'],
             ],
         ],

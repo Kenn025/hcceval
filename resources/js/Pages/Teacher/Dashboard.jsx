@@ -948,6 +948,7 @@ function SubjectRatingModal({ subject, open, onClose }) {
 
 function SubjectRatingsTab({ ratings = [], classes = [], cycle }) {
     const [selectedSubject, setSelectedSubject] = useState(null);
+    const [printConfirm, setPrintConfirm] = useState(null);
     const fallbackSubjects = classes
         .filter((item) => item.subject_id || item.course_name)
         .reduce((items, item) => {
@@ -1013,7 +1014,11 @@ function SubjectRatingsTab({ ratings = [], classes = [], cycle }) {
             <div className="flex justify-end">
                 <button
                     type="button"
-                    onClick={() => printAllSubjectRatingsReport(subjects, cycle)}
+                    onClick={() => setPrintConfirm({
+                        title: 'Print subject ratings as PDF?',
+                        message: 'This opens a printable subject ratings report in a new tab so you can save it as PDF.',
+                        run: () => printAllSubjectRatingsReport(subjects, cycle),
+                    })}
                     disabled={!hasPrintableSubjects}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
                 >
@@ -1090,19 +1095,34 @@ function SubjectRatingsTab({ ratings = [], classes = [], cycle }) {
                 open={Boolean(selectedSubject)}
                 onClose={() => setSelectedSubject(null)}
             />
+
+            <ConfirmDialog
+                open={Boolean(printConfirm)}
+                title={printConfirm?.title}
+                message={printConfirm?.message}
+                confirmLabel="Print PDF"
+                tone="primary"
+                onConfirm={() => {
+                    printConfirm?.run?.();
+                    setPrintConfirm(null);
+                }}
+                onCancel={() => setPrintConfirm(null)}
+            />
         </div>
     );
 }
 
 function PeerRatingsTab({ ratings = {} }) {
+    const [printConfirm, setPrintConfirm] = useState(null);
     const groups = [
         ratings.inside ?? { label: 'Inside Faculty', questions: [] },
         ratings.outside ?? { label: 'Outside Faculty', questions: [] },
     ];
 
     return (
-        <div className="grid gap-4 xl:grid-cols-2">
-            {groups.map((group) => {
+        <>
+            <div className="grid gap-4 xl:grid-cols-2">
+                {groups.map((group) => {
                 const hasRatings = Number(group.submission_count ?? 0) > 0 && group.overall_rating !== null && group.overall_rating !== undefined;
 
                 return (
@@ -1115,7 +1135,11 @@ function PeerRatingsTab({ ratings = {} }) {
                                 </p>
                                 <button
                                     type="button"
-                                    onClick={() => printPeerRatingReport(group)}
+                                    onClick={() => setPrintConfirm({
+                                        title: 'Print peer rating as PDF?',
+                                        message: `This opens the ${group.label.toLowerCase()} printable report in a new tab so you can save it as PDF.`,
+                                        run: () => printPeerRatingReport(group),
+                                    })}
                                     disabled={!hasRatings}
                                     className="mt-3 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                                 >
@@ -1180,8 +1204,22 @@ function PeerRatingsTab({ ratings = {} }) {
                         )}
                     </div>
                 );
-            })}
-        </div>
+                })}
+            </div>
+
+            <ConfirmDialog
+                open={Boolean(printConfirm)}
+                title={printConfirm?.title}
+                message={printConfirm?.message}
+                confirmLabel="Print PDF"
+                tone="primary"
+                onConfirm={() => {
+                    printConfirm?.run?.();
+                    setPrintConfirm(null);
+                }}
+                onCancel={() => setPrintConfirm(null)}
+            />
+        </>
     );
 }
 
@@ -1285,6 +1323,7 @@ function ArchiveFoldersTab({ folders = [] }) {
     const [ratingsTab, setRatingsTab] = useState('subject');
     const [selectedSubmission, setSelectedSubmission] = useState(null);
     const [selectedRatingFile, setSelectedRatingFile] = useState(null);
+    const [printConfirm, setPrintConfirm] = useState(null);
 
     useEffect(() => {
         if (selectedPeriodKey && !folders.some((folder) => folder.key === selectedPeriodKey)) {
@@ -1444,7 +1483,11 @@ function ArchiveFoldersTab({ folders = [] }) {
                         {ratingRows.length > 0 && (
                             <button
                                 type="button"
-                                onClick={() => printRatingsFolderTableReport({ rows: ratingRows, type: ratingsTab, period: selectedPeriod.label })}
+                                onClick={() => setPrintConfirm({
+                                    title: 'Print ratings folder as PDF?',
+                                    message: 'This opens a printable ratings folder report in a new tab so you can save it as PDF.',
+                                    run: () => printRatingsFolderTableReport({ rows: ratingRows, type: ratingsTab, period: selectedPeriod.label }),
+                                })}
                                 className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50"
                             >
                                 <AppIcon name="print" className="h-3.5 w-3.5" />
@@ -1506,6 +1549,19 @@ function ArchiveFoldersTab({ folders = [] }) {
                 ratingFile={selectedRatingFile}
                 open={Boolean(selectedRatingFile)}
                 onClose={() => setSelectedRatingFile(null)}
+            />
+
+            <ConfirmDialog
+                open={Boolean(printConfirm)}
+                title={printConfirm?.title}
+                message={printConfirm?.message}
+                confirmLabel="Print PDF"
+                tone="primary"
+                onConfirm={() => {
+                    printConfirm?.run?.();
+                    setPrintConfirm(null);
+                }}
+                onCancel={() => setPrintConfirm(null)}
             />
         </div>
     );
@@ -2000,6 +2056,8 @@ export default function TeacherDashboard({ teacher, cycle, classes = [], subject
     const completedPeerTargets = pendingTargets.filter((target) => target.done);
     const submissionTargets = [...pendingTargets, ...headTargets, ...employeeTargets]
         .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
+    const evaluationNavs = ['faculty_peer_evaluation', 'school_heads_evaluation', 'employee_evaluation'];
+    const isEvaluationSection = evaluationNavs.includes(activeNav);
 
     function startEvaluation(target) {
         const key = String(target.form_key ?? target.id);
@@ -2025,13 +2083,44 @@ export default function TeacherDashboard({ teacher, cycle, classes = [], subject
             activeNav={activeNav}
             onNavChange={setActiveNav}
             sidebarDetails={[
-                { label: 'Employee ID', value: teacher.employee_no },
                 { label: 'Department', value: teacher.department },
                 { label: 'Role', value: teacher.role },
                 { label: 'Campus', value: teacher.branch },
             ].filter((detail) => detail.value)}
             sidebarBadge={cycle ? `${cycle.school_year} · ${cycle.semester}` : null}
         >
+            {isEvaluationSection && (
+                <div className="mb-5 flex items-center justify-between gap-3">
+                    <div>
+                        <h2 className="text-base font-semibold text-slate-800">{title}</h2>
+                        <p className="mt-1 text-xs text-slate-400">
+                            {cycle ? `${cycle.school_year} · ${cycle.semester}` : 'No active evaluation period'}
+                        </p>
+                    </div>
+                    <span className={[
+                        'rounded-full px-3 py-1 text-xs font-medium ring-1',
+                        cycle?.is_open
+                            ? 'bg-blue-50 text-blue-700 ring-blue-200'
+                            : 'bg-slate-100 text-slate-500 ring-slate-200',
+                    ].join(' ')}>
+                        {cycle?.is_open ? 'Evaluation Open' : 'Evaluation Closed'}
+                    </span>
+                </div>
+            )}
+
+            {isEvaluationSection && !cycle?.is_open && (
+                <div className="mb-5 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
+                    <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-amber-700 ring-1 ring-amber-200">
+                        <AppIcon name="calendar" className="h-4 w-4" />
+                    </div>
+                    <div>
+                        <p className="text-sm font-bold">Evaluation is now closed</p>
+                        <p className="mt-1 text-sm text-amber-800">
+                            Your assigned department is closed for this evaluation period. You can still view submitted records and ratings, but new evaluations are no longer available.
+                        </p>
+                    </div>
+                </div>
+            )}
             {activeNav === 'faculty_peer_evaluation' && (
                 <>
                     <div className="mb-5">

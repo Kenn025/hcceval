@@ -6,7 +6,7 @@ import { router } from '@inertiajs/react';
 import { Fragment, useEffect, useState } from 'react';
 
 const SECTION_TITLES = {
-    subjects:    'My Subjects',
+    subjects:    'Dashboard',
     program_chairs: 'Program Chairs',
     employees: 'Employee Feedback',
     evaluations: 'Evaluation Submissions',
@@ -161,20 +161,34 @@ function SubjectStatusCard({ subjects }) {
     const total = subjects.length;
     const evaluated = subjects.filter((subject) => subject.already_evaluated).length;
     const irregular = subjects.filter((subject) => subject.is_irregular).length;
+    const ratedSubjects = subjects.filter((subject) => subject.overall_rating !== null && subject.overall_rating !== undefined);
+    const ratingWeight = ratedSubjects.reduce((sum, subject) => sum + Math.max(Number(subject.rating_submission_count ?? 0), 1), 0);
+    const ratingTotal = ratedSubjects.reduce((sum, subject) => (
+        sum + (Number(subject.overall_rating) * Math.max(Number(subject.rating_submission_count ?? 0), 1))
+    ), 0);
+    const overallRating = ratingWeight > 0 ? ratingTotal / ratingWeight : null;
     const progress = total > 0 ? Math.round((evaluated / total) * 100) : 0;
     const cards = [
         { label: 'Progress', value: `${progress}%`, detail: `${evaluated} of ${total} evaluated`, icon: 'check-circle', color: 'blue' },
+        {
+            label: 'Overall Rating',
+            value: overallRating !== null ? overallRating.toFixed(2) : '-',
+            detail: ratedSubjects.length ? `${ratedSubjects.length} rated subject${ratedSubjects.length === 1 ? '' : 's'}` : 'No ratings yet',
+            icon: 'ratings',
+            color: 'purple',
+        },
         { label: 'Registered Subjects', value: total, detail: 'Current cycle', icon: 'subjects', color: 'emerald' },
         { label: 'Irregular Subjects', value: irregular, detail: irregular === 1 ? 'Irregular load' : 'Irregular loads', icon: 'layers', color: 'amber' },
     ];
     const colors = {
         blue: 'bg-blue-50 text-blue-700 ring-blue-100',
+        purple: 'bg-violet-50 text-violet-700 ring-violet-100',
         emerald: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
         amber: 'bg-amber-50 text-amber-700 ring-amber-100',
     };
 
     return (
-        <div className="mb-5 grid gap-3 md:grid-cols-3">
+        <div className="mb-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             {cards.map((card) => (
                 <div key={card.label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                     <div className="flex items-center justify-between gap-3">
@@ -192,8 +206,76 @@ function SubjectStatusCard({ subjects }) {
                             <div className="h-full rounded-full bg-blue-600 transition-all" style={{ width: `${progress}%` }} />
                         </div>
                     )}
+                    {card.label === 'Overall Rating' && overallRating !== null && (
+                        <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+                            <div className="h-full rounded-full bg-violet-600 transition-all" style={{ width: `${Math.min((overallRating / 5) * 100, 100)}%` }} />
+                        </div>
+                    )}
                 </div>
             ))}
+        </div>
+    );
+}
+
+function AssignedSubjectTeacherRatingsCard({ subjects, onViewEvaluation }) {
+    const orderedSubjects = [...subjects].sort((left, right) => (
+        (left.course_name ?? '').localeCompare(right.course_name ?? '')
+    ));
+
+    return (
+        <div className="mb-5 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+                <div>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Assigned Subjects and Teachers</p>
+                    <p className="mt-0.5 text-sm font-semibold text-slate-800">Overall ratings for the active academic year</p>
+                </div>
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-700 ring-1 ring-violet-100">
+                    <AppIcon name="ratings" className="h-5 w-5" />
+                </div>
+            </div>
+            <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
+                {orderedSubjects.map((subject) => {
+                    const hasRating = subject.overall_rating !== null && subject.overall_rating !== undefined;
+                    const rating = hasRating ? Number(subject.overall_rating) : null;
+                    const percentage = rating !== null ? Math.min((rating / 5) * 100, 100) : 0;
+
+                    return (
+                        <div key={subject.section_id ?? subject.course_id ?? subject.course_code} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                            <div className="min-w-0">
+                                <p className="truncate text-sm font-semibold text-slate-900">{subject.course_name}</p>
+                                <p className="mt-0.5 text-xs text-slate-500">{subject.course_code || 'No subject code'}</p>
+                            </div>
+                            <div className="mt-3 min-w-0">
+                                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Teacher</p>
+                                <p className="truncate text-sm font-medium text-slate-700">{subject.teacher_name || 'No teacher assigned'}</p>
+                            </div>
+                            <div className="mt-3">
+                                <div className="flex items-center justify-between gap-2">
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Rating</p>
+                                    <p className="text-sm font-bold text-slate-900">{rating !== null ? `${rating.toFixed(2)} / 5` : '-'}</p>
+                                </div>
+                                <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+                                    <div className="h-full rounded-full bg-violet-600" style={{ width: `${percentage}%` }} />
+                                </div>
+                                <p className="mt-1 text-right text-[11px] text-slate-400">
+                                    {Number(subject.rating_submission_count ?? 0) > 0
+                                        ? `${subject.rating_submission_count} response${Number(subject.rating_submission_count) === 1 ? '' : 's'}`
+                                        : 'No ratings yet'}
+                                </p>
+                                {subject.already_evaluated && (
+                                    <button
+                                        type="button"
+                                        onClick={() => onViewEvaluation?.(subject)}
+                                        className="mt-3 w-full rounded-lg border border-violet-200 bg-white px-3 py-2 text-xs font-semibold text-violet-700 transition hover:bg-violet-50"
+                                    >
+                                        View Full Ratings
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
         </div>
     );
 }
@@ -213,6 +295,7 @@ function SubjectsTab({ subjects, cycle, onStartEvaluation, onViewEvaluation }) {
 
     return (
         <>
+        <AssignedSubjectTeacherRatingsCard subjects={subjects} onViewEvaluation={onViewEvaluation} />
         <SubjectStatusCard subjects={subjects} />
         <div className="space-y-3">
             {orderedSubjects.map((s) => (
@@ -247,6 +330,15 @@ function SubjectsTab({ subjects, cycle, onStartEvaluation, onViewEvaluation }) {
                                 <span className="flex items-center gap-1.5">
                                     <AppIcon name="building" className="h-3.5 w-3.5 shrink-0" />
                                     {s.room}
+                                </span>
+                            )}
+                            {s.overall_rating !== null && s.overall_rating !== undefined && (
+                                <span className="flex items-center gap-1.5 font-semibold text-violet-700">
+                                    <AppIcon name="ratings" className="h-3.5 w-3.5 shrink-0" />
+                                    Overall {Number(s.overall_rating).toFixed(2)} / 5
+                                    {Number(s.rating_submission_count ?? 0) > 0
+                                        ? ` (${s.rating_submission_count} response${Number(s.rating_submission_count) === 1 ? '' : 's'})`
+                                        : ''}
                                 </span>
                             )}
                         </div>
@@ -387,17 +479,31 @@ function EvaluationPlaceholderTab({ icon, message }) {
 }
 
 function EmployeeFeedbackTab({ employees = [], branchName, onStartEvaluation }) {
-    const groupedEmployees = employees.reduce((groups, employee) => {
-        const key = employee.employee_department_name || 'Unassigned Department';
+    const [employeeSearch, setEmployeeSearch] = useState('');
+    const [employeePageSize, setEmployeePageSize] = useState(15);
+    const [employeeDepartment, setEmployeeDepartment] = useState('all');
 
-        if (!groups[key]) {
-            groups[key] = [];
-        }
+    const departments = Array.from(new Set(
+        employees.map((employee) => employee.employee_department_name || 'Unassigned Department'),
+    )).sort((a, b) => a.localeCompare(b));
 
-        groups[key].push(employee);
-        return groups;
-    }, {});
-    const departmentGroups = Object.entries(groupedEmployees).sort(([a], [b]) => a.localeCompare(b));
+    const normalizedSearch = employeeSearch.trim().toLowerCase();
+    const filteredEmployees = employees.filter((employee) => {
+        const departmentName = employee.employee_department_name || 'Unassigned Department';
+        const matchesDepartment = employeeDepartment === 'all' || departmentName === employeeDepartment;
+        const searchableText = [
+            employee.name,
+            employee.code,
+            employee.role,
+            employee.email,
+            departmentName,
+            employee.questionnaire_title,
+            employee.questionnaire_code,
+        ].filter(Boolean).join(' ').toLowerCase();
+
+        return matchesDepartment && (!normalizedSearch || searchableText.includes(normalizedSearch));
+    });
+    const visibleEmployees = filteredEmployees.slice(0, employeePageSize);
 
     if (!employees.length) {
         return <EmptyState icon="briefcase" message="No active employees are available in your assigned branch right now." />;
@@ -405,88 +511,101 @@ function EmployeeFeedbackTab({ employees = [], branchName, onStartEvaluation }) 
 
     return (
         <div className="space-y-4">
-            <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                    Branch Employees ({employees.length})
-                </p>
-                <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
-                    Assigned branch: <span className="font-semibold text-slate-800">{branchName || 'Current branch'}</span>
-                </div>
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                Employee feedback evaluations are optional and are not required to complete your student evaluations.
             </div>
 
-            {departmentGroups.map(([departmentName, departmentEmployees]) => (
-                <div key={departmentName}>
-                    <div className="mb-2 flex items-center justify-between gap-3">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{departmentName}</p>
-                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-                            {departmentEmployees.length}
-                        </span>
-                    </div>
-                    <div className="space-y-2">
-                        {departmentEmployees.map((employee) => (
-                            <div
-                                key={employee.id}
-                                className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="flex flex-col gap-3 border-b border-slate-100 p-4 md:flex-row md:items-center md:justify-between">
+                    <label className="relative block min-w-0 md:w-[400px]">
+                        <AppIcon name="search" className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <input
+                            type="search"
+                            value={employeeSearch}
+                            onChange={(event) => setEmployeeSearch(event.target.value)}
+                            placeholder="Search employees..."
+                            className="h-12 w-full rounded-lg border border-slate-200 bg-white pl-12 pr-3 text-[13px] text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                        />
+                    </label>
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+                        <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                            Show
+                            <select
+                                value={employeePageSize}
+                                onChange={(event) => setEmployeePageSize(Number(event.target.value))}
+                                className="h-12 w-20 rounded-lg border border-slate-200 bg-white px-3 text-[13px] font-medium normal-case tracking-normal text-slate-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
                             >
-                                <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-lg bg-violet-100 text-violet-700">
-                                    <AppIcon name="briefcase" className="h-5 w-5" />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <p className="truncate text-sm font-semibold text-slate-800">{employee.name || '-'}</p>
-                                        <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-700 ring-1 ring-slate-200">
-                                            {employee.code || 'No code'}
-                                        </span>
-                                    </div>
-                                    <p className="text-xs text-slate-400">
-                                        {employee.role || 'Employee'}
-                                        {employee.email ? ` - ${employee.email}` : ''}
-                                    </p>
-                                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                                        {employee.questionnaire_id && (
-                                            <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-700 ring-1 ring-slate-200">
-                                                Questionnaire ID: {employee.questionnaire_code || employee.questionnaire_id}
-                                            </span>
-                                        )}
-                                        <span className="inline-flex items-center rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-medium text-violet-700 ring-1 ring-violet-200">
-                                            {employee.questionnaire_title || 'No assigned questionnaire'}
-                                        </span>
-                                        {!employee.questionnaire_id && (
-                                            <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-700 ring-1 ring-amber-200">
-                                                Assignment needed
-                                            </span>
-                                        )}
-                                        {employee.done && (
-                                            <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700 ring-1 ring-emerald-200">
-                                                Submitted
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-                                {employee.done ? (
-                                    <button
-                                        type="button"
-                                        onClick={() => onStartEvaluation?.(employee)}
-                                        disabled={!employee.questionnaire_id}
-                                        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
-                                    >
-                                        View
-                                    </button>
-                                ) : (
-                                    <button
-                                        type="button"
-                                        onClick={() => onStartEvaluation?.(employee)}
-                                        disabled={!employee.questionnaire_id}
-                                        className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-                                    >
-                                        Start Evaluation
-                                    </button>
-                                )}
-                            </div>
-                        ))}
+                                {[5, 10, 15, 25, 50].map((size) => (
+                                    <option key={size} value={size}>{size}</option>
+                                ))}
+                            </select>
+                        </label>
+                        <select
+                            value={employeeDepartment}
+                            onChange={(event) => setEmployeeDepartment(event.target.value)}
+                            className="h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-[13px] font-medium text-slate-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-100 lg:w-[280px]"
+                        >
+                            <option value="all">All departments</option>
+                            {departments.map((department) => (
+                                <option key={department} value={department}>{department}</option>
+                            ))}
+                        </select>
                     </div>
                 </div>
-            ))}
+
+                {visibleEmployees.length ? (
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full text-left text-[13px]">
+                            <thead className="bg-slate-50">
+                                <tr>
+                                    <th className="w-16 px-5 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">#</th>
+                                    <th className="px-5 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Name</th>
+                                    <th className="px-5 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Department</th>
+                                    <th className="px-5 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Role</th>
+                                    <th className="px-5 py-4 text-right text-xs font-bold uppercase tracking-wider text-slate-500">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white">
+                                {visibleEmployees.map((employee, index) => {
+                                    const hasQuestionnaire = Boolean(employee.questionnaire_id);
+                                    const departmentName = employee.employee_department_name || 'Unassigned Department';
+
+                                    return (
+                                        <tr key={employee.id} className="border-t border-slate-100 transition hover:bg-slate-50">
+                                            <td className="px-5 py-5 text-slate-500">{index + 1}</td>
+                                            <td className="px-5 py-5 font-medium text-slate-900">{employee.name || '-'}</td>
+                                            <td className="px-5 py-5 text-slate-600">{departmentName}</td>
+                                            <td className="px-5 py-5 text-slate-600">{employee.role || 'Employee'}</td>
+                                            <td className="px-5 py-5 text-right">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onStartEvaluation?.(employee)}
+                                                    disabled={!hasQuestionnaire}
+                                                    className={[
+                                                        'inline-flex items-center justify-center rounded-lg text-xs font-semibold transition disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400',
+                                                        employee.done
+                                                            ? 'h-10 w-10 border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                                                            : 'min-h-10 bg-violet-600 px-3 py-2 text-white hover:bg-violet-700',
+                                                    ].join(' ')}
+                                                    aria-label={employee.done ? 'View submitted employee feedback' : 'Start employee feedback'}
+                                                >
+                                                    {employee.done ? <AppIcon name="eye" className="h-4 w-4" /> : 'Start'}
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                        <div className="border-t border-slate-100 px-5 py-4 text-sm text-slate-500">
+                            Showing <span className="font-semibold text-slate-700">1</span> to <span className="font-semibold text-slate-700">{visibleEmployees.length}</span> of <span className="font-semibold text-slate-700">{filteredEmployees.length}</span> results
+                            <span className="ml-2 text-slate-400">in {branchName || 'current branch'}</span>
+                        </div>
+                    </div>
+                ) : (
+                    <EmptyState icon="briefcase" message="No employees match the selected filters." />
+                )}
+            </div>
         </div>
     );
 }
@@ -781,18 +900,74 @@ function EvaluationModal({ form, open, onClose, readOnly = false }) {
 }
 
 function SubmittedEvaluationModal({ evaluation, open, onClose }) {
-    const ratingLabels = { 1: 'Poor', 2: 'Fair', 3: 'Good', 4: 'Very Good', 5: 'Excellent' };
+    const groupedAnswers = (evaluation?.answers ?? []).reduce((groups, answer) => {
+        const key = answer.class_name || 'Evaluation Items';
+
+        if (!groups[key]) {
+            groups[key] = {
+                className: key,
+                weight: answer.weight_percentage,
+                answers: [],
+            };
+        }
+
+        groups[key].answers.push(answer);
+        return groups;
+    }, {});
+    const answerGroups = Object.values(groupedAnswers);
+    const formattedRating = (rating) => (
+        rating !== null && rating !== undefined && rating !== '' && !Number.isNaN(Number(rating))
+            ? Number(rating).toFixed(2)
+            : '-'
+    );
+    const groupAverage = (answers = []) => {
+        const ratings = answers
+            .map((answer) => Number(answer.rating))
+            .filter((rating) => Number.isFinite(rating));
+
+        if (!ratings.length) {
+            return null;
+        }
+
+        return ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length;
+    };
+    const typeId = Number(evaluation?.questionnaire_type_id);
+    const typeLabel = typeId === 4
+        ? 'Employee Feedback'
+        : typeId === 3
+            ? 'School Head Evaluation'
+            : 'Subject Evaluation';
+    const typeColor = typeId === 4 ? 'text-emerald-600' : 'text-blue-600';
+    const headerName = evaluation?.evaluatee_name || evaluation?.course_name || 'Submitted Evaluation';
+    const headerInfo = [
+        evaluation?.evaluatee_role,
+        evaluation?.evaluatee_scope,
+    ].filter(Boolean).join(' - ');
+    const subjectInfo = typeId === 1
+        ? [evaluation?.course_code, evaluation?.course_name].filter(Boolean).join(' - ')
+        : '';
+    const period = evaluation?.archive_group_label
+        || [evaluation?.school_year, evaluation?.semester_label || evaluation?.semester].filter(Boolean).join(' - ');
 
     return (
-        <Modal show={open} maxWidth="2xl" onClose={onClose}>
+        <Modal show={open} maxWidth="5xl" onClose={onClose}>
             {evaluation && (
-                <div className="max-h-[86vh] overflow-hidden bg-white">
-                    <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
+                <div className="flex h-[92vh] max-h-[92vh] flex-col overflow-hidden bg-white">
+                    <div className="shrink-0 border-b border-slate-200 bg-white px-5 py-4">
                         <div className="flex items-start justify-between gap-4">
                             <div className="min-w-0">
-                                <p className="text-xs font-semibold uppercase text-blue-600">Submitted Evaluation</p>
-                                <h3 className="mt-1 truncate text-lg font-bold text-slate-900">{evaluation.course_name || 'Subject Teacher Evaluation'}</h3>
-                                <p className="mt-1 text-sm text-slate-500">
+                                <p className={`text-xs font-bold uppercase tracking-wider ${typeColor}`}>{typeLabel}</p>
+                                <h3 className="mt-2 truncate text-xl font-bold text-slate-900">{headerName}</h3>
+                                {(headerInfo || subjectInfo) && (
+                                    <p className="mt-2 text-sm text-slate-500">{headerInfo || subjectInfo}</p>
+                                )}
+                                {evaluation.questionnaire_title && (
+                                    <p className="mt-1 text-sm text-slate-500">Questionnaire: {evaluation.questionnaire_title}</p>
+                                )}
+                                {period && (
+                                    <p className="mt-3 text-sm font-medium text-slate-400">{period}</p>
+                                )}
+                                <p className="hidden">
                                     {evaluation.course_code ? `${evaluation.course_code} · ` : ''}{evaluation.teacher_name || evaluation.evaluatee_name || 'Teacher'}
                                 </p>
                             </div>
@@ -800,7 +975,30 @@ function SubmittedEvaluationModal({ evaluation, open, onClose }) {
                                 Close
                             </button>
                         </div>
-                        <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
+                        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Submitted</p>
+                                <p className="mt-1 text-sm font-bold text-slate-900">{formatDate(evaluation.submitted_at)}</p>
+                            </div>
+                            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Overall Rating</p>
+                                <p className="mt-1 text-sm font-bold text-emerald-700">{formattedRating(evaluation.overall_average)} / 5</p>
+                            </div>
+                            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Category</p>
+                                <p className="mt-1 text-sm font-bold text-slate-900">{CATEGORY_LABELS[evaluation.category] ?? evaluation.category ?? typeLabel}</p>
+                            </div>
+                        </div>
+                        <div className="mt-3 flex justify-end">
+                            <button
+                                type="button"
+                                onClick={() => printSubmittedEvaluationReport(evaluation)}
+                                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                            >
+                                Print / Save PDF
+                            </button>
+                        </div>
+                        <div className="hidden">
                             {evaluation.submitted_at && (
                                 <Badge color="blue">{formatDate(evaluation.submitted_at)}</Badge>
                             )}
@@ -811,18 +1009,55 @@ function SubmittedEvaluationModal({ evaluation, open, onClose }) {
                         </div>
                     </div>
 
-                    <div className="max-h-[calc(86vh-116px)] overflow-y-auto px-5 py-4">
-                        <div className="space-y-3">
-                            {(evaluation.answers ?? []).map((answer, index) => (
-                                <div key={`${answer.question_id}-${index}`} className="rounded-lg border border-slate-200 bg-white p-4">
-                                    <div className="flex items-start justify-between gap-3">
-                                        <p className="text-sm text-slate-700">
-                                            <span className="mr-1 font-semibold text-slate-500">{index + 1}.</span>{answer.question_text}
-                                        </p>
-                                        <div className="shrink-0 rounded-lg bg-emerald-50 px-3 py-1 text-center text-emerald-700 ring-1 ring-emerald-200">
-                                            <span className="block text-sm font-bold">{answer.rating}</span>
-                                            <span className="block text-[10px] leading-tight">{ratingLabels[answer.rating] ?? 'Rating'}</span>
+                    <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50 px-5 py-4">
+                        <div className="mb-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
+                            <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">Full Questionnaire Ratings</p>
+                            <p className="mt-1 text-sm text-blue-900">
+                                Showing all submitted questionnaire items and their ratings for this evaluation.
+                            </p>
+                        </div>
+
+                        <div className="space-y-5">
+                            {answerGroups.map((group) => (
+                                <div key={group.className} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                                    <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-4 py-3">
+                                        <div>
+                                            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Questionnaire Items</p>
+                                            <h4 className="mt-1 text-base font-bold text-slate-900">{group.className}</h4>
                                         </div>
+                                        <div className="shrink-0 text-right">
+                                            {group.weight !== null && group.weight !== undefined && (
+                                                <p className="text-sm font-semibold text-slate-500">{group.weight}%</p>
+                                            )}
+                                            <p className="mt-1 text-sm font-bold text-blue-600">
+                                                Value Rating: {formattedRating(groupAverage(group.answers))}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="overflow-x-auto">
+                                        <table className="min-w-full text-left text-sm">
+                                            <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-500">
+                                                <tr>
+                                                    <th className="w-16 px-4 py-3">#</th>
+                                                    <th className="px-4 py-3">Questionnaire Item</th>
+                                                    <th className="w-32 px-4 py-3 text-right">Rating</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100 bg-white">
+                                                {group.answers.map((answer, index) => (
+                                                    <tr key={`${answer.question_id}-${index}`}>
+                                                        <td className="px-4 py-3 text-slate-500">{index + 1}</td>
+                                                        <td className="px-4 py-3 text-slate-700">{answer.question_text}</td>
+                                                        <td className="px-4 py-3 text-right">
+                                                            <span className="inline-flex min-w-16 justify-center rounded-full bg-blue-50 px-3 py-1 text-sm font-bold text-blue-600">
+                                                                {formattedRating(answer.rating)}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
                                     </div>
                                 </div>
                             ))}
@@ -913,10 +1148,18 @@ function EvaluationSubmissionsTabs({
             return {
                 submission_id: form.submission.id,
                 questionnaire_type_id: form.submission.questionnaire_type_id ?? form.questionnaireTypeId ?? null,
+                questionnaire_id: form.questionnaireId ?? null,
+                questionnaire_title: form.questionnaireTitle ?? null,
+                category: form.category,
                 course_code: form.subjectInfo?.code ?? null,
                 course_name: form.subjectInfo?.name ?? null,
+                subject_id: form.subjectId ?? null,
                 evaluatee_name: form.evaluatee?.name ?? null,
+                evaluatee_role: form.evaluatee?.role ?? null,
+                evaluatee_scope: form.evaluatee?.scope ?? null,
                 teacher_name: (form.submission.questionnaire_type_id ?? form.questionnaireTypeId) === QUESTIONNAIRE_TYPES.schoolHead ? form.evaluatee?.name : null,
+                school_year: form.cycle?.school_year ?? null,
+                semester_label: form.cycle?.semester ?? null,
                 submitted_at: form.submission.submitted_at,
                 comments: form.submission.comments,
                 overall_average: Object.values(answerLookup).length
@@ -926,6 +1169,8 @@ function EvaluationSubmissionsTabs({
                     question_id: question.question_id,
                     question_text: question.question_text,
                     rating: answerLookup[question.question_id] ?? null,
+                    class_name: question.class_name ?? '',
+                    weight_percentage: question.weight_percentage ?? null,
                 })).filter((answer) => answer.rating !== null),
             };
         });
@@ -1046,7 +1291,9 @@ function ArchiveTabInline({ archive, onView }) {
 
 function ArchiveTab({ archive, onView }) {
     const [openFolder, setOpenFolder] = useState(null);
-    const [activeArchiveTab, setActiveArchiveTab] = useState('subject');
+    const [archiveSearch, setArchiveSearch] = useState('');
+    const [selectedEvaluationType, setSelectedEvaluationType] = useState('all');
+    const [archivePageSize, setArchivePageSize] = useState(15);
 
     if (!archive.length) {
         return <EmptyState icon="archive" message="No archived evaluation records yet." />;
@@ -1061,21 +1308,42 @@ function ArchiveTab({ archive, onView }) {
 
         return labels[Number(typeId)] ?? 'Evaluation';
     };
-    const archiveTabs = [
+    const typeBadgeColor = (typeId) => {
+        const colors = {
+            1: 'purple',
+            3: 'amber',
+            4: 'green',
+        };
+
+        return colors[Number(typeId)] ?? 'slate';
+    };
+    const evaluationTypeOptions = [
         { key: 'subject', label: 'Subject Evaluation', typeId: 1, emptyIcon: 'subjects' },
         { key: 'school_head', label: 'School Head', typeId: 3, emptyIcon: 'school' },
         { key: 'employee_feedback', label: 'Employee Feedback', typeId: 4, emptyIcon: 'briefcase' },
     ];
     const grouped = archive.reduce((acc, item) => {
-        const key = `${item.school_year ?? 'Unknown Academic Year'} - ${item.semester_label ?? 'Unknown Term'}`;
+        const key = item.archive_group_label || `${item.school_year ?? 'Unknown Academic Year'} - ${item.semester_label ?? 'Unknown Term'}`;
 
         if (!acc[key]) acc[key] = [];
         acc[key].push(item);
         return acc;
     }, {});
     const selectedItems = openFolder ? grouped[openFolder] ?? [] : [];
-    const selectedTab = archiveTabs.find((tab) => tab.key === activeArchiveTab) ?? archiveTabs[0];
-    const tabItems = selectedItems.filter((item) => Number(item.questionnaire_type_id) === selectedTab.typeId);
+    const selectedTypeOption = evaluationTypeOptions.find((option) => option.key === selectedEvaluationType) ?? null;
+    const normalizedArchiveSearch = archiveSearch.trim().toLowerCase();
+    const filteredItems = selectedItems.filter((item) => {
+        const matchesType = !selectedTypeOption || Number(item.questionnaire_type_id) === selectedTypeOption.typeId;
+        const searchableText = [
+            item.course_name,
+            item.evaluatee_name,
+            item.course_code,
+            typeLabel(item.questionnaire_type_id),
+        ].filter(Boolean).join(' ').toLowerCase();
+
+        return matchesType && (!normalizedArchiveSearch || searchableText.includes(normalizedArchiveSearch));
+    });
+    const visibleItems = filteredItems.slice(0, archivePageSize);
 
     if (openFolder) {
         return (
@@ -1085,8 +1353,8 @@ function ArchiveTab({ archive, onView }) {
                     onClick={() => setOpenFolder(null)}
                     className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
                 >
-                    <AppIcon name="chevron-left" className="h-3.5 w-3.5" />
-                    Back to archive folders
+                    <AppIcon name="chevron-left" className="h-3.5 w-3.5 text-orange-600" />
+                    Back to folders
                 </button>
 
                 <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -1100,62 +1368,92 @@ function ArchiveTab({ archive, onView }) {
                         </div>
                     </div>
                     <div className="p-4">
-                        <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
-                            {archiveTabs.map((tab) => {
-                                const selected = activeArchiveTab === tab.key;
-                                const count = selectedItems.filter((item) => Number(item.questionnaire_type_id) === tab.typeId).length;
-
-                                return (
-                                    <button
-                                        key={tab.key}
-                                        type="button"
-                                        onClick={() => setActiveArchiveTab(tab.key)}
-                                        className={[
-                                            'flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition sm:flex-none',
-                                            selected
-                                                ? 'bg-blue-600 text-white shadow-sm'
-                                                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
-                                        ].join(' ')}
+                        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                            <div className="flex flex-col gap-3 border-b border-slate-100 p-4 md:flex-row md:items-center md:justify-between">
+                                <label className="relative block min-w-0 md:w-[400px]">
+                                    <AppIcon name="search" className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                    <input
+                                        type="search"
+                                        value={archiveSearch}
+                                        onChange={(event) => setArchiveSearch(event.target.value)}
+                                        placeholder="Search submitted evaluations..."
+                                        className="h-12 w-full rounded-lg border border-slate-200 bg-white pl-12 pr-3 text-[13px] text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                                    />
+                                </label>
+                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                                    <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                        Show
+                                        <select
+                                            value={archivePageSize}
+                                            onChange={(event) => setArchivePageSize(Number(event.target.value))}
+                                            className="h-12 w-20 rounded-lg border border-slate-200 bg-white px-3 text-[13px] font-medium normal-case tracking-normal text-slate-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                                        >
+                                            {[5, 10, 15, 25, 50].map((size) => (
+                                                <option key={size} value={size}>{size}</option>
+                                            ))}
+                                        </select>
+                                    </label>
+                                    <select
+                                        value={selectedEvaluationType}
+                                        onChange={(event) => setSelectedEvaluationType(event.target.value)}
+                                        className="h-12 w-full rounded-lg border border-slate-200 bg-white px-4 text-[13px] font-medium text-slate-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-100 sm:w-[280px]"
                                     >
-                                        <span className="truncate">{tab.label}</span>
-                                        <span className={[
-                                            'rounded-full px-2 py-0.5 text-[10px]',
-                                            selected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500',
-                                        ].join(' ')}>
-                                            {count}
-                                        </span>
-                                    </button>
-                                );
-                            })}
-                        </div>
-
-                        <div className="mt-4 overflow-hidden rounded-xl border border-slate-200">
-                            {tabItems.length ? (
-                                <div className="divide-y divide-slate-100">
-                                    {tabItems.map((e) => (
-                                        <div key={e.submission_id} className="flex items-center justify-between gap-3 px-4 py-3">
-                                            <div className="min-w-0">
-                                                <p className="truncate text-sm font-medium text-slate-800">{e.course_name || e.evaluatee_name || 'Submitted Evaluation'}</p>
-                                                <p className="text-xs text-slate-400">
-                                                    {[e.course_code, e.evaluatee_name].filter(Boolean).join(' - ') || typeLabel(e.questionnaire_type_id)}
-                                                </p>
-                                            </div>
-                                            <div className="flex shrink-0 items-center gap-2">
-                                                <Badge color="purple">{typeLabel(e.questionnaire_type_id)}</Badge>
-                                                <Badge color="blue">Submitted</Badge>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => onView?.(e)}
-                                                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-                                                >
-                                                    View
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
+                                        <option value="all">All evaluation types</option>
+                                        {evaluationTypeOptions.map((option) => (
+                                            <option key={option.key} value={option.key}>{option.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                            {visibleItems.length ? (
+                                <div className="overflow-x-auto">
+                                    <table className="min-w-full text-left text-[13px]">
+                                        <thead className="bg-slate-50">
+                                            <tr>
+                                                <th className="w-16 px-5 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">#</th>
+                                                <th className="px-5 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Name</th>
+                                                <th className="px-5 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Evaluation Type</th>
+                                                <th className="px-5 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Details</th>
+                                                <th className="px-5 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Date Submitted</th>
+                                                <th className="px-5 py-4 text-right text-xs font-bold uppercase tracking-wider text-slate-500">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="bg-white">
+                                            {visibleItems.map((e, index) => (
+                                                <tr key={e.submission_id} className="border-t border-slate-100 transition hover:bg-slate-50">
+                                                    <td className="px-5 py-5 text-slate-500">{index + 1}</td>
+                                                    <td className="px-5 py-5 font-medium text-slate-900">
+                                                        {e.course_name || e.evaluatee_name || 'Submitted Evaluation'}
+                                                    </td>
+                                                    <td className="px-5 py-5">
+                                                        <Badge color={typeBadgeColor(e.questionnaire_type_id)}>{typeLabel(e.questionnaire_type_id)}</Badge>
+                                                    </td>
+                                                    <td className="px-5 py-5 text-slate-500">
+                                                        {[e.course_code, e.evaluatee_name].filter(Boolean).join(' - ') || typeLabel(e.questionnaire_type_id)}
+                                                    </td>
+                                                    <td className="px-5 py-5">
+                                                        {formatDate(e.submitted_at)}
+                                                    </td>
+                                                    <td className="px-5 py-5 text-right">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => onView?.(e)}
+                                                            className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
+                                                            aria-label="View submitted evaluation"
+                                                        >
+                                                            <AppIcon name="eye" className="h-4 w-4" />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                    <div className="border-t border-slate-100 px-5 py-4 text-sm text-slate-500">
+                                        Showing <span className="font-semibold text-slate-700">1</span> to <span className="font-semibold text-slate-700">{visibleItems.length}</span> of <span className="font-semibold text-slate-700">{filteredItems.length}</span> results
+                                    </div>
                                 </div>
                             ) : (
-                                <EmptyState icon={selectedTab.emptyIcon} message={`No archived ${selectedTab.label.toLowerCase()} submissions in this folder.`} />
+                                <EmptyState icon={selectedTypeOption?.emptyIcon ?? 'archive'} message="No archived submissions match the selected filters." />
                             )}
                         </div>
                     </div>
@@ -1165,29 +1463,39 @@ function ArchiveTab({ archive, onView }) {
     }
 
     return (
-        <div className="space-y-4">
-            {Object.entries(grouped).map(([label, items]) => (
-                <button
-                    key={label}
-                    type="button"
-                    onClick={() => {
-                        setOpenFolder(label);
-                        setActiveArchiveTab('subject');
-                    }}
-                    className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition hover:border-amber-200 hover:bg-amber-50/30"
-                >
-                    <div className="flex min-w-0 items-center gap-3">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50 text-amber-600 ring-1 ring-amber-100">
-                            <AppIcon name="folder" className="h-5 w-5" />
+        <div>
+            <div className="mb-6">
+                <h3 className="text-lg font-bold text-slate-900">Evaluation Archive</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                    Open a past academic year and term folder to view your archived evaluation submissions.
+                </p>
+            </div>
+
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Past Academic Year and Term</p>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {Object.entries(grouped).map(([label, items]) => (
+                    <button
+                        key={label}
+                        type="button"
+                        onClick={() => {
+                            setOpenFolder(label);
+                            setArchiveSearch('');
+                            setSelectedEvaluationType('all');
+                        }}
+                        className="flex min-h-[96px] items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-orange-300 hover:bg-orange-50/40"
+                    >
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-orange-50 text-orange-600">
+                            <AppIcon name="folder" className="h-6 w-6" strokeWidth={2} />
                         </div>
                         <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-slate-700">{label}</p>
-                            <p className="text-xs text-slate-400">{items.length} submitted evaluation{items.length !== 1 ? 's' : ''}</p>
+                            <p className="truncate text-sm font-bold text-slate-800">{label}</p>
+                            <p className="mt-1 text-xs text-slate-500">
+                                {items.length} submission{items.length === 1 ? '' : 's'} - {items.length} response{items.length === 1 ? '' : 's'}
+                            </p>
                         </div>
-                    </div>
-                    <AppIcon name="chevron-right" className="h-4 w-4 shrink-0 text-slate-400" />
-                </button>
-            ))}
+                    </button>
+                ))}
+            </div>
         </div>
     );
 }
@@ -1310,17 +1618,31 @@ export default function StudentDashboard({ student, cycle, subjects = [], progra
                         <p className="text-xs text-slate-400">{counts[activeNav]} record{counts[activeNav] !== 1 ? 's' : ''}</p>
                     )}
                 </div>
-                {!cycle?.is_open && activeNav === 'subjects' && (
+                {!cycle?.is_open && ['subjects', 'program_chairs', 'employees'].includes(activeNav) && (
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500">
                         Evaluation Closed
                     </span>
                 )}
-                {cycle?.is_open && activeNav === 'subjects' && (
+                {cycle?.is_open && ['subjects', 'program_chairs', 'employees'].includes(activeNav) && (
                     <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 ring-1 ring-blue-200">
                         Evaluation Open
                     </span>
                 )}
             </div>
+
+            {!cycle?.is_open && ['subjects', 'program_chairs', 'employees'].includes(activeNav) && (
+                <div className="mb-5 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
+                    <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-amber-700 ring-1 ring-amber-200">
+                        <AppIcon name="calendar" className="h-4 w-4" />
+                    </div>
+                    <div>
+                        <p className="text-sm font-bold">Evaluation is now closed</p>
+                        <p className="mt-1 text-sm text-amber-800">
+                            You can still view your submitted evaluations and ratings, but new submissions are no longer available for this evaluation period.
+                        </p>
+                    </div>
+                </div>
+            )}
 
             {activeNav === 'subjects'    && <SubjectsTab    subjects={subjects} cycle={cycle} onStartEvaluation={startEvaluation} onViewEvaluation={viewCompletedEvaluation} />}
             {activeNav === 'program_chairs' && (

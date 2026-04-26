@@ -9,7 +9,11 @@ use App\Models\Employee;
 use App\Models\Program;
 use App\Models\Student;
 use App\Models\Teacher;
+use App\Services\AuditLogger;
+use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 
 class DashboardController extends Controller
@@ -37,6 +41,105 @@ class DashboardController extends Controller
             'branchSummaries' => $this->branchSummaries($branchId),
             'departmentStatuses' => $this->departmentStatuses($branchId),
         ]);
+    }
+
+    public function startDepartmentEvaluation(Request $request)
+    {
+        $validated = $request->validate([
+            'department_id' => 'required|integer|exists:department,id',
+            'academic_year_id' => 'required|integer|exists:academic_year,id',
+            'evaluation_start_mode' => 'nullable|in:now,scheduled',
+            'date_opened' => 'nullable|date',
+        ]);
+
+        if (! Schema::hasTable('department_evaluation_windows')) {
+            return back()->with('error', 'Department evaluation windows are not available. Please run the latest migrations.');
+        }
+
+        $department = DB::table('department')
+            ->select('id', 'branch_id', 'name')
+            ->where('id', $validated['department_id'])
+            ->where('is_deleted', 0)
+            ->first();
+
+        if (! $department) {
+            return back()->with('error', 'Selected department was not found.');
+        }
+
+        $scopedBranchId = $this->scopedBranchId();
+
+        if ($scopedBranchId && (int) $department->branch_id !== (int) $scopedBranchId) {
+            return back()->with('error', 'You cannot start evaluation for another branch.');
+        }
+
+        $openedAt = ($validated['evaluation_start_mode'] ?? 'now') === 'scheduled'
+            ? Carbon::parse($validated['date_opened'] ?? now())
+            : now();
+
+        DB::table('department_evaluation_windows')->updateOrInsert(
+            [
+                'academic_year_id' => (int) $validated['academic_year_id'],
+                'department_id' => (int) $department->id,
+            ],
+            [
+                'branch_id' => $department->branch_id,
+                'status' => 'active',
+                'date_opened' => $openedAt,
+                'date_closed' => null,
+                'updated_at' => now(),
+                'created_at' => now(),
+            ],
+        );
+
+        AuditLogger::record('department_evaluation.started', 'department', (int) $department->id, [
+            'academic_year_id' => (int) $validated['academic_year_id'],
+            'date_opened' => $openedAt->toDateTimeString(),
+        ]);
+
+        return back()->with('success', 'Department evaluation window saved.');
+    }
+
+    public function closeDepartmentEvaluation(Request $request)
+    {
+        $validated = $request->validate([
+            'department_id' => 'required|integer|exists:department,id',
+            'academic_year_id' => 'required|integer|exists:academic_year,id',
+        ]);
+
+        if (! Schema::hasTable('department_evaluation_windows')) {
+            return back()->with('error', 'Department evaluation windows are not available. Please run the latest migrations.');
+        }
+
+        $department = DB::table('department')
+            ->select('id', 'branch_id')
+            ->where('id', $validated['department_id'])
+            ->where('is_deleted', 0)
+            ->first();
+
+        if (! $department) {
+            return back()->with('error', 'Selected department was not found.');
+        }
+
+        $scopedBranchId = $this->scopedBranchId();
+
+        if ($scopedBranchId && (int) $department->branch_id !== (int) $scopedBranchId) {
+            return back()->with('error', 'You cannot close evaluation for another branch.');
+        }
+
+        DB::table('department_evaluation_windows')
+            ->where('academic_year_id', (int) $validated['academic_year_id'])
+            ->where('department_id', (int) $department->id)
+            ->update([
+                'status' => 'closed',
+                'date_closed' => now(),
+                'updated_at' => now(),
+            ]);
+
+        AuditLogger::record('department_evaluation.closed', 'department', (int) $department->id, [
+            'academic_year_id' => (int) $validated['academic_year_id'],
+        ]);
+
+        return back()->with('success', 'Department evaluation closed.');
     }
 
     private function branchSummaries(?int $branchId): array
@@ -79,6 +182,12 @@ class DashboardController extends Controller
 
     private function departmentStatuses(?int $branchId): array
     {
+        $activeAcademicYearId = DB::table('academic_year')
+            ->where('is_deleted', 0)
+            ->where('is_activated', 1)
+            ->orderByDesc('from_year')
+            ->orderByDesc('id')
+            ->value('id');
         $departments = DB::table('department as d')
             ->leftJoin('branch as b', 'b.id', '=', 'd.branch_id')
             ->select('d.id', 'd.code', 'd.name', 'd.branch_id', 'b.name as branch_name')
@@ -94,11 +203,28 @@ class DashboardController extends Controller
         $selectedHead = $this->selectedScopes('QTYPE-HEAD');
         $selectedEmployee = $this->selectedScopes('QTYPE-EMPLOYEE');
         $employeeScope = $this->employeeFeedbackScope($branchId);
+        $windows = Schema::hasTable('department_evaluation_windows') && $activeAcademicYearId
+            ? DB::table('department_evaluation_windows')
+                ->where('academic_year_id', $activeAcademicYearId)
+                ->get()
+                ->keyBy('department_id')
+            : collect();
 
         return $departments
-            ->map(function ($department) use ($selectedSubject, $selectedPeer, $selectedHead, $selectedEmployee, $employeeScope) {
+            ->map(function ($department) use ($selectedSubject, $selectedPeer, $selectedHead, $selectedEmployee, $employeeScope, $windows) {
                 $kind = $this->departmentKind($department);
                 $scope = $this->departmentScope($department, $kind);
+                $window = $windows->get((int) $department->id);
+                $windowStatus = null;
+
+                if ($window) {
+                    $openedAt = $window->date_opened ? Carbon::parse($window->date_opened) : null;
+                    $closedAt = $window->date_closed ? Carbon::parse($window->date_closed) : null;
+
+                    $windowStatus = $window->status === 'closed' || ($closedAt && $closedAt->lte(now()))
+                        ? 'closed'
+                        : (($openedAt && $openedAt->isFuture()) ? 'scheduled' : 'open');
+                }
                 $subjectProgress = $this->progressFromIds(
                     $scope['ids'],
                     $selectedSubject[$scope['selected_key']] ?? [],
@@ -133,6 +259,9 @@ class DashboardController extends Controller
                     'percent' => $percent,
                     'status' => $isComplete ? 'Complete' : ($loaded > 0 ? 'In Progress' : 'Not Started'),
                     'is_complete' => $isComplete,
+                    'evaluation_window_status' => $windowStatus,
+                    'evaluation_opened_at' => $window?->date_opened,
+                    'evaluation_closed_at' => $window?->date_closed,
                     'flows' => $flows,
                 ];
             })

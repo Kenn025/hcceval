@@ -276,7 +276,11 @@ class StudentEvaluationTest extends TestCase
             ->get(route('portal.student.dashboard'));
 
         $dashboard->assertOk()
-            ->assertInertia(fn (Assert $page) => $page->component('Student/Dashboard'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Student/Dashboard')
+                ->where('subjects.0.overall_rating', 4.5)
+                ->where('subjects.0.overall_percentage', 90.0)
+                ->where('subjects.0.rating_submission_count', 1))
             ->assertSee('Evaluation Testing')
             ->assertSee('Terry  Teacher')
             ->assertSee('Explains lessons clearly')

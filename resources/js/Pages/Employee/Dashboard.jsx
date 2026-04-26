@@ -1,4 +1,5 @@
 import AppIcon from '@/Components/AppIcon';
+import ConfirmDialog from '@/Components/ConfirmDialog';
 import Modal from '@/Components/Modal';
 import PortalLayout from '@/Layouts/PortalLayout';
 import { useState } from 'react';
@@ -425,9 +426,17 @@ function EmployeeInfoCard({ employee, cycle }) {
 }
 
 function RatingsCard({ ratings, employee, cycle }) {
+    const [printConfirm, setPrintConfirm] = useState(null);
+
     if (!ratings?.submission_count) {
         return <EmptyState icon="ratings" message="No evaluation ratings received for the current cycle." />;
     }
+
+    const askPrintRatings = () => setPrintConfirm({
+        title: 'Print ratings as PDF?',
+        message: 'This opens a printable ratings report in a new tab so you can save it as PDF.',
+        run: () => printRatingsReport({ employee, cycle, ratings, title: 'My Ratings' }),
+    });
 
     return (
         <div className="space-y-4">
@@ -449,7 +458,7 @@ function RatingsCard({ ratings, employee, cycle }) {
                             </p>
                             <button
                                 type="button"
-                                onClick={() => printRatingsReport({ employee, cycle, ratings, title: 'My Ratings' })}
+                                onClick={askPrintRatings}
                                 className="mt-4 inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 transition hover:bg-blue-100"
                             >
                                 <AppIcon name="print" className="h-3.5 w-3.5" />
@@ -477,13 +486,27 @@ function RatingsCard({ ratings, employee, cycle }) {
 
             <RatingsBreakdown
                 ratings={ratings}
-                onPrint={() => printRatingsReport({ employee, cycle, ratings, title: 'My Ratings' })}
+                onPrint={askPrintRatings}
+            />
+
+            <ConfirmDialog
+                open={Boolean(printConfirm)}
+                title={printConfirm?.title}
+                message={printConfirm?.message}
+                confirmLabel="Print PDF"
+                tone="primary"
+                onConfirm={() => {
+                    printConfirm?.run?.();
+                    setPrintConfirm(null);
+                }}
+                onCancel={() => setPrintConfirm(null)}
             />
         </div>
     );
 }
 
 function ArchiveRatingModal({ employee, folder, open, onClose }) {
+    const [printConfirm, setPrintConfirm] = useState(null);
     const ratings = folder?.ratings;
 
     return (
@@ -542,12 +565,16 @@ function ArchiveRatingModal({ employee, folder, open, onClose }) {
                 </button>
                 <button
                     type="button"
-                    onClick={() => printRatingsReport({
-                        employee,
-                        cycle: null,
-                        ratings,
-                        title: 'Archived Rating',
-                        archiveLabel: folder?.label,
+                    onClick={() => setPrintConfirm({
+                        title: 'Print archived rating as PDF?',
+                        message: 'This opens a printable archived rating report in a new tab so you can save it as PDF.',
+                        run: () => printRatingsReport({
+                            employee,
+                            cycle: null,
+                            ratings,
+                            title: 'Archived Rating',
+                            archiveLabel: folder?.label,
+                        }),
                     })}
                     disabled={!ratings?.submission_count}
                     className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
@@ -556,12 +583,26 @@ function ArchiveRatingModal({ employee, folder, open, onClose }) {
                     Print as PDF
                 </button>
             </div>
+
+            <ConfirmDialog
+                open={Boolean(printConfirm)}
+                title={printConfirm?.title}
+                message={printConfirm?.message}
+                confirmLabel="Print PDF"
+                tone="primary"
+                onConfirm={() => {
+                    printConfirm?.run?.();
+                    setPrintConfirm(null);
+                }}
+                onCancel={() => setPrintConfirm(null)}
+            />
         </Modal>
     );
 }
 
 function ArchiveTab({ archiveFolders = [], employee }) {
     const [viewingFolder, setViewingFolder] = useState(null);
+    const [printConfirm, setPrintConfirm] = useState(null);
 
     if (!archiveFolders.length) {
         return <EmptyState icon="archive" message="No archived ratings yet." />;
@@ -582,7 +623,11 @@ function ArchiveTab({ archiveFolders = [], employee }) {
                     </div>
                     <button
                         type="button"
-                        onClick={() => printAllArchiveRatingsReport({ employee, archiveFolders })}
+                        onClick={() => setPrintConfirm({
+                            title: 'Print archive ratings as PDF?',
+                            message: 'This opens a printable archive ratings report in a new tab so you can save it as PDF.',
+                            run: () => printAllArchiveRatingsReport({ employee, archiveFolders }),
+                        })}
                         className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 transition hover:bg-blue-100"
                     >
                         <AppIcon name="print" className="h-3.5 w-3.5" />
@@ -641,6 +686,19 @@ function ArchiveTab({ archiveFolders = [], employee }) {
                 folder={viewingFolder}
                 open={Boolean(viewingFolder)}
                 onClose={() => setViewingFolder(null)}
+            />
+
+            <ConfirmDialog
+                open={Boolean(printConfirm)}
+                title={printConfirm?.title}
+                message={printConfirm?.message}
+                confirmLabel="Print PDF"
+                tone="primary"
+                onConfirm={() => {
+                    printConfirm?.run?.();
+                    setPrintConfirm(null);
+                }}
+                onCancel={() => setPrintConfirm(null)}
             />
         </>
     );

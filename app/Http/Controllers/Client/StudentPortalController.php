@@ -7,6 +7,7 @@ use App\Models\Employee;
 use App\Models\Student;
 use App\Models\Subject;
 use App\Models\Teacher;
+use App\Services\DepartmentEvaluationWindow;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +24,10 @@ class StudentPortalController extends Controller
         return DB::table('academic_year')
             ->where('is_deleted', 0)
             ->where('is_activated', 1)
+            ->where(function ($query) {
+                $query->whereNull('date_opened')
+                    ->orWhere('date_opened', '<=', now());
+            })
             ->orderByDesc('from_year')
             ->first();
     }
@@ -160,13 +165,149 @@ class StudentPortalController extends Controller
                     'already_evaluated' => $alreadyEvaluated,
                     'registration_status' => 'Registered',
                     'is_irregular' => $irregularSubjectIds->contains($subjectId),
-                    'can_evaluate' => ! empty($teacherId) && ! empty($questionnaireId),
+                    'can_evaluate' => (bool) $cycle && ! empty($teacherId) && ! empty($questionnaireId),
                     'questionnaire_id' => $questionnaireId,
                 ];
             })
             ->filter()
             ->sortBy('course_name')
             ->values()
+            ->toArray();
+    }
+
+    private function withActiveSubjectRatings(array $subjects, ?object $cycle, ?Student $student = null): array
+    {
+        if (! $cycle || empty($subjects) || ! Schema::hasTable('ratings_subject')) {
+            return $subjects;
+        }
+
+        $subjectIds = collect($subjects)
+            ->pluck('course_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($subjectIds->isEmpty()) {
+            return $subjects;
+        }
+
+        $personColumn = collect(['employee_id', 'teacher_id'])
+            ->first(fn (string $column) => Schema::hasColumn('ratings_subject', $column));
+
+        $teacherIds = collect($subjects)
+            ->pluck('teacher_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $ratingsQuery = DB::table('ratings_subject')
+            ->select(array_filter([
+                'subject_id',
+                $personColumn,
+                'submission_count',
+                'overall_ratings',
+            ]))
+            ->where('academic_year_id', (int) $cycle->id)
+            ->whereIn('subject_id', $subjectIds->all())
+            ->where('is_archived', 0);
+
+        if ($personColumn && $teacherIds->isNotEmpty()) {
+            $ratingsQuery->whereIn($personColumn, $teacherIds->all());
+        }
+
+        $weighted = function ($rows): array {
+            $summary = ['total' => 0.0, 'count' => 0];
+
+            foreach ($rows as $row) {
+                $overall = json_decode($row->overall_ratings ?? '{}', true) ?: [];
+                $average = isset($overall['average']) ? (float) $overall['average'] : null;
+                $count = max((int) ($row->submission_count ?? 0), 1);
+
+                if ($average === null) {
+                    continue;
+                }
+
+                $summary['total'] += $average * $count;
+                $summary['count'] += $count;
+            }
+
+            return $summary;
+        };
+
+        $ratingRows = $ratingsQuery->get();
+        $exactRatings = $personColumn
+            ? $ratingRows->groupBy(fn ($row) => ((int) $row->subject_id) . ':' . ((int) ($row->{$personColumn} ?? 0)))
+            : collect();
+        $subjectRatings = $ratingRows->groupBy(fn ($row) => (int) $row->subject_id);
+        $studentSubmissionRatings = collect();
+
+        if ($student && Schema::hasTable('evaluation_submissions')) {
+            $submissionIds = collect($student->evaluation_submission_ids ?? [])
+                ->map(fn ($id) => (int) $id)
+                ->filter()
+                ->unique()
+                ->values();
+
+            if ($submissionIds->isNotEmpty()) {
+                $studentSubmissionRatings = DB::table('evaluation_submissions')
+                    ->whereIn('id', $submissionIds->all())
+                    ->where('academic_year_id', (int) $cycle->id)
+                    ->whereIn('subject_id', $subjectIds->all())
+                    ->select('subject_id', 'teacher_id', 'answers')
+                    ->get()
+                    ->map(function ($row) {
+                        $ratings = collect(json_decode($row->answers ?? '[]', true) ?: [])
+                            ->pluck('rating')
+                            ->map(fn ($rating) => (float) $rating)
+                            ->filter(fn ($rating) => $rating > 0);
+
+                        return [
+                            'subject_id' => (int) $row->subject_id,
+                            'teacher_id' => (int) ($row->teacher_id ?? 0),
+                            'average' => $ratings->isNotEmpty() ? round($ratings->avg(), 2) : null,
+                        ];
+                    })
+                    ->filter(fn (array $rating) => $rating['average'] !== null)
+                    ->groupBy(fn (array $rating) => $rating['subject_id'] . ':' . $rating['teacher_id']);
+            }
+        }
+
+        return collect($subjects)
+            ->map(function (array $subject) use ($personColumn, $exactRatings, $subjectRatings, $studentSubmissionRatings, $weighted) {
+                $subjectId = (int) ($subject['course_id'] ?? 0);
+                $teacherId = (int) ($subject['teacher_id'] ?? 0);
+                $rows = $personColumn && $teacherId
+                    ? ($exactRatings->get($subjectId . ':' . $teacherId) ?? collect())
+                    : collect();
+
+                if ($rows->isEmpty()) {
+                    $rows = $subjectRatings->get($subjectId) ?? collect();
+                }
+
+                $summary = $weighted($rows);
+                $submissionCount = (int) ($summary['count'] ?? 0);
+                $overallRating = $submissionCount > 0 ? round($summary['total'] / $submissionCount, 2) : null;
+
+                if ($overallRating === null) {
+                    $studentRows = $studentSubmissionRatings->get($subjectId . ':' . $teacherId)
+                        ?? $studentSubmissionRatings
+                            ->filter(fn ($ratings, string $key) => str_starts_with($key, $subjectId . ':'))
+                            ->flatten(1);
+
+                    if ($studentRows->isNotEmpty()) {
+                        $overallRating = round($studentRows->avg('average'), 2);
+                        $submissionCount = $studentRows->count();
+                    }
+                }
+
+                return array_merge($subject, [
+                    'overall_rating' => $overallRating,
+                    'overall_percentage' => $overallRating !== null ? round(($overallRating / 5) * 100, 1) : null,
+                    'rating_submission_count' => $submissionCount,
+                ]);
+            })
             ->toArray();
     }
 
@@ -894,22 +1035,67 @@ class StudentPortalController extends Controller
                 ->get()
                 ->mapWithKeys(fn (Employee $employee) => [$employee->id => $employee->full_name])
             : collect();
+        $employeeDepartmentTable = Schema::hasTable('employee_departments')
+            ? 'employee_departments'
+            : (Schema::hasTable('employee_department') ? 'employee_department' : null);
+        $employeeDetails = $employeeIds->isNotEmpty() && Schema::hasTable('employee')
+            ? DB::table('employee as e')
+                ->when(
+                    $employeeDepartmentTable && Schema::hasColumn('employee', 'employee_department_id'),
+                    fn ($query) => $query->leftJoin($employeeDepartmentTable . ' as ed', 'ed.id', '=', 'e.employee_department_id')
+                )
+                ->whereIn('e.id', $employeeIds->all())
+                ->select('e.id', 'e.role', DB::raw(($employeeDepartmentTable && Schema::hasColumn('employee', 'employee_department_id')) ? 'ed.name as department_name' : 'NULL as department_name'))
+                ->get()
+                ->keyBy('id')
+            : collect();
+        $questionnaireIds = DB::table('evaluation_submissions')
+            ->whereIn('id', $submissionIds->all())
+            ->pluck('questionnaire_id')
+            ->filter()
+            ->unique()
+            ->values();
+        $questionnaireInfo = $questionnaireIds->isNotEmpty() && Schema::hasTable('questionnaires')
+            ? DB::table('questionnaires')
+                ->whereIn('id', $questionnaireIds->all())
+                ->select('id', 'title', 'items')
+                ->get()
+                ->mapWithKeys(function ($questionnaire) {
+                    $items = json_decode($questionnaire->items ?? '{}', true) ?: [];
+                    $meta = collect($items['scale_questions'] ?? [])
+                        ->flatMap(fn ($group) => collect($group['questions'] ?? [])->mapWithKeys(fn ($id) => [
+                            (int) $id => [
+                                'class_name' => $group['class_name'] ?? '',
+                                'weight_percentage' => $group['weight_percentage'] ?? null,
+                            ],
+                        ]))
+                        ->all();
+
+                    return [(int) $questionnaire->id => [
+                        'title' => $questionnaire->title,
+                        'questions' => $meta,
+                    ]];
+                })
+            : collect();
 
         $activeAcademicYearId = $cycle ? (int) $cycle->id : null;
         $records = DB::table('evaluation_submissions')
             ->whereIn('id', $submissionIds->all())
             ->orderByDesc('created_at')
             ->get()
-            ->map(function ($row) use ($subjectLookup, $questionTexts, $academicYears, $teacherNames, $employeeNames) {
+            ->map(function ($row) use ($subjectLookup, $questionTexts, $academicYears, $teacherNames, $employeeNames, $employeeDetails, $questionnaireInfo) {
                 $answers = collect(json_decode($row->answers ?? '[]', true) ?: [])
-                    ->map(function ($answer) use ($questionTexts) {
+                    ->map(function ($answer) use ($questionTexts, $questionnaireInfo, $row) {
                         $questionId = (int) ($answer['question_id'] ?? 0);
                         $rating = (int) ($answer['rating'] ?? 0);
+                        $meta = data_get($questionnaireInfo->get((int) $row->questionnaire_id), "questions.{$questionId}", []);
 
                         return [
                             'question_id' => $questionId,
                             'question_text' => $questionTexts[$questionId] ?? ('Question #' . $questionId),
                             'rating' => $rating,
+                            'class_name' => $meta['class_name'] ?? '',
+                            'weight_percentage' => $meta['weight_percentage'] ?? null,
                         ];
                     })
                     ->values();
@@ -925,6 +1111,7 @@ class StudentPortalController extends Controller
                     : (isset($subject['term']) ? $this->semesterLabel($subject['term']) : null);
                 $ratings = $answers->pluck('rating')->filter();
                 $questionnaireTypeId = $row->questionnaire_type_id ? (int) $row->questionnaire_type_id : null;
+                $employeeDetail = $employeeDetails->get((int) $row->employee_id);
                 $evaluateeName = match ($questionnaireTypeId) {
                     3 => $teacherNames[(int) $row->teacher_id] ?? 'School Head',
                     4 => $employeeNames[(int) $row->employee_id] ?? 'Employee',
@@ -938,8 +1125,11 @@ class StudentPortalController extends Controller
                     'course_code' => $subject['course_code'] ?? null,
                     'course_name' => $subject['course_name'] ?? null,
                     'evaluatee_name' => $evaluateeName,
+                    'evaluatee_role' => $questionnaireTypeId === 4 ? ($employeeDetail->role ?? 'Employee') : null,
+                    'evaluatee_scope' => $questionnaireTypeId === 4 ? ($employeeDetail->department_name ?? null) : null,
                     'teacher_name' => $questionnaireTypeId === 1 ? $evaluateeName : null,
                     'questionnaire_id' => $row->questionnaire_id ? (int) $row->questionnaire_id : null,
+                    'questionnaire_title' => data_get($questionnaireInfo->get((int) $row->questionnaire_id), 'title'),
                     'academic_year_id' => $row->academic_year_id ? (int) $row->academic_year_id : null,
                     'school_year' => $schoolYear,
                     'semester_label' => $semesterLabel,
@@ -1167,6 +1357,11 @@ class StudentPortalController extends Controller
         ])));
 
         $student = Student::with('yearLevel')->findOrFail($studentId);
+
+        if (! DepartmentEvaluationWindow::isOpen((int) $student->department_id, (int) $data['academic_year_id'])) {
+            return redirect()->route('portal.student.dashboard')
+                ->with('error', 'Evaluation is not open for your department.');
+        }
 
         if ($data['category'] === 'program_chair') {
             $target = Teacher::query()
@@ -1584,6 +1779,9 @@ class StudentPortalController extends Controller
             ->findOrFail($studentId);
 
         $cycle = $this->activeCycle();
+        if ($cycle && ! DepartmentEvaluationWindow::isOpen((int) $student->department_id, (int) $cycle->id)) {
+            $cycle = null;
+        }
         $subjects     = [];
         $programChairs = [];
         $employees = [];
@@ -1665,6 +1863,8 @@ class StudentPortalController extends Controller
         if (empty($subjects)) {
             $subjects = $this->legacyRegisteredSubjects($student, $cycle);
         }
+
+        $subjects = $this->withActiveSubjectRatings($subjects, $cycle, $student);
 
         $studentEvaluationRecords = $this->studentEvaluationRecords($student, $cycle, $subjects);
         $evaluations = $studentEvaluationRecords['current'];

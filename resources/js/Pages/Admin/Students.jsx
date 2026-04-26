@@ -1349,18 +1349,10 @@ export default function Students({
                     <button
                         type="button"
                         onClick={() => setBulkUploadOpen(true)}
-                        className="inline-flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
+                        className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-base font-semibold text-slate-800 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
                     >
-                        <AppIcon name="assignments" className="h-4 w-4" />
+                        <AppIcon name="upload" className="h-4 w-4 text-slate-700" />
                         Bulk Upload CSV
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setStudentPortalOpen(true)}
-                        className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                    >
-                        <AppIcon name="graduation" className="h-4 w-4" />
-                        Student Portal
                     </button>
                     <button type="button" onClick={openCreate} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">+ New Student</button>
                 </div>

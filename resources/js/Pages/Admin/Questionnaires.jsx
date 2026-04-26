@@ -458,6 +458,7 @@ export default function Questionnaires({ questionnaires, branches = [], question
     const [commentSearch, setCommentSearch] = useState('');
     const [submitError, setSubmitError] = useState('');
     const [confirmSave, setConfirmSave] = useState(false);
+    const [confirmPrint, setConfirmPrint] = useState(false);
     const [questionnairePreviewOpen, setQuestionnairePreviewOpen] = useState(false);
 
     const { data, setData, errors, processing, reset, clearErrors } = useForm({
@@ -736,7 +737,7 @@ export default function Questionnaires({ questionnaires, branches = [], question
                         <div className="sticky top-0 z-10 flex justify-end gap-2 border-b border-slate-200 bg-white/95 px-6 py-4 backdrop-blur">
                                 <button
                                     type="button"
-                                    onClick={printViewingAsPdf}
+                                    onClick={() => setConfirmPrint(true)}
                                     className="inline-flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100"
                                 >
                                     <Printer className="h-4 w-4" aria-hidden="true" />
@@ -1115,6 +1116,19 @@ export default function Questionnaires({ questionnaires, branches = [], question
                     </div>
                 </div>
             </Modal>
+
+            <ConfirmDialog
+                open={confirmPrint}
+                title="Print Questionnaire"
+                message="Open a printable questionnaire in a new tab so you can save it as PDF?"
+                confirmLabel="Print PDF"
+                danger={false}
+                onConfirm={() => {
+                    printViewingAsPdf();
+                    setConfirmPrint(false);
+                }}
+                onCancel={() => setConfirmPrint(false)}
+            />
 
             <ConfirmDialog
                 open={Boolean(deleteTarget)}
