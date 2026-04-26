@@ -4,6 +4,8 @@ import ResourceTable from '@/Components/Admin/ResourceTable';
 import SlideOver from '@/Components/Admin/SlideOver';
 import SubmitButton from '@/Components/Admin/SubmitButton';
 import StatusBadge from '@/Components/Admin/StatusBadge';
+import useFormDirty from '@/Components/Admin/useFormDirty';
+import AppConfirmDialog from '@/Components/ConfirmDialog';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { router, useForm } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
@@ -23,6 +25,9 @@ export default function Strands({ strands, filters, branches, selectedBranchId, 
         adviser_teacher_id: '',
         is_activated: true,
     });
+
+    const { isDirty } = useFormDirty(data, editing?.id ?? 'new');
+    const [confirmUpdateOpen, setConfirmUpdateOpen] = useState(false);
 
     const filteredAdvisers = useMemo(
         () => advisers.filter((adviser) => {
@@ -70,6 +75,12 @@ export default function Strands({ strands, filters, branches, selectedBranchId, 
 
     const submit = (e) => {
         e.preventDefault();
+        if (editing && !isDirty) return;
+        if (editing) { setConfirmUpdateOpen(true); return; }
+        performSave();
+    };
+
+    const performSave = () => {
         const url = editing ? route('admin.senior-high.strands') + '/' + editing.id : route('admin.senior-high.strands');
         const request = editing
             ? (targetUrl, payload, options) => router.put(targetUrl, payload, options)
@@ -78,8 +89,10 @@ export default function Strands({ strands, filters, branches, selectedBranchId, 
         request(url, data, {
             onSuccess: () => {
                 setSlideOpen(false);
+                setConfirmUpdateOpen(false);
                 reset();
             },
+            onError: () => setConfirmUpdateOpen(false),
         });
     };
 
@@ -193,7 +206,7 @@ export default function Strands({ strands, filters, branches, selectedBranchId, 
 
                     <div className="flex gap-3 pt-2">
                         <button type="button" onClick={() => setSlideOpen(false)} className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700">Cancel</button>
-                        <SubmitButton processing={processing} className="flex-1">
+                        <SubmitButton processing={processing} disabled={Boolean(editing) && !isDirty} className="flex-1">
                             {editing ? 'Update' : 'Create'}
                         </SubmitButton>
                     </div>
@@ -201,6 +214,17 @@ export default function Strands({ strands, filters, branches, selectedBranchId, 
             </SlideOver>
 
             <ConfirmDialog open={Boolean(deleteTarget)} onConfirm={() => { router.delete(route('admin.senior-high.strands') + '/' + deleteTarget.id, { onSuccess: () => setDeleteTarget(null) }); }} onCancel={() => setDeleteTarget(null)} title="Delete Strand" message={`Delete "${deleteTarget?.name}"?`} />
+
+            <AppConfirmDialog
+                open={confirmUpdateOpen}
+                title="Save changes?"
+                message={`Save changes to ${editing?.name ?? 'this strand'}?`}
+                confirmLabel="Update"
+                tone="primary"
+                loading={processing}
+                onConfirm={performSave}
+                onCancel={() => setConfirmUpdateOpen(false)}
+            />
         </AdminLayout>
     );
 }

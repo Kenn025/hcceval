@@ -3,6 +3,8 @@ import FormField, { SelectInput, TextInput, TextareaInput } from '@/Components/A
 import ResourceTable from '@/Components/Admin/ResourceTable';
 import SlideOver from '@/Components/Admin/SlideOver';
 import SubmitButton from '@/Components/Admin/SubmitButton';
+import useFormDirty from '@/Components/Admin/useFormDirty';
+import AppConfirmDialog from '@/Components/ConfirmDialog';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
@@ -21,6 +23,9 @@ export default function Questions({ questions, questionTypes, questionClasses, n
         question_text: '',
         is_active: true,
     });
+
+    const { isDirty } = useFormDirty(data, editing?.question_id ?? 'new');
+    const [confirmUpdateOpen, setConfirmUpdateOpen] = useState(false);
 
     const openCreate = () => {
         reset();
@@ -61,6 +66,12 @@ export default function Questions({ questions, questionTypes, questionClasses, n
 
     const submit = (e) => {
         e.preventDefault();
+        if (editing && !isDirty) return;
+        if (editing) { setConfirmUpdateOpen(true); return; }
+        performSave();
+    };
+
+    const performSave = () => {
         const url = editing ? '/admin/questions/' + editing.question_id : '/admin/questions';
         const request = editing
             ? (targetUrl, payload, options) => router.put(targetUrl, payload, options)
@@ -69,8 +80,10 @@ export default function Questions({ questions, questionTypes, questionClasses, n
         request(url, data, {
             onSuccess: () => {
                 setSlideOpen(false);
+                setConfirmUpdateOpen(false);
                 reset();
             },
+            onError: () => setConfirmUpdateOpen(false),
         });
     };
 
@@ -153,7 +166,7 @@ export default function Questions({ questions, questionTypes, questionClasses, n
 
                     <div className="flex gap-3 pt-2">
                         <button type="button" onClick={() => setSlideOpen(false)} className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700">Cancel</button>
-                        <SubmitButton processing={processing} className="flex-1">
+                        <SubmitButton processing={processing} disabled={Boolean(editing) && !isDirty} className="flex-1">
                             {editing ? 'Update' : 'Create'}
                         </SubmitButton>
                     </div>
@@ -166,6 +179,17 @@ export default function Questions({ questions, questionTypes, questionClasses, n
                 onCancel={() => setDeleteTarget(null)}
                 title="Delete Question"
                 message={`Delete question "${deleteTarget?.question_code}"? This may affect existing evaluations.`}
+            />
+
+            <AppConfirmDialog
+                open={confirmUpdateOpen}
+                title="Save changes?"
+                message={`Save changes to ${editing?.question_code ?? 'this question'}?`}
+                confirmLabel="Update"
+                tone="primary"
+                loading={processing}
+                onConfirm={performSave}
+                onCancel={() => setConfirmUpdateOpen(false)}
             />
         </AdminLayout>
     );

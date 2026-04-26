@@ -359,8 +359,8 @@ function DepartmentStatusCard({ department, onOpen, onStartEvaluation }) {
 }
 
 const QUICK_LINKS = [
-    { label: 'Branches', route: 'admin.branches', icon: 'branches', desc: 'Campus branches' },
-    { label: 'Departments', route: 'admin.departments', icon: 'departments', desc: 'Academic departments' },
+    { label: 'Branches', route: 'admin.branches', icon: 'branches', desc: 'Campus branches', roles: ['superadmin', 'overalladmin'] },
+    { label: 'Departments', route: 'admin.departments', icon: 'departments', desc: 'Academic departments', roles: ['superadmin', 'overalladmin'] },
     { label: 'Programs', route: 'admin.college.programs', icon: 'programs', desc: 'Degree programs' },
     { label: 'Students', route: 'admin.students', icon: 'students', desc: 'Student directory' },
     { label: 'Teachers', route: 'admin.teachers', icon: 'teachers', desc: 'Faculty directory' },
@@ -370,7 +370,9 @@ const QUICK_LINKS = [
 ];
 
 export default function Dashboard({ branchSummaries = [], departmentStatuses = [] }) {
-    const { activeAcademicYear } = usePage().props;
+    const { activeAcademicYear, auth } = usePage().props;
+    const role = auth?.role ?? 'admin';
+    const visibleQuickLinks = QUICK_LINKS.filter((item) => !item.roles || item.roles.includes(role));
     const [selectedDepartmentStatus, setSelectedDepartmentStatus] = useState(null);
     const [startWarningTarget, setStartWarningTarget] = useState(null);
     const readyDepartments = departmentStatuses.filter((department) => department.is_complete).length;
@@ -484,7 +486,7 @@ export default function Dashboard({ branchSummaries = [], departmentStatuses = [
             <section className="mt-6">
                 <h3 className="mb-3 text-sm font-semibold text-slate-700">Quick Access</h3>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    {QUICK_LINKS.map((item) => (
+                    {visibleQuickLinks.map((item) => (
                         <Link
                             key={item.route}
                             href={route(item.route)}

@@ -5,6 +5,8 @@ import ResourceTable from '@/Components/Admin/ResourceTable';
 import SlideOver from '@/Components/Admin/SlideOver';
 import SubmitButton from '@/Components/Admin/SubmitButton';
 import StatusBadge from '@/Components/Admin/StatusBadge';
+import useFormDirty from '@/Components/Admin/useFormDirty';
+import AppConfirmDialog from '@/Components/ConfirmDialog';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { router, useForm } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
@@ -115,6 +117,9 @@ export default function YearLevels({
         section: '',
         education_type: educationType,
     });
+
+    const { isDirty } = useFormDirty(data, editing?.id ?? 'new');
+    const [confirmUpdateOpen, setConfirmUpdateOpen] = useState(false);
     const [subjectSearch, setSubjectSearch] = useState('');
     const resolvedDepartment = useMemo(() => {
         if (!data.branch_id) {
@@ -401,6 +406,12 @@ export default function YearLevels({
 
     const submit = (e) => {
         e.preventDefault();
+        if (editing && !isDirty) return;
+        if (editing) { setConfirmUpdateOpen(true); return; }
+        performSave();
+    };
+
+    const performSave = () => {
         setErrorNotification('');
         const base = '/admin/year-levels';
         const url = editing ? base + '/' + editing.id : base;
@@ -411,10 +422,12 @@ export default function YearLevels({
         request(url, data, {
             onSuccess: () => {
                 setSlideOpen(false);
+                setConfirmUpdateOpen(false);
                 reset();
             },
             onError: (formErrors) => {
                 setErrorNotification(getFirstErrorMessage(formErrors, `Unable to save ${levelLabel.toLowerCase()}.`));
+                setConfirmUpdateOpen(false);
             },
         });
     };
@@ -809,7 +822,7 @@ export default function YearLevels({
 
                     <div className="flex gap-3 pt-2">
                         <button type="button" onClick={() => setSlideOpen(false)} className="flex-1 rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700">Cancel</button>
-                        <SubmitButton processing={processing} className="flex-1">
+                        <SubmitButton processing={processing} disabled={Boolean(editing) && !isDirty} className="flex-1">
                             {editing ? 'Update' : 'Create'}
                         </SubmitButton>
                     </div>
@@ -817,6 +830,17 @@ export default function YearLevels({
             </SlideOver>
 
             <ConfirmDialog open={Boolean(deleteTarget)} onConfirm={() => { router.delete('/admin/year-levels/' + deleteTarget.id, { onSuccess: () => setDeleteTarget(null) }); }} onCancel={() => setDeleteTarget(null)} title="Delete Level" message={`Delete "${deleteTarget?.display_name ?? deleteTarget?.code}"?`} />
+
+            <AppConfirmDialog
+                open={confirmUpdateOpen}
+                title="Save changes?"
+                message={`Save changes to ${editing?.display_name ?? editing?.code ?? 'this level'}?`}
+                confirmLabel="Update"
+                tone="primary"
+                loading={processing}
+                onConfirm={performSave}
+                onCancel={() => setConfirmUpdateOpen(false)}
+            />
         </AdminLayout>
     );
 }
