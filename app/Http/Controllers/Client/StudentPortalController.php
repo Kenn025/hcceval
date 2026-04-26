@@ -140,7 +140,7 @@ class StudentPortalController extends Controller
                     $student,
                     $cycle ? (int) $cycle->id : null,
                     $questionnaireId,
-                    $teacherId ? (int) $teacherId : null,
+                    $subject->id ? (int) $subject->id : null,
                 );
 
                 return [
@@ -505,6 +505,7 @@ class StudentPortalController extends Controller
                 return [
                     'submission_id' => (int) $row->id,
                     'category' => 'teacher_subject',
+                    'subject_id' => $row->subject_id ? (int) $row->subject_id : null,
                     'course_code' => $subject['course_code'] ?? null,
                     'course_name' => $subject['course_name'] ?? null,
                     'evaluatee_name' => $subject['teacher_name'] ?? 'Teacher',
@@ -745,8 +746,7 @@ class StudentPortalController extends Controller
             DB::transaction(function () use ($student, $subjectSection, $data, $questionnaireId) {
                 $questionnaireTypeId = $this->questionnaireTypeId($questionnaireId);
                 $comments = $data['comments'] ?? null;
-
-                $submissionId = (int) DB::table('evaluation_submissions')->insertGetId([
+                $submissionPayload = [
                     'branch_id' => $student->branch_id,
                     'academic_year_id' => $data['academic_year_id'],
                     'questionnaire_type_id' => $questionnaireTypeId,
@@ -756,7 +756,13 @@ class StudentPortalController extends Controller
                     'comments' => json_encode($comments ? ['text' => $comments] : []),
                     'created_at' => now(),
                     'updated_at' => now(),
-                ]);
+                ];
+
+                if (Schema::hasColumn('evaluation_submissions', 'teacher_id')) {
+                    $submissionPayload['teacher_id'] = $subjectSection->teacher_employee_id ?: null;
+                }
+
+                $submissionId = (int) DB::table('evaluation_submissions')->insertGetId($submissionPayload);
 
                 $submissionIds = collect($student->evaluation_submission_ids ?? [])
                     ->map(fn ($id) => (int) $id)
@@ -780,50 +786,69 @@ class StudentPortalController extends Controller
             ->map(fn ($group) => round($group->avg('rating'), 2))
             ->toArray();
 
-        $ratingPersonColumn = Schema::hasColumn('ratings_subject', 'employee_id') ? 'employee_id' : 'teacher_id';
-        $canAggregateRating = $ratingPersonColumn === 'teacher_id'
-            || DB::table('employee')->where('id', $subjectSection->teacher_employee_id)->exists();
-
-        if (! $canAggregateRating) {
-            return redirect()->route('portal.student.dashboard')->with('success', 'Evaluation submitted. Thank you!');
-        }
-
-        $existing = DB::table('ratings_subject')
-            ->where('academic_year_id', $data['academic_year_id'])
-            ->where('subject_id', $subjectSection->subject_id)
-            ->where($ratingPersonColumn, $subjectSection->teacher_employee_id)
-            ->first();
-
-        if ($existing) {
-            $count = ((int) $existing->submission_count) + 1;
-            $previous = json_decode($existing->item_ratings ?? '{}', true) ?: [];
-            $combined = [];
-
-            foreach (array_unique(array_merge(array_keys($previous), array_keys($newItems))) as $questionId) {
-                $combined[$questionId] = round((($previous[$questionId] ?? 0) * ($count - 1) + ($newItems[$questionId] ?? 0)) / $count, 2);
+        try {
+            if (! Schema::hasTable('ratings_subject')) {
+                return redirect()->route('portal.student.dashboard')->with('success', 'Evaluation submitted. Thank you!');
             }
 
-            $overall = count($combined) ? round(array_sum($combined) / count($combined), 2) : 0;
+            $ratingPersonColumn = collect(['employee_id', 'teacher_id'])
+                ->first(fn (string $column) => Schema::hasColumn('ratings_subject', $column));
 
-            DB::table('ratings_subject')->where('id', $existing->id)->update([
-                'submission_count' => $count,
-                'item_ratings' => json_encode($combined),
-                'overall_ratings' => json_encode(['average' => $overall]),
-                'updated_at' => now(),
-            ]);
-        } else {
-            $overall = count($newItems) ? round(array_sum($newItems) / count($newItems), 2) : 0;
+            if (! $ratingPersonColumn) {
+                return redirect()->route('portal.student.dashboard')->with('success', 'Evaluation submitted. Thank you!');
+            }
 
-            DB::table('ratings_subject')->insert([
-                'academic_year_id' => $data['academic_year_id'],
-                'subject_id' => $subjectSection->subject_id,
-                $ratingPersonColumn => $subjectSection->teacher_employee_id,
-                'submission_count' => 1,
-                'item_ratings' => json_encode($newItems),
-                'overall_ratings' => json_encode(['average' => $overall]),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            $canAggregateRating = match ($ratingPersonColumn) {
+                'employee_id' => Schema::hasTable('employee')
+                    && DB::table('employee')->where('id', $subjectSection->teacher_employee_id)->exists(),
+                'teacher_id' => Schema::hasTable('teacher')
+                    && DB::table('teacher')->where('id', $subjectSection->teacher_employee_id)->exists(),
+                default => false,
+            };
+
+            if (! $canAggregateRating) {
+                return redirect()->route('portal.student.dashboard')->with('success', 'Evaluation submitted. Thank you!');
+            }
+
+            $existing = DB::table('ratings_subject')
+                ->where('academic_year_id', $data['academic_year_id'])
+                ->where('subject_id', $subjectSection->subject_id)
+                ->where($ratingPersonColumn, $subjectSection->teacher_employee_id)
+                ->first();
+
+            if ($existing) {
+                $count = ((int) $existing->submission_count) + 1;
+                $previous = json_decode($existing->item_ratings ?? '{}', true) ?: [];
+                $combined = [];
+
+                foreach (array_unique(array_merge(array_keys($previous), array_keys($newItems))) as $questionId) {
+                    $combined[$questionId] = round((($previous[$questionId] ?? 0) * ($count - 1) + ($newItems[$questionId] ?? 0)) / $count, 2);
+                }
+
+                $overall = count($combined) ? round(array_sum($combined) / count($combined), 2) : 0;
+
+                DB::table('ratings_subject')->where('id', $existing->id)->update([
+                    'submission_count' => $count,
+                    'item_ratings' => json_encode($combined),
+                    'overall_ratings' => json_encode(['average' => $overall]),
+                    'updated_at' => now(),
+                ]);
+            } else {
+                $overall = count($newItems) ? round(array_sum($newItems) / count($newItems), 2) : 0;
+
+                DB::table('ratings_subject')->insert([
+                    'academic_year_id' => $data['academic_year_id'],
+                    'subject_id' => $subjectSection->subject_id,
+                    $ratingPersonColumn => $subjectSection->teacher_employee_id,
+                    'submission_count' => 1,
+                    'item_ratings' => json_encode($newItems),
+                    'overall_ratings' => json_encode(['average' => $overall]),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+        } catch (Throwable $exception) {
+            report($exception);
         }
 
         return redirect()->route('portal.student.dashboard')->with('success', 'Evaluation submitted. Thank you!');
@@ -897,7 +922,7 @@ class StudentPortalController extends Controller
                         $student,
                         $cycle ? (int) $cycle->id : null,
                         $questionnaireId,
-                        $row->teacher_id ? (int) $row->teacher_id : null,
+                        $row->course_id ? (int) $row->course_id : null,
                     );
 
                     return array_merge((array) $row, [

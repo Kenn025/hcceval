@@ -769,17 +769,23 @@ class TeacherPortalController extends Controller
             'academic_year_id' => $data['academic_year_id'],
             'questionnaire_type_id' => $this->questionnaireTypeId($questionnaireId),
             'questionnaire_id' => $questionnaireId,
-            'teacher_id' => $evaluatee->id,
             'answers' => json_encode($data['answers']),
-            'comments' => $hasLegacyEvaluatorColumns
-                ? ($data['comments'] ?? null)
-                : json_encode($data['comments'] ? ['text' => $data['comments']] : []),
             'comments' => json_encode(($data['comments'] ?? null) ? ['text' => $data['comments']] : []),
-            'overall_average' => $avg,
-            'submitted_at' => now(),
             'created_at' => now(),
             'updated_at' => now(),
         ];
+
+        if (Schema::hasColumn('evaluation_submissions', 'teacher_id')) {
+            $submissionPayload['teacher_id'] = $evaluatee->id;
+        }
+
+        if (Schema::hasColumn('evaluation_submissions', 'overall_average')) {
+            $submissionPayload['overall_average'] = $avg;
+        }
+
+        if (Schema::hasColumn('evaluation_submissions', 'submitted_at')) {
+            $submissionPayload['submitted_at'] = now();
+        }
 
         if ($hasLegacyEvaluatorColumns) {
             $submissionPayload += [

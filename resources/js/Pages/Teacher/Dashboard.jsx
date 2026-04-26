@@ -567,6 +567,7 @@ export default function TeacherDashboard({ teacher, cycle, pendingTargets = [], 
     const selectedEvaluationForm = selectedEvaluationKey ? evaluationForms[selectedEvaluationKey] : null;
     const scopeType = teacher.program ? 'program' : teacher.strand ? 'strand' : 'department';
     const scopeLabel = teacher.program || teacher.strand || teacher.department || 'assigned scope';
+    const completedPeerTargets = pendingTargets.filter((target) => target.done);
     const submissionTargets = [...pendingTargets, ...headTargets]
         .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
 
@@ -638,7 +639,17 @@ export default function TeacherDashboard({ teacher, cycle, pendingTargets = [], 
             )}
 
             {activeNav === 'peer_ratings' && (
-                <EmptyState icon="group" message="Your peer ratings will appear here once faculty evaluations are aggregated." />
+                <>
+                    <div className="mb-5">
+                        <p className="text-xs text-slate-400">
+                            Completed faculty peer evaluations in your assigned {scopeType} scope
+                        </p>
+                        <p className="mt-1 text-sm font-medium text-slate-700">
+                            Scope: {scopeLabel}
+                        </p>
+                    </div>
+                    <SubmissionsTab targets={completedPeerTargets} onViewEvaluation={startEvaluation} />
+                </>
             )}
 
             {activeNav === 'submissions' && (

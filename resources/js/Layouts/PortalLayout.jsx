@@ -217,6 +217,11 @@ function PortalNavDivider({ item, collapsed }) {
         <div className="px-3 pt-4 pb-2">
             <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/35">
                 {item.label}
+            </p>
+        </div>
+    );
+}
+
 function PortalNavSection({ label, collapsed }) {
     if (collapsed) {
         return <div className="mx-auto my-3 h-px w-8 rounded-full bg-white/15" />;
@@ -437,6 +442,11 @@ export default function PortalLayout({
                                 <PortalNavDivider
                                     key={item.key}
                                     item={item}
+                                    collapsed={sidebarCollapsed}
+                                />
+                            );
+                        }
+
                         if (item.type === "section") {
                             return (
                                 <PortalNavSection
