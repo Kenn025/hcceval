@@ -6,6 +6,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class StudentEvaluationTest extends TestCase
@@ -275,7 +276,7 @@ class StudentEvaluationTest extends TestCase
             ->get(route('portal.student.dashboard'));
 
         $dashboard->assertOk()
-            ->assertSee('Student/Dashboard')
+            ->assertInertia(fn (Assert $page) => $page->component('Student/Dashboard'))
             ->assertSee('Evaluation Testing')
             ->assertSee('Terry  Teacher')
             ->assertSee('Explains lessons clearly')
