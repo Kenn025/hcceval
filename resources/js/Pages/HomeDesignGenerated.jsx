@@ -136,6 +136,7 @@ function App({
     stats: homepageStats = [],
     headerLinks: customHeaderLinks = [],
     homeSection: customHomeSection = null,
+    featuresSection: customFeaturesSection = null,
 }) {
     const [isDarkMode, setIsDarkMode] = useState(() => {
         if (typeof window === "undefined") return false;
@@ -312,38 +313,59 @@ function App({
             progress: 95,
         },
     ];
-    const features = [
+    const defaultFeatureCards = [
         {
-            icon: "dashboard",
             title: "Real-Time Analytics",
             desc: "Live performance tracking with interactive charts and comprehensive dashboards.",
         },
         {
-            icon: "shield",
             title: "Secure & Private",
             desc: "Enterprise-grade encryption ensuring all evaluations remain confidential.",
         },
         {
-            icon: "network",
             title: "Multi-Device",
             desc: "Responsive design accessible on desktop, tablet, and mobile devices.",
         },
         {
-            icon: "branches",
             title: "Multi-Campus",
             desc: "Seamlessly connect and manage evaluations across multiple campuses.",
         },
         {
-            icon: "edit",
             title: "Customizable",
             desc: "Tailor evaluation criteria and workflows to your institution needs.",
         },
         {
-            icon: "assignments",
             title: "Detailed Reports",
             desc: "Generate comprehensive PDF reports with actionable insights.",
         },
     ];
+    const defaultFeaturesSection = {
+        badge_text: "Features",
+        title_text: "Powerful Capabilities",
+        subtitle_text:
+            "Everything you need for comprehensive evaluation management",
+        features: defaultFeatureCards,
+    };
+    const featuresSection =
+        customFeaturesSection && typeof customFeaturesSection === "object"
+            ? {
+                  ...defaultFeaturesSection,
+                  ...customFeaturesSection,
+                  features:
+                      Array.isArray(customFeaturesSection.features) &&
+                      customFeaturesSection.features.length > 0
+                          ? customFeaturesSection.features
+                          : defaultFeaturesSection.features,
+              }
+            : defaultFeaturesSection;
+    const featureCards =
+        Array.isArray(featuresSection.features) &&
+        featuresSection.features.length > 0
+            ? featuresSection.features.map((feature) => ({
+                  title: String(feature?.title || ""),
+                  desc: String(feature?.subtitle || feature?.desc || ""),
+              }))
+            : defaultFeatureCards;
     const defaultStats = [
         { value: 4, label: "User Roles", icon: "group" },
         { value: 12, label: "Campuses", icon: "branches" },
@@ -428,7 +450,9 @@ function App({
     const heroVideoSrc = String(
         homeSection.background_video_path || "/videos/hero-loop.mp4",
     );
-    const heroBadgeText = String(homeSection.badge_text || "Thesis Project 2026");
+    const heroBadgeText = String(
+        homeSection.badge_text || "Thesis Project 2026",
+    );
     const heroTitleText = String(
         homeSection.title_text || defaultHomeSection.title_text,
     );
@@ -441,9 +465,7 @@ function App({
     const heroPrimaryLabel = String(
         homeSection.primary_cta_label || "Start Evaluating",
     );
-    const heroPrimaryTarget = String(
-        homeSection.primary_cta_target || "login",
-    );
+    const heroPrimaryTarget = String(homeSection.primary_cta_target || "login");
     const heroSecondaryLabel = String(
         homeSection.secondary_cta_label || "Learn More",
     );
@@ -496,7 +518,8 @@ function App({
         const beforeWords = parseWords(beforeText);
         const afterWords = parseWords(afterText);
 
-        const line1 = beforeWords.join(" ") || afterWords.shift() || fallbackLines[0];
+        const line1 =
+            beforeWords.join(" ") || afterWords.shift() || fallbackLines[0];
         const line2 = highlightMatch || afterWords.shift() || fallbackLines[1];
 
         let line3 = "";
@@ -550,16 +573,86 @@ function App({
         scrollTo(normalizedTarget);
     };
     const defaultHeaderItems = [
-        { id: "logo-default", label: "Brand Logo", target: "graduation", item_type: "logo", sort_order: 0, is_active: true },
-        { id: "title-default", label: "Brand Title", target: "MCH-PEMS", item_type: "brand_title", sort_order: 0, is_active: true },
-        { id: "subtitle-default", label: "Brand Subtitle", target: "Evaluation System", item_type: "brand_subtitle", sort_order: 0, is_active: true },
-        { id: "link-home", label: "Home", target: "home", item_type: "link", sort_order: 1, is_active: true },
-        { id: "link-features", label: "Features", target: "features", item_type: "link", sort_order: 2, is_active: true },
-        { id: "link-roles", label: "Roles", target: "roles", item_type: "link", sort_order: 3, is_active: true },
-        { id: "link-how", label: "How It Works", target: "how-it-works", item_type: "link", sort_order: 4, is_active: true },
-        { id: "link-faq", label: "FAQ", target: "faq", item_type: "link", sort_order: 5, is_active: true },
-        { id: "toggle-default", label: "Theme Toggle", target: "Theme Toggle", item_type: "toggle", sort_order: 6, is_active: true },
-        { id: "signin-default", label: "Sign In Button", target: "Sign In", item_type: "signin", sort_order: 7, is_active: true },
+        {
+            id: "logo-default",
+            label: "Brand Logo",
+            target: "graduation",
+            item_type: "logo",
+            sort_order: 0,
+            is_active: true,
+        },
+        {
+            id: "title-default",
+            label: "Brand Title",
+            target: "MCH-PEMS",
+            item_type: "brand_title",
+            sort_order: 0,
+            is_active: true,
+        },
+        {
+            id: "subtitle-default",
+            label: "Brand Subtitle",
+            target: "Evaluation System",
+            item_type: "brand_subtitle",
+            sort_order: 0,
+            is_active: true,
+        },
+        {
+            id: "link-home",
+            label: "Home",
+            target: "home",
+            item_type: "link",
+            sort_order: 1,
+            is_active: true,
+        },
+        {
+            id: "link-features",
+            label: "Features",
+            target: "features",
+            item_type: "link",
+            sort_order: 2,
+            is_active: true,
+        },
+        {
+            id: "link-roles",
+            label: "Roles",
+            target: "roles",
+            item_type: "link",
+            sort_order: 3,
+            is_active: true,
+        },
+        {
+            id: "link-how",
+            label: "How It Works",
+            target: "how-it-works",
+            item_type: "link",
+            sort_order: 4,
+            is_active: true,
+        },
+        {
+            id: "link-faq",
+            label: "FAQ",
+            target: "faq",
+            item_type: "link",
+            sort_order: 5,
+            is_active: true,
+        },
+        {
+            id: "toggle-default",
+            label: "Theme Toggle",
+            target: "Theme Toggle",
+            item_type: "toggle",
+            sort_order: 6,
+            is_active: true,
+        },
+        {
+            id: "signin-default",
+            label: "Sign In Button",
+            target: "Sign In",
+            item_type: "signin",
+            sort_order: 7,
+            is_active: true,
+        },
     ];
     const headerItems =
         Array.isArray(customHeaderLinks) && customHeaderLinks.length > 0
@@ -580,15 +673,27 @@ function App({
             label: link.label,
             target: link.target,
         }));
-    const logoItem = activeHeaderItems.find((item) => item.item_type === "logo");
-    const brandTitleItem = activeHeaderItems.find((item) => item.item_type === "brand_title");
-    const brandSubtitleItem = activeHeaderItems.find((item) => item.item_type === "brand_subtitle");
-    const toggleItem = activeHeaderItems.find((item) => item.item_type === "toggle");
-    const signInItem = activeHeaderItems.find((item) => item.item_type === "signin");
+    const logoItem = activeHeaderItems.find(
+        (item) => item.item_type === "logo",
+    );
+    const brandTitleItem = activeHeaderItems.find(
+        (item) => item.item_type === "brand_title",
+    );
+    const brandSubtitleItem = activeHeaderItems.find(
+        (item) => item.item_type === "brand_subtitle",
+    );
+    const toggleItem = activeHeaderItems.find(
+        (item) => item.item_type === "toggle",
+    );
+    const signInItem = activeHeaderItems.find(
+        (item) => item.item_type === "signin",
+    );
     const brandLogoIcon = String(logoItem?.target || "graduation");
     const brandLogoIsImage = isImageTarget(brandLogoIcon);
     const brandTitle = String(brandTitleItem?.target || "MCH-PEMS");
-    const brandSubtitle = String(brandSubtitleItem?.target || "Evaluation System");
+    const brandSubtitle = String(
+        brandSubtitleItem?.target || "Evaluation System",
+    );
     const showThemeToggle = Boolean(toggleItem);
     const showSignInButton = Boolean(signInItem);
     const signInLabel = String(signInItem?.target || "Sign In");
@@ -638,11 +743,15 @@ function App({
                                                             : "rgba(148, 163, 184, 0.28)",
                                                     },
                                                     children: brandLogoIsImage
-                                                        ? /* @__PURE__ */ jsx("img", {
-                                                              src: brandLogoIcon,
-                                                              alt: `${brandTitle} logo`,
-                                                              className: "h-10 w-10 rounded-full object-cover",
-                                                          })
+                                                        ? /* @__PURE__ */ jsx(
+                                                              "img",
+                                                              {
+                                                                  src: brandLogoIcon,
+                                                                  alt: `${brandTitle} logo`,
+                                                                  className:
+                                                                      "h-10 w-10 rounded-full object-cover",
+                                                              },
+                                                          )
                                                         : /* @__PURE__ */ jsx(
                                                               AppIcon,
                                                               {
@@ -664,7 +773,8 @@ function App({
                                                                 style: {
                                                                     color: "var(--text-primary)",
                                                                 },
-                                                                children: brandTitle,
+                                                                children:
+                                                                    brandTitle,
                                                             },
                                                         ),
                                                         /* @__PURE__ */ jsx(
@@ -675,7 +785,8 @@ function App({
                                                                 style: {
                                                                     color: "var(--text-secondary)",
                                                                 },
-                                                                children: brandSubtitle,
+                                                                children:
+                                                                    brandSubtitle,
                                                             },
                                                         ),
                                                     ],
@@ -724,18 +835,23 @@ function App({
                                                         },
                                                     ),
                                                 showSignInButton &&
-                                                    /* @__PURE__ */ jsx("button", {
-                                                        onClick: goToLogin,
-                                                        className: `hidden sm:inline-flex px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 ${isIslandExpanded ? "opacity-100" : "lg:opacity-0 lg:pointer-events-none"}`,
-                                                        style: {
-                                                            color: "var(--accent)",
-                                                            background: isDarkMode
-                                                                ? "rgba(30, 41, 59, 0.66)"
-                                                                : "rgba(255, 255, 255, 0.72)",
-                                                            border: "1px solid var(--border)",
+                                                    /* @__PURE__ */ jsx(
+                                                        "button",
+                                                        {
+                                                            onClick: goToLogin,
+                                                            className: `hidden sm:inline-flex px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 ${isIslandExpanded ? "opacity-100" : "lg:opacity-0 lg:pointer-events-none"}`,
+                                                            style: {
+                                                                color: "var(--accent)",
+                                                                background:
+                                                                    isDarkMode
+                                                                        ? "rgba(30, 41, 59, 0.66)"
+                                                                        : "rgba(255, 255, 255, 0.72)",
+                                                                border: "1px solid var(--border)",
+                                                            },
+                                                            children:
+                                                                signInLabel,
                                                         },
-                                                        children: signInLabel,
-                                                    }),
+                                                    ),
                                                 /* @__PURE__ */ jsx("button", {
                                                     className:
                                                         "lg:hidden w-10 h-10 rounded-full flex items-center justify-center",
@@ -935,25 +1051,31 @@ function App({
                                                                 style: {
                                                                     color: "var(--text-primary)",
                                                                 },
-                                                                children: heroTitleLayout.lines.map(
-                                                                    (line, index) =>
-                                                                        /* @__PURE__ */ jsx(
-                                                                            "span",
-                                                                            {
-                                                                                className: "block",
-                                                                                style:
-                                                                                    heroTitleLayout.hasHighlightLine &&
-                                                                                    index ===
-                                                                                        heroTitleLayout.highlightLineIndex
-                                                                                        ? {
-                                                                                              color: "var(--accent)",
-                                                                                          }
-                                                                                        : undefined,
-                                                                                children: line,
-                                                                            },
-                                                                            `hero-title-line-${index}`,
-                                                                        ),
-                                                                ),
+                                                                children:
+                                                                    heroTitleLayout.lines.map(
+                                                                        (
+                                                                            line,
+                                                                            index,
+                                                                        ) =>
+                                                                            /* @__PURE__ */ jsx(
+                                                                                "span",
+                                                                                {
+                                                                                    className:
+                                                                                        "block",
+                                                                                    style:
+                                                                                        heroTitleLayout.hasHighlightLine &&
+                                                                                        index ===
+                                                                                            heroTitleLayout.highlightLineIndex
+                                                                                            ? {
+                                                                                                  color: "var(--accent)",
+                                                                                              }
+                                                                                            : undefined,
+                                                                                    children:
+                                                                                        line,
+                                                                                },
+                                                                                `hero-title-line-${index}`,
+                                                                            ),
+                                                                    ),
                                                             },
                                                         ),
                                                         /* @__PURE__ */ jsx(
@@ -1545,46 +1667,34 @@ function App({
                                     className:
                                         "neumorphic-flat px-4 py-2 inline-block text-sm font-bold mb-4",
                                     style: { color: "var(--accent)" },
-                                    children: "Features",
+                                    children:
+                                        featuresSection.badge_text ||
+                                        "Features",
                                 }),
                                 /* @__PURE__ */ jsx("h2", {
                                     className:
                                         "text-3xl md:text-4xl font-bold mb-4",
                                     style: { color: "var(--text-primary)" },
-                                    children: "Powerful Capabilities",
+                                    children:
+                                        featuresSection.title_text ||
+                                        "Powerful Capabilities",
                                 }),
                                 /* @__PURE__ */ jsx("p", {
                                     style: { color: "var(--text-secondary)" },
-                                    children:
-                                        "Everything you need for comprehensive evaluation management",
+                                    children: featuresSection.subtitle_text,
                                 }),
                             ],
                         }),
                         /* @__PURE__ */ jsx("div", {
                             className:
                                 "grid md:grid-cols-2 lg:grid-cols-3 gap-8",
-                            children: features.map((feature, i) =>
+                            children: featureCards.map((feature, i) =>
                                 /* @__PURE__ */ jsxs(
                                     "div",
                                     {
                                         className:
                                             "neumorphic p-6 hover:scale-[1.02] transition-transform duration-300 cursor-pointer",
                                         children: [
-                                            /* @__PURE__ */ jsx("div", {
-                                                className:
-                                                    "w-16 h-16 neumorphic-circle flex items-center justify-center text-2xl mb-4",
-                                                style: {
-                                                    color: "var(--accent)",
-                                                },
-                                                children: /* @__PURE__ */ jsx(
-                                                    AppIcon,
-                                                    {
-                                                        name: feature.icon,
-                                                        className: "h-8 w-8",
-                                                        strokeWidth: 1.9,
-                                                    },
-                                                ),
-                                            }),
                                             /* @__PURE__ */ jsx("h3", {
                                                 className:
                                                     "text-xl font-bold mb-2",

@@ -59,6 +59,20 @@ function normalizeStatsSection(stats = []) {
     }));
 }
 
+function normalizeFeaturesSection(featuresSection = {}) {
+    return {
+        badge_text: String(featuresSection.badge_text ?? "").trim(),
+        title_text: String(featuresSection.title_text ?? "").trim(),
+        subtitle_text: String(featuresSection.subtitle_text ?? "").trim(),
+        features: (featuresSection.features ?? []).map((row) => ({
+            id: row.id ?? null,
+            title: String(row.title ?? "").trim(),
+            subtitle: String(row.subtitle ?? "").trim(),
+            sort_order: Number(row.sort_order ?? 0),
+        })),
+    };
+}
+
 function normalizeStatKey(value) {
     return String(value ?? "")
         .trim()
@@ -95,6 +109,12 @@ export default function LandingPage({
     filters,
     homeSection,
     statsSection = [],
+    featuresSection = {
+        badge_text: "",
+        title_text: "",
+        subtitle_text: "",
+        features: [],
+    },
 }) {
     const canEditStats =
         (statsSection ?? []).length > 0 &&
@@ -105,14 +125,19 @@ export default function LandingPage({
     const [modalOpen, setModalOpen] = useState(false);
     const [homeModalOpen, setHomeModalOpen] = useState(false);
     const [statsModalOpen, setStatsModalOpen] = useState(false);
+    const [featuresModalOpen, setFeaturesModalOpen] = useState(false);
     const [pendingScrollToIndex, setPendingScrollToIndex] = useState(null);
     const [pendingStatsScrollToIndex, setPendingStatsScrollToIndex] =
         useState(null);
+    const [pendingFeaturesScrollToIndex, setPendingFeaturesScrollToIndex] =
+        useState(null);
     const linkContainerRefs = useRef([]);
     const statContainerRefs = useRef([]);
+    const featureContainerRefs = useRef([]);
     const initialHeadersSnapshotRef = useRef("[]");
     const initialHomeSectionSnapshotRef = useRef("{}");
     const initialStatsSnapshotRef = useRef("[]");
+    const initialFeaturesSnapshotRef = useRef("{}");
 
     const { data, setData, errors, processing, reset, clearErrors } = useForm({
         headers: [],
@@ -146,6 +171,20 @@ export default function LandingPage({
         clearErrors: clearStatsErrors,
     } = useForm({
         stats: [],
+        delete_ids: [],
+    });
+    const {
+        data: featuresData,
+        setData: setFeaturesData,
+        errors: featuresErrors,
+        processing: featuresProcessing,
+        reset: resetFeatures,
+        clearErrors: clearFeaturesErrors,
+    } = useForm({
+        badge_text: "",
+        title_text: "",
+        subtitle_text: "",
+        features: [],
         delete_ids: [],
     });
 
@@ -209,6 +248,31 @@ export default function LandingPage({
         );
         setStatsModalOpen(true);
     };
+    const openFeaturesEdit = () => {
+        clearFeaturesErrors();
+
+        const nextFeatures = (featuresSection?.features ?? []).map((row) => ({
+            id: row.id ?? null,
+            title: row.title ?? "",
+            subtitle: row.subtitle ?? "",
+            sort_order: row.sort_order ?? 0,
+        }));
+
+        setFeaturesData("badge_text", featuresSection?.badge_text ?? "");
+        setFeaturesData("title_text", featuresSection?.title_text ?? "");
+        setFeaturesData("subtitle_text", featuresSection?.subtitle_text ?? "");
+        setFeaturesData("features", nextFeatures);
+        setFeaturesData("delete_ids", []);
+        initialFeaturesSnapshotRef.current = JSON.stringify(
+            normalizeFeaturesSection({
+                badge_text: featuresSection?.badge_text ?? "",
+                title_text: featuresSection?.title_text ?? "",
+                subtitle_text: featuresSection?.subtitle_text ?? "",
+                features: nextFeatures,
+            }),
+        );
+        setFeaturesModalOpen(true);
+    };
 
     const closeModal = () => {
         reset();
@@ -228,6 +292,13 @@ export default function LandingPage({
         clearStatsErrors();
         setPendingStatsScrollToIndex(null);
         statContainerRefs.current = [];
+    };
+    const closeFeaturesModal = () => {
+        resetFeatures();
+        setFeaturesModalOpen(false);
+        clearFeaturesErrors();
+        setPendingFeaturesScrollToIndex(null);
+        featureContainerRefs.current = [];
     };
 
     const updateRow = (index, key, value) => {
@@ -308,6 +379,19 @@ export default function LandingPage({
             setPendingStatsScrollToIndex(null);
         }
     }, [statsData.stats?.length, statsModalOpen, pendingStatsScrollToIndex]);
+    useEffect(() => {
+        if (!featuresModalOpen || pendingFeaturesScrollToIndex === null) return;
+
+        const target = featureContainerRefs.current[pendingFeaturesScrollToIndex];
+        if (target) {
+            target.scrollIntoView({ behavior: "smooth", block: "start" });
+            setPendingFeaturesScrollToIndex(null);
+        }
+    }, [
+        featuresData.features?.length,
+        featuresModalOpen,
+        pendingFeaturesScrollToIndex,
+    ]);
 
     const hasEmptyRequiredFields = useMemo(
         () =>
@@ -496,6 +580,107 @@ export default function LandingPage({
             {
                 forceFormData: true,
                 onSuccess: closeStatsModal,
+            },
+        );
+    };
+    const updateFeatureField = (key, value) => {
+        setFeaturesData(key, value);
+    };
+    const updateFeatureRow = (index, key, value) => {
+        const next = [...(featuresData.features ?? [])];
+        next[index] = {
+            ...next[index],
+            [key]: value,
+        };
+        setFeaturesData("features", next);
+    };
+    const withFeatureSortOrder = (rows = []) =>
+        rows.map((item, idx) => ({
+            ...item,
+            sort_order: idx + 1,
+        }));
+    const addFeatureRow = () => {
+        const nextFeatures = withFeatureSortOrder([
+            ...(featuresData.features ?? []),
+            {
+                id: null,
+                title: "",
+                subtitle: "",
+                sort_order: 0,
+            },
+        ]);
+
+        setFeaturesData("features", nextFeatures);
+        setPendingFeaturesScrollToIndex(nextFeatures.length - 1);
+    };
+    const removeFeatureRow = (index) => {
+        const row = (featuresData.features ?? [])[index];
+        const nextRows = withFeatureSortOrder(
+            (featuresData.features ?? []).filter((_, i) => i !== index),
+        );
+
+        setFeaturesData("features", nextRows);
+
+        if (row?.id) {
+            const nextDeleteIds = Array.from(
+                new Set([...(featuresData.delete_ids ?? []), row.id]),
+            );
+            setFeaturesData("delete_ids", nextDeleteIds);
+        }
+    };
+    const moveFeatureRow = (index, direction) => {
+        const rows = [...(featuresData.features ?? [])];
+        const targetIndex = direction === "up" ? index - 1 : index + 1;
+        if (targetIndex < 0 || targetIndex >= rows.length) {
+            return;
+        }
+
+        const temp = rows[index];
+        rows[index] = rows[targetIndex];
+        rows[targetIndex] = temp;
+
+        setFeaturesData("features", withFeatureSortOrder(rows));
+    };
+    const hasEmptyFeaturesRequiredFields = useMemo(() => {
+        const sectionFields = [
+            featuresData.badge_text,
+            featuresData.title_text,
+            featuresData.subtitle_text,
+        ];
+
+        const sectionHasEmpty = sectionFields.some(
+            (value) => String(value ?? "").trim() === "",
+        );
+        const rowHasEmpty = (featuresData.features ?? []).some(
+            (row) =>
+                String(row.title ?? "").trim() === "" ||
+                String(row.subtitle ?? "").trim() === "",
+        );
+
+        return sectionHasEmpty || rowHasEmpty;
+    }, [featuresData]);
+    const hasFeaturesSectionChanges = useMemo(() => {
+        const currentSnapshot = JSON.stringify(
+            normalizeFeaturesSection(featuresData),
+        );
+        return currentSnapshot !== initialFeaturesSnapshotRef.current;
+    }, [featuresData]);
+    const submitFeaturesSection = (event) => {
+        event.preventDefault();
+
+        if (hasEmptyFeaturesRequiredFields || !hasFeaturesSectionChanges) {
+            return;
+        }
+
+        router.post(
+            route("admin.landing-page.features-section.update"),
+            {
+                _method: "put",
+                ...featuresData,
+            },
+            {
+                forceFormData: true,
+                onSuccess: closeFeaturesModal,
             },
         );
     };
@@ -696,6 +881,86 @@ export default function LandingPage({
                                     </td>
                                 </tr>
                             ))}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section className="mb-4 rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-5">
+                    <h2 className="text-base font-semibold text-slate-900">
+                        Features
+                    </h2>
+                    <button
+                        type="button"
+                        onClick={openFeaturesEdit}
+                        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                    >
+                        Edit
+                    </button>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="min-w-full">
+                        <thead>
+                            <tr className="border-b border-slate-100 bg-slate-50/70 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                <th className="px-4 py-3 sm:px-5">Field</th>
+                                <th className="px-4 py-3 sm:px-5">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody className="text-sm text-slate-700">
+                            <tr className="border-b border-slate-100">
+                                <td className="px-4 py-3 font-medium sm:px-5">
+                                    Badge
+                                </td>
+                                <td className="px-4 py-3 sm:px-5">
+                                    {featuresSection?.badge_text || "-"}
+                                </td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                                <td className="px-4 py-3 font-medium sm:px-5">
+                                    Title
+                                </td>
+                                <td className="px-4 py-3 sm:px-5">
+                                    {featuresSection?.title_text || "-"}
+                                </td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                                <td className="px-4 py-3 font-medium sm:px-5">
+                                    Subtitle
+                                </td>
+                                <td className="px-4 py-3 sm:px-5">
+                                    {featuresSection?.subtitle_text || "-"}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td className="px-4 py-3 font-medium sm:px-5 align-top">
+                                    Cards
+                                </td>
+                                <td className="px-4 py-3 sm:px-5">
+                                    <div className="space-y-1">
+                                        {(featuresSection?.features ?? []).map(
+                                            (row, index) => (
+                                                <div
+                                                    key={
+                                                        row.id ??
+                                                        `feature-summary-${index}`
+                                                    }
+                                                >
+                                                    <span className="font-medium text-slate-900">
+                                                        {row.title ||
+                                                            `Card ${index + 1}`}
+                                                    </span>
+                                                    <span className="text-slate-500">
+                                                        {" "}
+                                                        - {row.subtitle || "-"}
+                                                    </span>
+                                                </div>
+                                            ),
+                                        )}
+                                    </div>
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -1041,7 +1306,7 @@ export default function LandingPage({
                                                 </button>
                                             </div>
                                         </div>
-                                        <div className="grid gap-3 md:grid-cols-3">
+                                            <div className="grid gap-3 md:grid-cols-2">
                                             <FormField
                                                 label="Metric"
                                                 error={
@@ -1111,6 +1376,254 @@ export default function LandingPage({
                                     <button
                                         type="button"
                                         onClick={closeStatsModal}
+                                        className="w-full md:w-[180px] rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {featuresModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div
+                        className="absolute inset-0 bg-slate-950/40"
+                        onClick={closeFeaturesModal}
+                    />
+                    <div
+                        className="relative w-full max-w-4xl rounded-xl bg-white p-6 shadow-2xl"
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div className="mb-4 flex items-center justify-between">
+                            <h3 className="text-base font-semibold text-slate-900">
+                                Edit Features
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={closeFeaturesModal}
+                                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                                aria-label="Close modal"
+                            >
+                                <svg
+                                    className="h-5 w-5"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={2}
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M6 18L18 6M6 6l12 12"
+                                    />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <form
+                            onSubmit={submitFeaturesSection}
+                            className="space-y-4"
+                        >
+                            <div className="max-h-[60vh] overflow-y-auto space-y-3 pr-1">
+                                <div className="grid gap-3 md:grid-cols-3">
+                                    <FormField
+                                        label="Badge"
+                                        error={featuresErrors.badge_text}
+                                        required
+                                    >
+                                        <TextInput
+                                            value={featuresData.badge_text}
+                                            onChange={(event) =>
+                                                updateFeatureField(
+                                                    "badge_text",
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                    </FormField>
+                                    <FormField
+                                        label="Title"
+                                        error={featuresErrors.title_text}
+                                        required
+                                    >
+                                        <TextInput
+                                            value={featuresData.title_text}
+                                            onChange={(event) =>
+                                                updateFeatureField(
+                                                    "title_text",
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                    </FormField>
+                                    <FormField
+                                        label="Subtitle"
+                                        error={featuresErrors.subtitle_text}
+                                        required
+                                    >
+                                        <TextInput
+                                            value={featuresData.subtitle_text}
+                                            onChange={(event) =>
+                                                updateFeatureField(
+                                                    "subtitle_text",
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                    </FormField>
+                                </div>
+
+                                <div className="flex justify-end">
+                                    <button
+                                        type="button"
+                                        onClick={addFeatureRow}
+                                        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                                    >
+                                        + Add Feature
+                                    </button>
+                                </div>
+
+                                {(featuresData.features ?? []).map(
+                                    (row, index) => (
+                                        <div
+                                            key={row.id ?? `feature-${index}`}
+                                            ref={(el) => {
+                                                featureContainerRefs.current[
+                                                    index
+                                                ] = el;
+                                            }}
+                                            className="rounded-lg border border-slate-200 bg-slate-50 p-4"
+                                        >
+                                            <div className="mb-3 flex items-center justify-between gap-2">
+                                                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                    Card #{index + 1}
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            moveFeatureRow(
+                                                                index,
+                                                                "up",
+                                                            )
+                                                        }
+                                                        aria-label={`Move Feature #${index + 1} up`}
+                                                        disabled={index === 0}
+                                                        className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                                    >
+                                                        <AppIcon
+                                                            name="arrow-up"
+                                                            className="h-4 w-4"
+                                                        />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            moveFeatureRow(
+                                                                index,
+                                                                "down",
+                                                            )
+                                                        }
+                                                        aria-label={`Move Feature #${index + 1} down`}
+                                                        disabled={
+                                                            index ===
+                                                            (featuresData.features ??
+                                                                []).length -
+                                                                1
+                                                        }
+                                                        className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                                    >
+                                                        <AppIcon
+                                                            name="arrow-down"
+                                                            className="h-4 w-4"
+                                                        />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            removeFeatureRow(
+                                                                index,
+                                                            )
+                                                        }
+                                                        aria-label={`Delete Feature #${index + 1}`}
+                                                        className="rounded-lg border border-rose-200 bg-white p-1.5 text-rose-600 hover:bg-rose-50"
+                                                    >
+                                                        <AppIcon
+                                                            name="trash"
+                                                            className="h-4 w-4"
+                                                        />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        <div className="grid gap-3 md:grid-cols-3">
+                                                <FormField
+                                                    label="Card Title"
+                                                    error={
+                                                        featuresErrors[
+                                                            `features.${index}.title`
+                                                        ]
+                                                    }
+                                                    required
+                                                >
+                                                    <TextInput
+                                                        value={row.title ?? ""}
+                                                        onChange={(event) =>
+                                                            updateFeatureRow(
+                                                                index,
+                                                                "title",
+                                                                event.target
+                                                                    .value,
+                                                            )
+                                                        }
+                                                    />
+                                                </FormField>
+                                                <FormField
+                                                    label="Card Subtitle"
+                                                    error={
+                                                        featuresErrors[
+                                                            `features.${index}.subtitle`
+                                                        ]
+                                                    }
+                                                    required
+                                                >
+                                                    <TextInput
+                                                        value={
+                                                            row.subtitle ?? ""
+                                                        }
+                                                        onChange={(event) =>
+                                                            updateFeatureRow(
+                                                                index,
+                                                                "subtitle",
+                                                                event.target
+                                                                    .value,
+                                                            )
+                                                        }
+                                                    />
+                                                </FormField>
+                                            </div>
+                                        </div>
+                                    ),
+                                )}
+                            </div>
+
+                            <div className="pt-2">
+                                <div className="flex flex-col md:flex-row-reverse gap-3 md:justify-start w-full">
+                                    <SubmitButton
+                                        processing={featuresProcessing}
+                                        disabled={
+                                            hasEmptyFeaturesRequiredFields ||
+                                            !hasFeaturesSectionChanges
+                                        }
+                                        className="w-full md:w-[180px]"
+                                    >
+                                        Save Changes
+                                    </SubmitButton>
+                                    <button
+                                        type="button"
+                                        onClick={closeFeaturesModal}
                                         className="w-full md:w-[180px] rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700"
                                     >
                                         Cancel

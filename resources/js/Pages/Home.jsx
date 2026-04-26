@@ -1,18 +1,23 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Head } from '@inertiajs/react';
-import HomeDesignGenerated from './HomeDesignGenerated';
-import SecretTeamCard from '@/Components/SecretTeamCard';
-import '../../css/homepage-design.css';
+import React, { useEffect, useRef, useState } from "react";
+import { Head } from "@inertiajs/react";
+import HomeDesignGenerated from "./HomeDesignGenerated";
+import SecretTeamCard from "@/Components/SecretTeamCard";
+import "../../css/homepage-design.css";
 
-export default function Home({ stats = [], headerLinks = [], homeSection = null }) {
+export default function Home({
+    stats = [],
+    headerLinks = [],
+    homeSection = null,
+    featuresSection = null,
+}) {
     const [showSecretTeamCard, setShowSecretTeamCard] = useState(false);
-    const secretSequence = useRef(['h', 'e', 's', 'o', 'y', 'a', 'm']);
+    const secretSequence = useRef(["h", "e", "s", "o", "y", "a", "m"]);
     const typedSequence = useRef([]);
     const audioRef = useRef(null);
 
     useEffect(() => {
         if (!audioRef.current) {
-            audioRef.current = new Audio('/assets/audio/pota-pota-dance.mp3');
+            audioRef.current = new Audio("/assets/audio/pota-pota-dance.mp3");
             audioRef.current.loop = true;
         }
         const audio = audioRef.current;
@@ -34,13 +39,13 @@ export default function Home({ stats = [], headerLinks = [], homeSection = null 
                 return;
             }
 
-            if (event.key === 'Escape') {
+            if (event.key === "Escape") {
                 setShowSecretTeamCard(false);
                 typedSequence.current = [];
                 return;
             }
 
-            const key = event.key.length === 1 ? event.key.toLowerCase() : '';
+            const key = event.key.length === 1 ? event.key.toLowerCase() : "";
 
             if (!key) {
                 return;
@@ -52,16 +57,19 @@ export default function Home({ stats = [], headerLinks = [], homeSection = null 
                 typedSequence.current.shift();
             }
 
-            if (typedSequence.current.join('') === secretSequence.current.join('')) {
+            if (
+                typedSequence.current.join("") ===
+                secretSequence.current.join("")
+            ) {
                 setShowSecretTeamCard(true);
                 typedSequence.current = [];
             }
         };
 
-        window.addEventListener('keydown', handleKeyDown, true);
+        window.addEventListener("keydown", handleKeyDown, true);
 
         return () => {
-            window.removeEventListener('keydown', handleKeyDown, true);
+            window.removeEventListener("keydown", handleKeyDown, true);
         };
     }, []);
 
@@ -75,8 +83,8 @@ export default function Home({ stats = [], headerLinks = [], homeSection = null 
         const isBrandTarget = (target) => {
             let el = target;
             for (let depth = 0; el && depth < 4; depth++) {
-                const text = (el.textContent ?? '').trim();
-                if (text === 'MCH-PEMS') {
+                const text = (el.textContent ?? "").trim();
+                if (text === "MCH-PEMS") {
                     return true;
                 }
                 el = el.parentElement;
@@ -97,8 +105,8 @@ export default function Home({ stats = [], headerLinks = [], homeSection = null 
             }
         };
 
-        document.addEventListener('click', handleTap, true);
-        return () => document.removeEventListener('click', handleTap, true);
+        document.addEventListener("click", handleTap, true);
+        return () => document.removeEventListener("click", handleTap, true);
     }, []);
 
     return (
@@ -110,19 +118,23 @@ export default function Home({ stats = [], headerLinks = [], homeSection = null 
                     onClick={() => setShowSecretTeamCard(false)}
                 >
                     <div className="flex min-h-full items-start justify-center px-4 py-8 sm:items-center sm:py-12">
-                        <div onClick={(event) => event.stopPropagation()} className="relative w-full max-w-[980px]">
+                        <div
+                            onClick={(event) => event.stopPropagation()}
+                            className="relative w-full max-w-[980px]"
+                        >
                             <SecretTeamCard />
                         </div>
                     </div>
                 </div>
             )}
             <HomeDesignGenerated
-                loginUrl={route('login')}
-                loginSubmitUrl={route('login.submit')}
-                registerUrl={route('register')}
+                loginUrl={route("login")}
+                loginSubmitUrl={route("login.submit")}
+                registerUrl={route("register")}
                 stats={stats}
                 headerLinks={headerLinks}
                 homeSection={homeSection}
+                featuresSection={featuresSection}
             />
         </>
     );

@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\LandingPageFeature;
+use App\Models\LandingPageFeatureSection;
 use App\Models\LandingPageHeader;
 use App\Models\LandingPageHomeSection;
 use App\Models\LandingPageStat;
@@ -19,6 +21,7 @@ class HomeController extends Controller
             'stats' => $this->stats(),
             'headerLinks' => $this->headerLinks(),
             'homeSection' => $this->homeSection(),
+            'featuresSection' => $this->featuresSection(),
         ]);
     }
 
@@ -163,6 +166,49 @@ class HomeController extends Controller
             'secondary_cta_label' => $homeSection->secondary_cta_label,
             'secondary_cta_target' => $homeSection->secondary_cta_target,
             'background_video_path' => $homeSection->background_video_path,
+        ];
+    }
+
+    private function featuresSection(): array
+    {
+        $defaultFeatures = [
+            ['title' => 'Real-Time Analytics', 'subtitle' => 'Live performance tracking with interactive charts and comprehensive dashboards.', 'sort_order' => 1],
+            ['title' => 'Secure & Private', 'subtitle' => 'Enterprise-grade encryption ensuring all evaluations remain confidential.', 'sort_order' => 2],
+            ['title' => 'Multi-Device', 'subtitle' => 'Responsive design accessible on desktop, tablet, and mobile devices.', 'sort_order' => 3],
+            ['title' => 'Multi-Campus', 'subtitle' => 'Seamlessly connect and manage evaluations across multiple campuses.', 'sort_order' => 4],
+            ['title' => 'Customizable', 'subtitle' => 'Tailor evaluation criteria and workflows to your institution needs.', 'sort_order' => 5],
+            ['title' => 'Detailed Reports', 'subtitle' => 'Generate comprehensive PDF reports with actionable insights.', 'sort_order' => 6],
+        ];
+        $defaultSection = [
+            'badge_text' => 'Features',
+            'title_text' => 'Powerful Capabilities',
+            'subtitle_text' => 'Everything you need for comprehensive evaluation management',
+            'features' => $defaultFeatures,
+        ];
+
+        if (! Schema::hasTable('landing_page_feature_sections') || ! Schema::hasTable('landing_page_features')) {
+            return $defaultSection;
+        }
+
+        $section = LandingPageFeatureSection::query()->first();
+        $features = LandingPageFeature::query()
+            ->where('is_active', 1)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get(['title', 'subtitle', 'sort_order'])
+            ->map(fn(LandingPageFeature $feature) => [
+                'title' => $feature->title,
+                'subtitle' => $feature->subtitle,
+                'sort_order' => $feature->sort_order,
+            ])
+            ->values()
+            ->all();
+
+        return [
+            'badge_text' => $section?->badge_text ?: $defaultSection['badge_text'],
+            'title_text' => $section?->title_text ?: $defaultSection['title_text'],
+            'subtitle_text' => $section?->subtitle_text ?: $defaultSection['subtitle_text'],
+            'features' => count($features) > 0 ? $features : $defaultFeatures,
         ];
     }
 }

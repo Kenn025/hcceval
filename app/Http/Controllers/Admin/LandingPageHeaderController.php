@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\LandingPageFeature;
+use App\Models\LandingPageFeatureSection;
 use App\Models\LandingPageHeader;
 use App\Models\LandingPageHomeSection;
 use App\Models\LandingPageStat;
@@ -26,6 +28,43 @@ class LandingPageHeaderController extends Controller
         'secondary_cta_label' => 'Learn More',
         'secondary_cta_target' => 'how-it-works',
         'background_video_path' => '/videos/hero-loop.mp4',
+    ];
+    private const DEFAULT_FEATURE_SECTION = [
+        'badge_text' => 'Features',
+        'title_text' => 'Powerful Capabilities',
+        'subtitle_text' => 'Everything you need for comprehensive evaluation management',
+    ];
+    private const DEFAULT_FEATURES = [
+        [
+            'title' => 'Real-Time Analytics',
+            'subtitle' => 'Live performance tracking with interactive charts and comprehensive dashboards.',
+            'sort_order' => 1,
+        ],
+        [
+            'title' => 'Secure & Private',
+            'subtitle' => 'Enterprise-grade encryption ensuring all evaluations remain confidential.',
+            'sort_order' => 2,
+        ],
+        [
+            'title' => 'Multi-Device',
+            'subtitle' => 'Responsive design accessible on desktop, tablet, and mobile devices.',
+            'sort_order' => 3,
+        ],
+        [
+            'title' => 'Multi-Campus',
+            'subtitle' => 'Seamlessly connect and manage evaluations across multiple campuses.',
+            'sort_order' => 4,
+        ],
+        [
+            'title' => 'Customizable',
+            'subtitle' => 'Tailor evaluation criteria and workflows to your institution needs.',
+            'sort_order' => 5,
+        ],
+        [
+            'title' => 'Detailed Reports',
+            'subtitle' => 'Generate comprehensive PDF reports with actionable insights.',
+            'sort_order' => 6,
+        ],
     ];
     private const DEFAULT_STATS = [
         'students' => [
@@ -78,6 +117,7 @@ class LandingPageHeaderController extends Controller
             'headers' => $headers,
             'homeSection' => $this->homeSectionData(),
             'statsSection' => $this->statsSectionData(),
+            'featuresSection' => $this->featureSectionData(),
             'filters' => [
                 'search' => $search,
                 'per_page' => $perPage,
@@ -193,7 +233,7 @@ class LandingPageHeaderController extends Controller
             ->values();
         $activeHeaders = collect($validated['headers'])
             ->reject(
-                fn (array $row) => isset($row['id']) && $deleteIds->contains($row['id']),
+                fn(array $row) => isset($row['id']) && $deleteIds->contains($row['id']),
             )
             ->values();
 
@@ -453,6 +493,103 @@ class LandingPageHeaderController extends Controller
         return back()->with('success', 'Stats section updated successfully.');
     }
 
+    public function updateFeaturesSection(Request $request)
+    {
+        if (! Schema::hasTable('landing_page_feature_sections') || ! Schema::hasTable('landing_page_features')) {
+            return back()->withErrors([
+                'features_section' => 'Features section table is not available yet. Please run migrations first.',
+            ]);
+        }
+
+        $validated = $request->validate([
+            'badge_text' => 'required|string|max:120',
+            'title_text' => 'required|string|max:255',
+            'subtitle_text' => 'required|string|max:1000',
+            'features' => 'nullable|array',
+            'features.*.id' => 'nullable|integer|exists:landing_page_features,id',
+            'features.*.title' => 'required|string|max:150',
+            'features.*.subtitle' => 'required|string|max:500',
+            'features.*.sort_order' => 'nullable|integer|min:0|max:9999',
+            'delete_ids' => 'nullable|array',
+            'delete_ids.*' => 'integer|exists:landing_page_features,id',
+        ]);
+
+        $featuresPayload = collect($validated['features'] ?? [])
+            ->map(fn(array $row, int $index) => [
+                'id' => $row['id'] ?? null,
+                'title' => trim((string) ($row['title'] ?? '')),
+                'subtitle' => trim((string) ($row['subtitle'] ?? '')),
+                'sort_order' => $row['sort_order'] ?? ($index + 1),
+            ])
+            ->values();
+        $deleteIds = collect($validated['delete_ids'] ?? [])->filter()->values();
+        $ids = $featuresPayload->pluck('id')->filter()->values();
+        $featuresById = LandingPageFeature::query()
+            ->whereIn('id', $ids)
+            ->get()
+            ->keyBy('id');
+
+        DB::transaction(function () use ($validated, $featuresPayload, $deleteIds, $featuresById) {
+            $featureSection = LandingPageFeatureSection::query()->first();
+            if (! $featureSection) {
+                $featureSection = LandingPageFeatureSection::query()->create(self::DEFAULT_FEATURE_SECTION);
+            }
+
+            $featureSection->update([
+                'badge_text' => $validated['badge_text'],
+                'title_text' => $validated['title_text'],
+                'subtitle_text' => $validated['subtitle_text'],
+            ]);
+
+            if ($deleteIds->isNotEmpty()) {
+                LandingPageFeature::query()
+                    ->whereIn('id', $deleteIds)
+                    ->delete();
+            }
+
+            foreach ($featuresPayload as $index => $row) {
+                if (isset($row['id']) && $deleteIds->contains($row['id'])) {
+                    continue;
+                }
+
+                if (! empty($row['id'])) {
+                    $feature = $featuresById->get($row['id']);
+                    if (! $feature) {
+                        continue;
+                    }
+
+                    $feature->update([
+                        'title' => $row['title'],
+                        'subtitle' => $row['subtitle'],
+                        'sort_order' => $row['sort_order'] ?? ($index + 1),
+                    ]);
+                    continue;
+                }
+
+                LandingPageFeature::create([
+                    'title' => $row['title'],
+                    'subtitle' => $row['subtitle'],
+                    'sort_order' => $row['sort_order'] ?? ($index + 1),
+                    'is_active' => true,
+                ]);
+            }
+
+            $orderedIds = LandingPageFeature::query()
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->pluck('id')
+                ->values();
+
+            foreach ($orderedIds as $position => $id) {
+                LandingPageFeature::query()
+                    ->where('id', $id)
+                    ->update(['sort_order' => $position + 1]);
+            }
+        });
+
+        return back()->with('success', 'Features section updated successfully.');
+    }
+
     private function storeLogoFile(UploadedFile $file): string
     {
         $path = $file->store('landing-page/logos', 'public');
@@ -518,6 +655,48 @@ class LandingPageHeaderController extends Controller
             ->all();
 
         return count($rows) > 0 ? $rows : array_values($defaults);
+    }
+
+    private function featureSectionData(): array
+    {
+        $defaultFeatures = collect(self::DEFAULT_FEATURES)
+            ->map(fn(array $feature) => [
+                'id' => null,
+                'title' => $feature['title'],
+                'subtitle' => $feature['subtitle'],
+                'sort_order' => $feature['sort_order'],
+            ])
+            ->values()
+            ->all();
+
+        if (! Schema::hasTable('landing_page_feature_sections') || ! Schema::hasTable('landing_page_features')) {
+            return [
+                ...self::DEFAULT_FEATURE_SECTION,
+                'features' => $defaultFeatures,
+            ];
+        }
+
+        $section = LandingPageFeatureSection::query()->first();
+        $features = LandingPageFeature::query()
+            ->where('is_active', 1)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get(['id', 'title', 'subtitle', 'sort_order'])
+            ->map(fn(LandingPageFeature $feature) => [
+                'id' => $feature->id,
+                'title' => $feature->title,
+                'subtitle' => $feature->subtitle,
+                'sort_order' => $feature->sort_order,
+            ])
+            ->values()
+            ->all();
+
+        return [
+            'badge_text' => $section?->badge_text ?: self::DEFAULT_FEATURE_SECTION['badge_text'],
+            'title_text' => $section?->title_text ?: self::DEFAULT_FEATURE_SECTION['title_text'],
+            'subtitle_text' => $section?->subtitle_text ?: self::DEFAULT_FEATURE_SECTION['subtitle_text'],
+            'features' => count($features) > 0 ? $features : $defaultFeatures,
+        ];
     }
 
     private function defaultStatsWithValues(): array
