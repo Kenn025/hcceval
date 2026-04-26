@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\LandingPageHeader;
+use App\Models\LandingPageHomeSection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
@@ -15,6 +16,7 @@ class HomeController extends Controller
         return Inertia::render('Home', [
             'stats' => $this->stats(),
             'headerLinks' => $this->headerLinks(),
+            'homeSection' => $this->homeSection(),
         ]);
     }
 
@@ -96,5 +98,41 @@ class HomeController extends Controller
             ->all();
 
         return count($links) > 0 ? $links : $defaults;
+    }
+
+    private function homeSection(): array
+    {
+        $defaults = [
+            'badge_text' => 'Thesis Project 2026',
+            'title_text' => 'Web-Based Multicampus Performance Evaluation System',
+            'title_highlight_text' => 'Multicampus',
+            'subtitle_text' => 'A comprehensive holistic computerized faculty-peer-student-admin performance evaluation management system connecting all stakeholders.',
+            'primary_cta_label' => 'Start Evaluating',
+            'primary_cta_target' => 'login',
+            'secondary_cta_label' => 'Learn More',
+            'secondary_cta_target' => 'how-it-works',
+            'background_video_path' => '/videos/hero-loop.mp4',
+        ];
+
+        if (! Schema::hasTable('landing_page_home_sections')) {
+            return $defaults;
+        }
+
+        $homeSection = LandingPageHomeSection::query()->first();
+        if (! $homeSection) {
+            return $defaults;
+        }
+
+        return [
+            'badge_text' => $homeSection->badge_text,
+            'title_text' => $homeSection->title_text,
+            'title_highlight_text' => $homeSection->title_highlight_text,
+            'subtitle_text' => $homeSection->subtitle_text,
+            'primary_cta_label' => $homeSection->primary_cta_label,
+            'primary_cta_target' => $homeSection->primary_cta_target,
+            'secondary_cta_label' => $homeSection->secondary_cta_label,
+            'secondary_cta_target' => $homeSection->secondary_cta_target,
+            'background_video_path' => $homeSection->background_video_path,
+        ];
     }
 }

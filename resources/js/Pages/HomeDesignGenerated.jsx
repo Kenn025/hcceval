@@ -135,6 +135,7 @@ function App({
     registerUrl = "/register",
     stats: homepageStats = [],
     headerLinks: customHeaderLinks = [],
+    homeSection: customHomeSection = null,
 }) {
     const [isDarkMode, setIsDarkMode] = useState(() => {
         if (typeof window === "undefined") return false;
@@ -405,6 +406,148 @@ function App({
     const scrollTo = (id) => {
         document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
         setMenuOpen(false);
+    };
+    const defaultHomeSection = {
+        badge_text: "Thesis Project 2026",
+        title_text: "Web-Based Multicampus Performance Evaluation System",
+        title_highlight_text: "Multicampus",
+        subtitle_text:
+            "A comprehensive holistic computerized faculty-peer-student-admin performance evaluation management system connecting all stakeholders.",
+        primary_cta_label: "Start Evaluating",
+        primary_cta_target: "login",
+        secondary_cta_label: "Learn More",
+        secondary_cta_target: "how-it-works",
+        background_video_path: "/videos/hero-loop.mp4",
+    };
+    const homeSection = {
+        ...defaultHomeSection,
+        ...(customHomeSection && typeof customHomeSection === "object"
+            ? customHomeSection
+            : {}),
+    };
+    const heroVideoSrc = String(
+        homeSection.background_video_path || "/videos/hero-loop.mp4",
+    );
+    const heroBadgeText = String(homeSection.badge_text || "Thesis Project 2026");
+    const heroTitleText = String(
+        homeSection.title_text || defaultHomeSection.title_text,
+    );
+    const heroHighlightText = String(
+        homeSection.title_highlight_text || "",
+    ).trim();
+    const heroSubtitleText = String(
+        homeSection.subtitle_text || defaultHomeSection.subtitle_text,
+    );
+    const heroPrimaryLabel = String(
+        homeSection.primary_cta_label || "Start Evaluating",
+    );
+    const heroPrimaryTarget = String(
+        homeSection.primary_cta_target || "login",
+    );
+    const heroSecondaryLabel = String(
+        homeSection.secondary_cta_label || "Learn More",
+    );
+    const heroSecondaryTarget = String(
+        homeSection.secondary_cta_target || "how-it-works",
+    );
+    const normalizedHeroTitleText = heroTitleText.replace(/\s+/g, " ").trim();
+    const buildHeroTitleLayout = () => {
+        const fallbackLines = [
+            "Web-Based",
+            "Multicampus",
+            "Performance",
+            "Evaluation System",
+        ];
+        const parseWords = (value) =>
+            String(value || "")
+                .trim()
+                .split(/\s+/)
+                .filter(Boolean);
+
+        if (!normalizedHeroTitleText) {
+            return {
+                lines: fallbackLines,
+                highlightLineIndex: 1,
+                hasHighlightLine: true,
+            };
+        }
+
+        let beforeText = "";
+        let highlightMatch = "";
+        let afterText = normalizedHeroTitleText;
+
+        if (heroHighlightText) {
+            const highlightIndex = normalizedHeroTitleText
+                .toLowerCase()
+                .indexOf(heroHighlightText.toLowerCase());
+
+            if (highlightIndex >= 0) {
+                beforeText = normalizedHeroTitleText.slice(0, highlightIndex);
+                highlightMatch = normalizedHeroTitleText.slice(
+                    highlightIndex,
+                    highlightIndex + heroHighlightText.length,
+                );
+                afterText = normalizedHeroTitleText.slice(
+                    highlightIndex + heroHighlightText.length,
+                );
+            }
+        }
+
+        const beforeWords = parseWords(beforeText);
+        const afterWords = parseWords(afterText);
+
+        const line1 = beforeWords.join(" ") || afterWords.shift() || fallbackLines[0];
+        const line2 = highlightMatch || afterWords.shift() || fallbackLines[1];
+
+        let line3 = "";
+        let line4 = "";
+        if (afterWords.length === 0) {
+            line3 = fallbackLines[2];
+            line4 = fallbackLines[3];
+        } else if (afterWords.length === 1) {
+            line3 = afterWords[0];
+            line4 = fallbackLines[3];
+        } else if (afterWords.length === 2) {
+            line3 = afterWords[0];
+            line4 = afterWords[1];
+        } else if (afterWords.length === 3) {
+            line3 = afterWords[0];
+            line4 = afterWords.slice(1).join(" ");
+        } else {
+            const splitIndex = Math.ceil(afterWords.length / 2);
+            line3 = afterWords.slice(0, splitIndex).join(" ");
+            line4 = afterWords.slice(splitIndex).join(" ");
+        }
+
+        return {
+            lines: [line1, line2, line3, line4],
+            highlightLineIndex: 1,
+            hasHighlightLine: Boolean(highlightMatch || heroHighlightText),
+        };
+    };
+    const heroTitleLayout = buildHeroTitleLayout();
+    const handleHeroCtaClick = (target, fallback) => {
+        const normalizedTarget = String(target || "").trim();
+        if (!normalizedTarget) {
+            fallback();
+            return;
+        }
+
+        if (normalizedTarget.toLowerCase() === "login") {
+            goToLogin();
+            return;
+        }
+
+        if (
+            normalizedTarget.startsWith("http://") ||
+            normalizedTarget.startsWith("https://") ||
+            normalizedTarget.startsWith("/")
+        ) {
+            window.location.assign(normalizedTarget);
+            return;
+        }
+
+        scrollTo(normalizedTarget);
     };
     const defaultHeaderItems = [
         { id: "logo-default", label: "Brand Logo", target: "graduation", item_type: "logo", sort_order: 0, is_active: true },
@@ -709,7 +852,7 @@ function App({
                                 /* @__PURE__ */ jsx("video", {
                                     className:
                                         "absolute inset-0 w-full h-full object-cover pointer-events-none",
-                                    src: "/videos/hero-loop.mp4",
+                                    src: heroVideoSrc,
                                     autoPlay: true,
                                     muted: true,
                                     playsInline: true,
@@ -778,7 +921,7 @@ function App({
                                                                                 color: "var(--accent)",
                                                                             },
                                                                             children:
-                                                                                "Thesis Project 2026",
+                                                                                heroBadgeText,
                                                                         },
                                                                     ),
                                                                 ],
@@ -792,33 +935,25 @@ function App({
                                                                 style: {
                                                                     color: "var(--text-primary)",
                                                                 },
-                                                                children: [
-                                                                    "Web-Based",
-                                                                    /* @__PURE__ */ jsx(
-                                                                        "br",
-                                                                        {},
-                                                                    ),
-                                                                    /* @__PURE__ */ jsx(
-                                                                        "span",
-                                                                        {
-                                                                            style: {
-                                                                                color: "var(--accent)",
+                                                                children: heroTitleLayout.lines.map(
+                                                                    (line, index) =>
+                                                                        /* @__PURE__ */ jsx(
+                                                                            "span",
+                                                                            {
+                                                                                className: "block",
+                                                                                style:
+                                                                                    heroTitleLayout.hasHighlightLine &&
+                                                                                    index ===
+                                                                                        heroTitleLayout.highlightLineIndex
+                                                                                        ? {
+                                                                                              color: "var(--accent)",
+                                                                                          }
+                                                                                        : undefined,
+                                                                                children: line,
                                                                             },
-                                                                            children:
-                                                                                "Multicampus",
-                                                                        },
-                                                                    ),
-                                                                    /* @__PURE__ */ jsx(
-                                                                        "br",
-                                                                        {},
-                                                                    ),
-                                                                    "Performance",
-                                                                    /* @__PURE__ */ jsx(
-                                                                        "br",
-                                                                        {},
-                                                                    ),
-                                                                    "Evaluation System",
-                                                                ],
+                                                                            `hero-title-line-${index}`,
+                                                                        ),
+                                                                ),
                                                             },
                                                         ),
                                                         /* @__PURE__ */ jsx(
@@ -830,7 +965,7 @@ function App({
                                                                     color: "var(--text-secondary)",
                                                                 },
                                                                 children:
-                                                                    "A comprehensive holistic computerized faculty-peer-student-admin performance evaluation management system connecting all stakeholders.",
+                                                                    heroSubtitleText,
                                                             },
                                                         ),
                                                         /* @__PURE__ */ jsxs(
@@ -843,7 +978,11 @@ function App({
                                                                         "button",
                                                                         {
                                                                             onClick:
-                                                                                goToLogin,
+                                                                                () =>
+                                                                                    handleHeroCtaClick(
+                                                                                        heroPrimaryTarget,
+                                                                                        goToLogin,
+                                                                                    ),
                                                                             className:
                                                                                 "neumorphic-btn px-8 py-4 font-bold text-white flex items-center gap-2",
                                                                             style: {
@@ -856,7 +995,7 @@ function App({
                                                                                         "span",
                                                                                         {
                                                                                             children:
-                                                                                                "Start Evaluating",
+                                                                                                heroPrimaryLabel,
                                                                                         },
                                                                                     ),
                                                                                     /* @__PURE__ */ jsx(
@@ -890,8 +1029,12 @@ function App({
                                                                         {
                                                                             onClick:
                                                                                 () =>
-                                                                                    scrollTo(
-                                                                                        "how-it-works",
+                                                                                    handleHeroCtaClick(
+                                                                                        heroSecondaryTarget,
+                                                                                        () =>
+                                                                                            scrollTo(
+                                                                                                "how-it-works",
+                                                                                            ),
                                                                                     ),
                                                                             className:
                                                                                 "neumorphic-btn px-8 py-4 font-bold",
@@ -899,7 +1042,7 @@ function App({
                                                                                 color: "var(--text-primary)",
                                                                             },
                                                                             children:
-                                                                                "Learn More",
+                                                                                heroSecondaryLabel,
                                                                         },
                                                                     ),
                                                                 ],

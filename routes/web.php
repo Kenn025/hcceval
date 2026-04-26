@@ -184,6 +184,7 @@ Route::middleware('auth')->group(function () {
             Route::get('/admin/landing-page', [LandingPageHeaderController::class, 'index'])->name('admin.landing-page');
             Route::post('/admin/landing-page', [LandingPageHeaderController::class, 'store']);
             Route::put('/admin/landing-page/bulk-update', [LandingPageHeaderController::class, 'bulkUpdate'])->name('admin.landing-page.bulk-update');
+            Route::put('/admin/landing-page/home-section', [LandingPageHeaderController::class, 'updateHomeSection'])->name('admin.landing-page.home-section.update');
             Route::put('/admin/landing-page/{landingPageHeader}', [LandingPageHeaderController::class, 'update']);
             Route::delete('/admin/landing-page/{landingPageHeader}', [LandingPageHeaderController::class, 'destroy']);
         });

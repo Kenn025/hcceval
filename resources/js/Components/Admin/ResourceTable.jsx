@@ -1,26 +1,27 @@
-import { router } from '@inertiajs/react';
-import { useCallback, useRef, useState } from 'react';
-import Pagination from './Pagination';
+import { router } from "@inertiajs/react";
+import { useCallback, useRef, useState } from "react";
+import Pagination from "./Pagination";
 
 export default function ResourceTable({
     columns,
     data,
     onRowClick,
     onEdit,
-    editLabel = 'Edit',
+    editLabel = "Edit",
     onDelete,
     showRowNumbers = true,
-    searchPlaceholder = 'Search...',
+    searchPlaceholder = "Search...",
     filters = {},
     routeName,
     extraHeaderActions,
     rowActions,
-    perPageControlPosition = 'top',
+    perPageControlPosition = "top",
     showSearch = true,
     showPageIndicator = true,
-    containerClassName = 'rounded-xl border border-slate-200 bg-white shadow-sm',
+    showPagination = true,
+    containerClassName = "rounded-xl border border-slate-200 bg-white shadow-sm",
 }) {
-    const [search, setSearch] = useState(filters.search ?? '');
+    const [search, setSearch] = useState(filters.search ?? "");
     const timerRef = useRef(null);
 
     const handleSearch = useCallback(
@@ -28,28 +29,42 @@ export default function ResourceTable({
             setSearch(value);
             clearTimeout(timerRef.current);
             timerRef.current = setTimeout(() => {
-                router.get(route(routeName), { ...filters, search: value, per_page: filters.per_page ?? 15 }, {
-                    preserveState: true,
-                    replace: true,
-                });
+                router.get(
+                    route(routeName),
+                    {
+                        ...filters,
+                        search: value,
+                        per_page: filters.per_page ?? 15,
+                    },
+                    {
+                        preserveState: true,
+                        replace: true,
+                    },
+                );
             }, 400);
         },
         [routeName, filters],
     );
 
     const handlePerPageChange = (value) => {
-        router.get(route(routeName), { ...filters, per_page: value, page: 1 }, {
-            preserveState: true,
-        });
+        router.get(
+            route(routeName),
+            { ...filters, per_page: value, page: 1 },
+            {
+                preserveState: true,
+            },
+        );
     };
 
-    const pageStart = data?.from ?? (
-        ((data?.current_page ?? 1) - 1) * (data?.per_page ?? data?.data?.length ?? 0) + 1
-    );
+    const pageStart =
+        data?.from ??
+        ((data?.current_page ?? 1) - 1) *
+            (data?.per_page ?? data?.data?.length ?? 0) +
+            1;
     const showTopToolbar =
         showSearch ||
         showPageIndicator ||
-        perPageControlPosition === 'top' ||
+        perPageControlPosition === "top" ||
         Boolean(extraHeaderActions);
 
     const perPageControl = (
@@ -63,7 +78,9 @@ export default function ResourceTable({
                 className="rounded-lg border border-slate-200 bg-white py-1.5 pl-2 pr-8 text-xs font-medium text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             >
                 {[10, 15, 25, 50, 100].map((n) => (
-                    <option key={n} value={n}>{n}</option>
+                    <option key={n} value={n}>
+                        {n}
+                    </option>
                 ))}
             </select>
         </div>
@@ -78,14 +95,23 @@ export default function ResourceTable({
                             <div className="relative min-w-0 flex-1 md:max-w-xs">
                                 <svg
                                     className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
-                                    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={2}
                                 >
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
+                                    />
                                 </svg>
                                 <input
                                     type="text"
                                     value={search}
-                                    onChange={(e) => handleSearch(e.target.value)}
+                                    onChange={(e) =>
+                                        handleSearch(e.target.value)
+                                    }
                                     placeholder={searchPlaceholder}
                                     className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-4 text-sm placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                 />
@@ -99,13 +125,15 @@ export default function ResourceTable({
                                     {data.current_page}
                                 </span>
                                 <span>of</span>
-                                <span className="text-slate-900">{data.last_page}</span>
+                                <span className="text-slate-900">
+                                    {data.last_page}
+                                </span>
                             </div>
                         )}
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3">
-                        {perPageControlPosition === 'top' && perPageControl}
+                        {perPageControlPosition === "top" && perPageControl}
                         {extraHeaderActions && (
                             <div className="flex flex-wrap items-center gap-2">
                                 {extraHeaderActions}
@@ -144,7 +172,13 @@ export default function ResourceTable({
                         {data.data?.length === 0 && (
                             <tr>
                                 <td
-                                    colSpan={columns.length + (showRowNumbers ? 1 : 0) + ((onEdit || onDelete || rowActions) ? 1 : 0)}
+                                    colSpan={
+                                        columns.length +
+                                        (showRowNumbers ? 1 : 0) +
+                                        (onEdit || onDelete || rowActions
+                                            ? 1
+                                            : 0)
+                                    }
                                     className="px-4 py-10 text-center text-sm text-slate-500"
                                 >
                                     No records found.
@@ -155,10 +189,14 @@ export default function ResourceTable({
                             <tr
                                 key={row.id ?? i}
                                 className={[
-                                    'hover:bg-slate-50/70',
-                                    onRowClick ? 'cursor-pointer' : '',
-                                ].join(' ')}
-                                onClick={onRowClick ? () => onRowClick(row) : undefined}
+                                    "hover:bg-slate-50/70",
+                                    onRowClick ? "cursor-pointer" : "",
+                                ].join(" ")}
+                                onClick={
+                                    onRowClick
+                                        ? () => onRowClick(row)
+                                        : undefined
+                                }
                             >
                                 {showRowNumbers && (
                                     <td className="px-4 py-3 text-sm font-medium text-slate-500">
@@ -166,8 +204,13 @@ export default function ResourceTable({
                                     </td>
                                 )}
                                 {columns.map((col) => (
-                                    <td key={col.key} className="px-4 py-3 text-sm text-slate-800">
-                                        {col.render ? col.render(row) : row[col.key] ?? '-'}
+                                    <td
+                                        key={col.key}
+                                        className="px-4 py-3 text-sm text-slate-800"
+                                    >
+                                        {col.render
+                                            ? col.render(row)
+                                            : (row[col.key] ?? "-")}
                                     </td>
                                 ))}
                                 {(onEdit || onDelete || rowActions) && (
@@ -175,7 +218,9 @@ export default function ResourceTable({
                                         <div className="flex justify-end gap-2">
                                             {rowActions && (
                                                 <div
-                                                    onClick={(e) => e.stopPropagation()}
+                                                    onClick={(e) =>
+                                                        e.stopPropagation()
+                                                    }
                                                 >
                                                     {rowActions(row)}
                                                 </div>
@@ -224,9 +269,9 @@ export default function ResourceTable({
                     <div
                         key={row.id ?? i}
                         className={[
-                            'p-4 active:bg-slate-50 transition-colors',
-                            onRowClick ? 'cursor-pointer' : '',
-                        ].join(' ')}
+                            "p-4 active:bg-slate-50 transition-colors",
+                            onRowClick ? "cursor-pointer" : "",
+                        ].join(" ")}
                         onClick={onRowClick ? () => onRowClick(row) : undefined}
                     >
                         <div className="flex items-start justify-between gap-4">
@@ -242,14 +287,19 @@ export default function ResourceTable({
                                             {col.label}
                                         </div>
                                         <div className="mt-0.5 text-sm font-medium text-slate-900">
-                                            {col.render ? col.render(row) : row[col.key] ?? '-'}
+                                            {col.render
+                                                ? col.render(row)
+                                                : (row[col.key] ?? "-")}
                                         </div>
                                     </div>
                                 ))}
                             </div>
 
                             {(onEdit || onDelete || rowActions) && (
-                                <div className="flex flex-col gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                <div
+                                    className="flex flex-col gap-2 shrink-0"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
                                     {rowActions && rowActions(row)}
                                     {onEdit && (
                                         <button
@@ -276,14 +326,16 @@ export default function ResourceTable({
                 ))}
             </div>
 
-            <Pagination
-                data={data}
-                rightContent={
-                    perPageControlPosition === 'bottom'
-                        ? perPageControl
-                        : null
-                }
-            />
+            {showPagination && (
+                <Pagination
+                    data={data}
+                    rightContent={
+                        perPageControlPosition === "bottom"
+                            ? perPageControl
+                            : null
+                    }
+                />
+            )}
         </div>
     );
 }
