@@ -397,7 +397,8 @@ function App({
     const navSections = ["home", "features", "roles", "how-it-works", "faq"];
     const islandExpanded = isIslandExpanded || menuOpen;
     return /* @__PURE__ */ jsxs("div", {
-        className: "min-h-screen transition-all duration-500 overflow-x-hidden",
+        className:
+            "homepage-root min-h-screen transition-all duration-500 overflow-x-hidden",
         style: { backgroundColor: "var(--bg-primary)" },
         children: [
             /* @__PURE__ */ jsx("nav", {
@@ -411,21 +412,7 @@ function App({
                             children: [
                                 /* @__PURE__ */ jsxs("div", {
                                     className:
-                                        "rounded-[999px] border px-3 py-2 sm:px-4 sm:py-3 flex items-center justify-between gap-2 transition-all duration-300",
-                                    style: {
-                                        background: isDarkMode
-                                            ? "rgba(15, 23, 42, 0.78)"
-                                            : "rgba(255, 255, 255, 0.72)",
-                                        borderColor: isDarkMode
-                                            ? "rgba(148, 163, 184, 0.26)"
-                                            : "rgba(148, 163, 184, 0.34)",
-                                        backdropFilter: "blur(20px) saturate(140%)",
-                                        WebkitBackdropFilter:
-                                            "blur(20px) saturate(140%)",
-                                        boxShadow: isDarkMode
-                                            ? "0 14px 34px rgba(2, 6, 23, 0.5)"
-                                            : "0 14px 30px rgba(15, 23, 42, 0.22)",
-                                    },
+                                        "homepage-glass-header rounded-[999px] border px-3 py-2 sm:px-4 sm:py-3 flex items-center justify-between gap-2 transition-all duration-300",
                                     children: [
                                         /* @__PURE__ */ jsxs("div", {
                                             className:
@@ -494,7 +481,7 @@ function App({
                                                                     section,
                                                                 ),
                                                             className:
-                                                                "px-4 py-2 rounded-full text-sm font-medium capitalize transition-all duration-300 hover:scale-[1.01]",
+                                                                "homepage-nav-chip px-4 py-2 rounded-full text-sm font-medium capitalize transition-all duration-300 hover:scale-[1.01]",
                                                             style: {
                                                                 color: "var(--text-secondary)",
                                                                 background: isDarkMode
@@ -604,7 +591,7 @@ function App({
                                                         onClick: () =>
                                                             scrollTo(section),
                                                         className:
-                                                            "w-full text-left px-4 py-3 mb-2 rounded-2xl capitalize font-medium",
+                                                            "homepage-nav-chip w-full text-left px-4 py-3 mb-2 rounded-2xl capitalize font-medium",
                                                         style: {
                                                             color: "var(--text-primary)",
                                                             background: isDarkMode
@@ -1910,7 +1897,7 @@ function App({
                                                             : i,
                                                     ),
                                                 className:
-                                                    "w-full p-6 flex justify-between items-center text-left",
+                                                    "homepage-faq-toggle w-full p-6 flex justify-between items-center text-left",
                                                 children: [
                                                     /* @__PURE__ */ jsx(
                                                         "span",
