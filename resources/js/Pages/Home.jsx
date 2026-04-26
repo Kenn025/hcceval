@@ -65,6 +65,42 @@ export default function Home({ stats = [] }) {
         };
     }, []);
 
+    // Mobile easter egg — 5 quick taps on the brand "MCH-PEMS" reveals the secret card.
+    useEffect(() => {
+        const TAP_WINDOW_MS = 700;
+        const TAPS_REQUIRED = 5;
+        let taps = 0;
+        let lastTap = 0;
+
+        const isBrandTarget = (target) => {
+            let el = target;
+            for (let depth = 0; el && depth < 4; depth++) {
+                const text = (el.textContent ?? '').trim();
+                if (text === 'MCH-PEMS') {
+                    return true;
+                }
+                el = el.parentElement;
+            }
+            return false;
+        };
+
+        const handleTap = (event) => {
+            if (!isBrandTarget(event.target)) return;
+
+            const now = Date.now();
+            taps = now - lastTap > TAP_WINDOW_MS ? 1 : taps + 1;
+            lastTap = now;
+
+            if (taps >= TAPS_REQUIRED) {
+                taps = 0;
+                setShowSecretTeamCard(true);
+            }
+        };
+
+        document.addEventListener('click', handleTap, true);
+        return () => document.removeEventListener('click', handleTap, true);
+    }, []);
+
     return (
         <>
             <Head title="Holy Cross College - Evaluation System" />
