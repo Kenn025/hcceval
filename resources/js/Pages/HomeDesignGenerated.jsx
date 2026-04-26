@@ -1,6 +1,20 @@
 import { jsx, jsxs } from "react/jsx-runtime";
 import { useState, useEffect, useRef } from "react";
 import { router } from "@inertiajs/react";
+import {
+    LayoutGrid,
+    Shield,
+    Network,
+    School,
+    SquarePen,
+    Layers,
+    CircleCheck,
+    ListFilter,
+    Users,
+    GraduationCap,
+    BarChart3,
+    Star,
+} from "lucide-react";
 import AppIcon from "@/Components/AppIcon";
 const HERO_VIDEO_LOOP_SECONDS = 73;
 const Counter = ({ end, suffix = "" }) => {
@@ -217,9 +231,11 @@ function App({
         }
     }, [isDarkMode]);
     const ROLE_ICON_PATHS = {
-        faculty: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253",
+        faculty:
+            "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253",
         peer: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z",
-        student: "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z",
+        student:
+            "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z",
         admin: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z",
     };
     const makeRoleIcon = (iconType) =>
@@ -236,20 +252,69 @@ function App({
             }),
         });
     const defaultRoles = [
-        { icon: makeRoleIcon("faculty"), title: "Faculty", desc: "Comprehensive evaluation tools for academic professionals", features: ["Self-Assessment Portal", "Peer Review Access", "Student Feedback View", "Performance History", "Development Reports"], progress: 85 },
-        { icon: makeRoleIcon("peer"), title: "Peer", desc: "Collaborative evaluation between colleagues", features: ["Anonymous Reviews", "360° Assessment", "Teaching Observation", "Collaborative Goals", "Best Practices Share"], progress: 78 },
-        { icon: makeRoleIcon("student"), title: "Student", desc: "Student-centered faculty evaluation system", features: ["Course Feedback", "Anonymous Surveys", "Learning Outcomes", "Suggestion Portal", "Progress Tracking"], progress: 92 },
-        { icon: makeRoleIcon("admin"), title: "Administrator", desc: "Complete system oversight and management", features: ["Analytics Dashboard", "User Management", "Report Generation", "Campus Settings", "System Configuration"], progress: 95 },
+        {
+            icon: makeRoleIcon("faculty"),
+            title: "Faculty",
+            desc: "Comprehensive evaluation tools for academic professionals",
+            features: [
+                "Self-Assessment Portal",
+                "Peer Review Access",
+                "Student Feedback View",
+                "Performance History",
+                "Development Reports",
+            ],
+            progress: 85,
+        },
+        {
+            icon: makeRoleIcon("peer"),
+            title: "Peer",
+            desc: "Collaborative evaluation between colleagues",
+            features: [
+                "Anonymous Reviews",
+                "360° Assessment",
+                "Teaching Observation",
+                "Collaborative Goals",
+                "Best Practices Share",
+            ],
+            progress: 78,
+        },
+        {
+            icon: makeRoleIcon("student"),
+            title: "Student",
+            desc: "Student-centered faculty evaluation system",
+            features: [
+                "Course Feedback",
+                "Anonymous Surveys",
+                "Learning Outcomes",
+                "Suggestion Portal",
+                "Progress Tracking",
+            ],
+            progress: 92,
+        },
+        {
+            icon: makeRoleIcon("admin"),
+            title: "Administrator",
+            desc: "Complete system oversight and management",
+            features: [
+                "Analytics Dashboard",
+                "User Management",
+                "Report Generation",
+                "Campus Settings",
+                "System Configuration",
+            ],
+            progress: 95,
+        },
     ];
-    const roles = (customRolesSection?.roles ?? []).length > 0
-        ? customRolesSection.roles.map((r) => ({
-            icon: makeRoleIcon(r.icon_type ?? "faculty"),
-            title: r.title,
-            desc: r.desc_text,
-            features: r.features ?? [],
-            progress: r.progress ?? 0,
-        }))
-        : defaultRoles;
+    const roles =
+        (customRolesSection?.roles ?? []).length > 0
+            ? customRolesSection.roles.map((r) => ({
+                  icon: makeRoleIcon(r.icon_type ?? "faculty"),
+                  title: r.title,
+                  desc: r.desc_text,
+                  features: r.features ?? [],
+                  progress: r.progress ?? 0,
+              }))
+            : defaultRoles;
     const defaultFeatureCards = [
         {
             title: "Real-Time Analytics",
@@ -303,6 +368,14 @@ function App({
                   desc: String(feature?.subtitle || feature?.desc || ""),
               }))
             : defaultFeatureCards;
+    const featureIconByTitle = {
+        "real-time analytics": LayoutGrid,
+        "secure & private": Shield,
+        "multi-device": Network,
+        "multi-campus": School,
+        customizable: SquarePen,
+        "detailed reports": ListFilter,
+    };
     const defaultStats = [
         { value: 4, label: "User Roles", icon: "group" },
         { value: 12, label: "Campuses", icon: "branches" },
@@ -313,6 +386,31 @@ function App({
         Array.isArray(homepageStats) && homepageStats.length > 0
             ? homepageStats
             : defaultStats;
+    const statIconByKey = {
+        group: Users,
+        branches: School,
+        assignments: ListFilter,
+        ratings: Star,
+        dashboard: BarChart3,
+    };
+    const resolveStatIcon = (stat) => {
+        const iconKey = String(stat?.icon ?? "")
+            .trim()
+            .toLowerCase();
+        if (statIconByKey[iconKey]) {
+            return statIconByKey[iconKey];
+        }
+
+        const label = String(stat?.label ?? "")
+            .trim()
+            .toLowerCase();
+        if (label.includes("student")) return Users;
+        if (label.includes("faculty")) return GraduationCap;
+        if (label.includes("campus")) return School;
+        if (label.includes("evaluation")) return ListFilter;
+        if (label.includes("satisfaction")) return Star;
+        return BarChart3;
+    };
     const faqs = [
         {
             q: "How does multi-campus evaluation work?",
@@ -1544,48 +1642,54 @@ function App({
                             className:
                                 "max-w-7xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-6 mt-20",
                             children: stats.map((stat, i) =>
-                                /* @__PURE__ */ jsxs(
-                                    "div",
-                                    {
-                                        className: "neumorphic p-6 text-center",
-                                        children: [
-                                            /* @__PURE__ */ jsx("div", {
-                                                className:
-                                                    "mb-2 flex items-center justify-center",
-                                                style: {
-                                                    color: "var(--accent)",
-                                                },
-                                                children: /* @__PURE__ */ jsx(
-                                                    AppIcon,
-                                                    {
-                                                        name: stat.icon,
-                                                        className: "h-8 w-8",
-                                                        strokeWidth: 1.9,
+                                (() => {
+                                    const StatIcon = resolveStatIcon(stat);
+                                    return /* @__PURE__ */ jsxs(
+                                        "div",
+                                        {
+                                            className:
+                                                "neumorphic p-6 text-center",
+                                            children: [
+                                                /* @__PURE__ */ jsx("div", {
+                                                    className:
+                                                        "mb-2 flex items-center justify-center",
+                                                    style: {
+                                                        color: "var(--accent)",
                                                     },
-                                                ),
-                                            }),
-                                            /* @__PURE__ */ jsx("div", {
-                                                className:
-                                                    "text-3xl font-bold mb-1",
-                                                style: {
-                                                    color: "var(--accent)",
-                                                },
-                                                children: /* @__PURE__ */ jsx(
-                                                    Counter,
-                                                    { end: stat.value },
-                                                ),
-                                            }),
-                                            /* @__PURE__ */ jsx("div", {
-                                                className: "text-sm",
-                                                style: {
-                                                    color: "var(--text-secondary)",
-                                                },
-                                                children: stat.label,
-                                            }),
-                                        ],
-                                    },
-                                    i,
-                                ),
+                                                    children:
+                                                        /* @__PURE__ */ jsx(
+                                                            StatIcon,
+                                                            {
+                                                                className:
+                                                                    "h-8 w-8",
+                                                                strokeWidth: 1.9,
+                                                            },
+                                                        ),
+                                                }),
+                                                /* @__PURE__ */ jsx("div", {
+                                                    className:
+                                                        "text-3xl font-bold mb-1",
+                                                    style: {
+                                                        color: "var(--accent)",
+                                                    },
+                                                    children:
+                                                        /* @__PURE__ */ jsx(
+                                                            Counter,
+                                                            { end: stat.value },
+                                                        ),
+                                                }),
+                                                /* @__PURE__ */ jsx("div", {
+                                                    className: "text-sm",
+                                                    style: {
+                                                        color: "var(--text-secondary)",
+                                                    },
+                                                    children: stat.label,
+                                                }),
+                                            ],
+                                        },
+                                        i,
+                                    );
+                                })(),
                             ),
                         }),
                     ],
@@ -1626,31 +1730,55 @@ function App({
                             className:
                                 "grid md:grid-cols-2 lg:grid-cols-3 gap-8",
                             children: featureCards.map((feature, i) =>
-                                /* @__PURE__ */ jsxs(
-                                    "div",
-                                    {
-                                        className:
-                                            "neumorphic p-6 hover:scale-[1.02] transition-transform duration-300 cursor-pointer",
-                                        children: [
-                                            /* @__PURE__ */ jsx("h3", {
-                                                className:
-                                                    "text-xl font-bold mb-2",
-                                                style: {
-                                                    color: "var(--text-primary)",
-                                                },
-                                                children: feature.title,
-                                            }),
-                                            /* @__PURE__ */ jsx("p", {
-                                                className: "text-sm",
-                                                style: {
-                                                    color: "var(--text-secondary)",
-                                                },
-                                                children: feature.desc,
-                                            }),
-                                        ],
-                                    },
-                                    i,
-                                ),
+                                (() => {
+                                    const Icon =
+                                        featureIconByTitle[
+                                            String(feature.title || "")
+                                                .trim()
+                                                .toLowerCase()
+                                        ] ?? LayoutGrid;
+                                    return /* @__PURE__ */ jsxs(
+                                        "div",
+                                        {
+                                            className:
+                                                "neumorphic p-8 hover:scale-[1.02] transition-transform duration-300 cursor-pointer",
+                                            children: [
+                                                /* @__PURE__ */ jsx("div", {
+                                                    className:
+                                                        "w-20 h-20 mb-6 rounded-full neumorphic-circle flex items-center justify-center",
+                                                    style: {
+                                                        color: "var(--accent)",
+                                                    },
+                                                    children:
+                                                        /* @__PURE__ */ jsx(
+                                                            Icon,
+                                                            {
+                                                                className:
+                                                                    "w-8 h-8",
+                                                                strokeWidth: 2,
+                                                            },
+                                                        ),
+                                                }),
+                                                /* @__PURE__ */ jsx("h3", {
+                                                    className:
+                                                        "text-xl font-bold mb-2",
+                                                    style: {
+                                                        color: "var(--text-primary)",
+                                                    },
+                                                    children: feature.title,
+                                                }),
+                                                /* @__PURE__ */ jsx("p", {
+                                                    className: "text-sm",
+                                                    style: {
+                                                        color: "var(--text-secondary)",
+                                                    },
+                                                    children: feature.desc,
+                                                }),
+                                            ],
+                                        },
+                                        i,
+                                    );
+                                })(),
                             ),
                         }),
                     ],
@@ -1669,17 +1797,23 @@ function App({
                                     className:
                                         "neumorphic-flat px-4 py-2 inline-block text-sm font-bold mb-4",
                                     style: { color: "var(--accent)" },
-                                    children: customRolesSection?.badge_text || "User Roles",
+                                    children:
+                                        customRolesSection?.badge_text ||
+                                        "User Roles",
                                 }),
                                 /* @__PURE__ */ jsx("h2", {
                                     className:
                                         "text-3xl md:text-4xl font-bold mb-4",
                                     style: { color: "var(--text-primary)" },
-                                    children: customRolesSection?.title_text || "Four Integrated Roles",
+                                    children:
+                                        customRolesSection?.title_text ||
+                                        "Four Integrated Roles",
                                 }),
                                 /* @__PURE__ */ jsx("p", {
                                     style: { color: "var(--text-secondary)" },
-                                    children: customRolesSection?.subtitle_text || "Click a role to explore its capabilities",
+                                    children:
+                                        customRolesSection?.subtitle_text ||
+                                        "Click a role to explore its capabilities",
                                 }),
                             ],
                         }),
@@ -1997,28 +2131,36 @@ function App({
                                     step: "01",
                                     title: "Register",
                                     desc: "Create account and select your role",
-                                    icon: "edit",
+                                    iconKey: "edit",
                                 },
                                 {
                                     step: "02",
                                     title: "Configure",
                                     desc: "Set up evaluation criteria",
-                                    icon: "layers",
+                                    iconKey: "layers",
                                 },
                                 {
                                     step: "03",
                                     title: "Evaluate",
                                     desc: "Complete evaluations forms",
-                                    icon: "check-circle",
+                                    iconKey: "check-circle",
                                 },
                                 {
                                     step: "04",
                                     title: "Analyze",
                                     desc: "View reports and insights",
-                                    icon: "dashboard",
+                                    iconKey: "dashboard",
                                 },
-                            ].map((item, i) =>
-                                /* @__PURE__ */ jsxs(
+                            ].map((item, i) => {
+                                const ProcessIcon =
+                                    item.iconKey === "edit"
+                                        ? SquarePen
+                                        : item.iconKey === "layers"
+                                          ? Layers
+                                          : item.iconKey === "check-circle"
+                                            ? CircleCheck
+                                            : LayoutGrid;
+                                return /* @__PURE__ */ jsxs(
                                     "div",
                                     {
                                         className:
@@ -2031,9 +2173,8 @@ function App({
                                                     color: "var(--accent)",
                                                 },
                                                 children: /* @__PURE__ */ jsx(
-                                                    AppIcon,
+                                                    ProcessIcon,
                                                     {
-                                                        name: item.icon,
                                                         className: "h-9 w-9",
                                                         strokeWidth: 1.9,
                                                     },
@@ -2065,8 +2206,8 @@ function App({
                                         ],
                                     },
                                     i,
-                                ),
-                            ),
+                                );
+                            }),
                         }),
                     ],
                 }),
