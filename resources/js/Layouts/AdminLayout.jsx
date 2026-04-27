@@ -372,22 +372,29 @@ export default function AdminLayout({
         const items = Array.isArray(systemControls.items)
             ? [...systemControls.items]
             : [];
-        const hasBugReportsItem = items.some(
-            (item) => item?.route === "admin.bug-reports",
+        const contactItem = {
+            label: "Contact Us",
+            route: "admin.contact-us",
+            icon: "chat",
+            roles: ["superadmin"],
+        };
+        const bugReportsItem = {
+            label: "Bug Reports",
+            route: "admin.bug-reports",
+            icon: "bug",
+            roles: ["superadmin"],
+        };
+        const withoutSupportItems = items.filter(
+            (item) =>
+                item?.route !== "admin.contact-us" &&
+                item?.route !== "admin.bug-reports",
         );
 
-        if (!hasBugReportsItem) {
-            items.push({
-                label: "Bug Reports",
-                route: "admin.bug-reports",
-                icon: "bug",
-                roles: ["superadmin"],
-            });
-        }
+        withoutSupportItems.push(contactItem, bugReportsItem);
 
         next[systemControlsIndex] = {
             ...systemControls,
-            items,
+            items: withoutSupportItems,
         };
 
         return next;

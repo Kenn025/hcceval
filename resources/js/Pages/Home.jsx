@@ -137,6 +137,7 @@ export default function Home({
             <HomeDesignGenerated
                 loginUrl={route("login")}
                 loginSubmitUrl={route("login.submit")}
+                contactSubmitUrl={route("contact-us.store")}
                 registerUrl={route("register")}
                 stats={stats}
                 headerLinks={headerLinks}

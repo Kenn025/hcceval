@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\BulkImportController;
 use App\Http\Controllers\Admin\GlobalSearchController;
 use App\Http\Controllers\Admin\BranchController;
 use App\Http\Controllers\Admin\BugReportInboxController;
+use App\Http\Controllers\Admin\ContactMessageInboxController;
 use App\Http\Controllers\Admin\LandingPageHeaderController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DepartmentController;
@@ -29,6 +30,7 @@ use App\Http\Controllers\Client\EmployeePortalController;
 use App\Http\Controllers\Client\StudentPortalController;
 use App\Http\Controllers\Client\TeacherPortalController;
 use App\Http\Controllers\BugReportController;
+use App\Http\Controllers\ContactMessageController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProfileController;
@@ -36,6 +38,7 @@ use App\Http\Controllers\TestimonialFeedbackController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', HomeController::class)->name('home');
+Route::post('/contact-us', [ContactMessageController::class, 'store'])->name('contact-us.store');
 
 Route::middleware('auth')->group(function () {
     Route::redirect('/admin', '/dashboard');
@@ -188,6 +191,9 @@ Route::middleware('auth')->group(function () {
 
         Route::get('/admin/audit-logs', [AuditLogController::class, 'index'])->name('admin.audit-logs');
         Route::middleware('role:superadmin')->group(function () {
+            Route::get('/admin/contact-us', [ContactMessageInboxController::class, 'index'])->name('admin.contact-us');
+            Route::put('/admin/contact-us/{contactMessage}/read', [ContactMessageInboxController::class, 'markRead'])->name('admin.contact-us.read');
+            Route::put('/admin/contact-us/{contactMessage}/resolve', [ContactMessageInboxController::class, 'resolve'])->name('admin.contact-us.resolve');
             Route::get('/admin/bug-reports', [BugReportInboxController::class, 'index'])->name('admin.bug-reports');
             Route::put('/admin/bug-reports/{bugReport}/resolve', [BugReportInboxController::class, 'resolve'])->name('admin.bug-reports.resolve');
             Route::get('/admin/landing-page', [LandingPageHeaderController::class, 'index'])->name('admin.landing-page');
