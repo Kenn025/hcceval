@@ -14,5 +14,6 @@ class BugReport extends Model
         'description',
         'severity',
         'status',
+        'resolved_at',
     ];
 }

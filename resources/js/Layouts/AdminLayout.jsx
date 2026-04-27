@@ -355,6 +355,44 @@ export default function AdminLayout({
             .join("");
     }, [auth?.user?.name]);
 
+    const navigation = useMemo(() => {
+        const raw = Array.isArray(portal?.navigation) ? portal.navigation : [];
+        const next = raw.map((section) => ({
+            ...section,
+            items: Array.isArray(section.items) ? [...section.items] : [],
+            groups: Array.isArray(section.groups) ? [...section.groups] : [],
+        }));
+
+        const systemControlsIndex = next.findIndex(
+            (section) => section?.title === "System Controls",
+        );
+        if (systemControlsIndex < 0) return next;
+
+        const systemControls = next[systemControlsIndex];
+        const items = Array.isArray(systemControls.items)
+            ? [...systemControls.items]
+            : [];
+        const hasBugReportsItem = items.some(
+            (item) => item?.route === "admin.bug-reports",
+        );
+
+        if (!hasBugReportsItem) {
+            items.push({
+                label: "Bug Reports",
+                route: "admin.bug-reports",
+                icon: "bug",
+                roles: ["superadmin"],
+            });
+        }
+
+        next[systemControlsIndex] = {
+            ...systemControls,
+            items,
+        };
+
+        return next;
+    }, [portal?.navigation]);
+
     const sidebarW = collapsed ? "lg:w-20" : "lg:w-64";
     const mainPad = collapsed ? "lg:pl-20" : "lg:pl-64";
     const closeMobile = () => setMobileOpen(false);
@@ -441,7 +479,7 @@ export default function AdminLayout({
                 ref={navRef}
                 className="sidebar-scroll flex-1 overflow-y-auto px-2 pb-2"
             >
-                {portal.navigation
+                {navigation
                     .filter((s) => !s.roles || s.roles.includes(role))
                     .map((section) => (
                         <div key={section.title} className="mb-4">

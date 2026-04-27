@@ -2,7 +2,8 @@ import axios from 'axios';
 import { useEffect, useRef, useState } from 'react';
 import ConfirmDialog from '@/Components/ConfirmDialog';
 
-const POLL_MS = 60_000;
+const CLOSED_POLL_MS = 15_000;
+const OPEN_POLL_MS = 5_000;
 
 function timeAgo(iso) {
     if (!iso) return '';
@@ -36,8 +37,29 @@ export default function NotificationBell({ routePrefix = '' }) {
 
     useEffect(() => {
         fetchNotifications();
-        const t = setInterval(fetchNotifications, POLL_MS);
+
+        const pollMs = open ? OPEN_POLL_MS : CLOSED_POLL_MS;
+        const t = setInterval(fetchNotifications, pollMs);
+
         return () => clearInterval(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open]);
+
+    useEffect(() => {
+        const onFocus = () => fetchNotifications();
+        const onVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                fetchNotifications();
+            }
+        };
+
+        window.addEventListener('focus', onFocus);
+        document.addEventListener('visibilitychange', onVisibilityChange);
+
+        return () => {
+            window.removeEventListener('focus', onFocus);
+            document.removeEventListener('visibilitychange', onVisibilityChange);
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 

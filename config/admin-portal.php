@@ -96,6 +96,7 @@ return [
                 ['label' => 'Academic Year', 'route' => 'admin.evaluation-cycle', 'icon' => 'calendar'],
                 ['label' => 'Admin Users', 'route' => 'admin.admin-users', 'icon' => 'shield'],
                 ['label' => 'Audit Logs', 'route' => 'admin.audit-logs', 'icon' => 'logs'],
+                ['label' => 'Bug Reports', 'route' => 'admin.bug-reports', 'icon' => 'bug', 'roles' => ['superadmin']],
                 ['label' => 'Landing Page', 'route' => 'admin.landing-page', 'icon' => 'dashboard', 'roles' => ['superadmin']],
             ],
         ],
@@ -308,6 +309,12 @@ return [
             'description' => 'Tamper-evident record of admin and authentication events for security review.',
             'eyebrow' => 'System Controls',
             'icon' => 'logs',
+        ],
+        'admin.bug-reports' => [
+            'title' => 'Bug Reports',
+            'description' => 'Inbox for incoming bug reports submitted from admin and portal users.',
+            'eyebrow' => 'System Controls',
+            'icon' => 'bug',
         ],
         'admin.departments' => [
             'title' => 'Departments',
