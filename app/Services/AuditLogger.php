@@ -20,13 +20,13 @@ class AuditLogger
         }
 
         $request ??= request();
-        $user     = $request?->user();
+        $user = $request?->user();
 
-        $actorType  = 'admin';
-        $actorId    = $user?->id;
+        $actorType = session('admin_role', 'admin');
+        $actorId = session('admin_id') ? (int) session('admin_id') : $user?->id;
         $actorEmail = $user?->email ?? session('client_email');
 
-        if (! $actorId && session('client_id')) {
+        if (! session('admin_id') && session('client_id')) {
             $actorType = session('client_type', 'client');
             $actorId   = (int) session('client_id');
         }

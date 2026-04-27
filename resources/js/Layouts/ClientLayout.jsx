@@ -1,5 +1,10 @@
 import { Head, Link } from "@inertiajs/react";
 import TestimonialFeedbackWidget from "@/Components/TestimonialFeedbackWidget";
+import { Moon, Sun } from "lucide-react";
+import { useEffect, useState } from "react";
+
+const THEME_MODE_KEY = "hcceval-theme-mode";
+const THEME_MODE_EVENT = "hcceval-theme-mode-change";
 
 export default function ClientLayout({
     title,
@@ -8,15 +13,48 @@ export default function ClientLayout({
     userType = "student",
 }) {
     const isStudent = userType === "student";
-    const accent = isStudent ? "#1e6e40" : "#1a4a8a";
+    const accent = isStudent ? "#2563eb" : "#1a4a8a";
     const logoutRoute = "portal.logout";
+    const [isDarkMode, setIsDarkMode] = useState(() => {
+        if (typeof window === "undefined") return false;
+        return localStorage.getItem(THEME_MODE_KEY) === "dark";
+    });
+
+    useEffect(() => {
+        document.body.classList.toggle("dark-mode", isDarkMode);
+        document.body.classList.toggle("light-mode", !isDarkMode);
+        const mode = isDarkMode ? "dark" : "light";
+        localStorage.setItem(THEME_MODE_KEY, mode);
+        window.dispatchEvent(new CustomEvent(THEME_MODE_EVENT, { detail: mode }));
+    }, [isDarkMode]);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return undefined;
+
+        const syncThemeMode = (event) => {
+            const nextMode = event.type === "storage"
+                ? event.newValue
+                : event.detail;
+
+            if (nextMode !== "dark" && nextMode !== "light") return;
+            setIsDarkMode(nextMode === "dark");
+        };
+
+        window.addEventListener("storage", syncThemeMode);
+        window.addEventListener(THEME_MODE_EVENT, syncThemeMode);
+
+        return () => {
+            window.removeEventListener("storage", syncThemeMode);
+            window.removeEventListener(THEME_MODE_EVENT, syncThemeMode);
+        };
+    }, []);
 
     return (
         <>
             <Head title={title} />
-            <div className="min-h-screen bg-slate-50 text-slate-900">
+            <div className="portal-shell portal-student min-h-screen bg-blue-50/50 text-slate-900 transition-colors duration-300">
                 {/* Top bar */}
-                <header className="sticky top-0 z-20 border-b border-slate-200 bg-white shadow-sm">
+                <header className="sticky top-0 z-20 border-b border-blue-100 bg-white/95 shadow-sm">
                     <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
                         <div className="flex items-center gap-3">
                             <div
@@ -49,6 +87,14 @@ export default function ClientLayout({
                         </div>
 
                         <div className="flex items-center gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setIsDarkMode((value) => !value)}
+                                aria-label={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
+                                className="flex h-9 w-9 items-center justify-center rounded-full border border-blue-100 bg-white text-blue-700 shadow-sm transition hover:bg-blue-50"
+                            >
+                                {isDarkMode ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+                            </button>
                             <div className="hidden text-right sm:block">
                                 <p className="text-sm font-semibold text-slate-800 leading-none">
                                     {user?.name ?? ""}

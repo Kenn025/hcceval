@@ -180,6 +180,8 @@ class LoginRequest extends FormRequest
         if (Auth::attempt(['email' => $identifier, 'password' => $password], $this->boolean('remember'))) {
             RateLimiter::clear($this->throttleKey());
 
+            AuditLogger::record('auth.login', 'user', Auth::id());
+
             $this->merge(['login_destination' => 'admin']);
 
             return;

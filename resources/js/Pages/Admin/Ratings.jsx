@@ -3,6 +3,7 @@ import ResourceTable from '@/Components/Admin/ResourceTable';
 import Modal from '@/Components/Modal';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { router } from '@inertiajs/react';
+import axios from 'axios';
 import { useEffect, useMemo, useState } from 'react';
 
 const normalizeLabel = (value) => String(value ?? '').trim().toLowerCase();
@@ -281,7 +282,17 @@ const buildRatingsReportDocument = (ratings, ratingType, reportTitle) => {
     `;
 };
 
-const printRatingsReport = (ratings, ratingType, reportTitle) => {
+const recordPrintEvent = (payload) => {
+    const csrf = document
+        .querySelector('meta[name="csrf-token"]')
+        ?.getAttribute('content');
+
+    axios.post(route('admin.audit-logs.print'), payload, {
+        headers: csrf ? { 'X-CSRF-TOKEN': csrf } : {},
+    }).catch(() => {});
+};
+
+const printRatingsReport = (ratings, ratingType, reportTitle, meta = {}) => {
     const printableRatings = ratings.filter((rating) => rating?.overall_rating != null);
 
     if (!printableRatings.length) return;
@@ -290,12 +301,30 @@ const printRatingsReport = (ratings, ratingType, reportTitle) => {
 
     if (!reportWindow) return;
 
+    recordPrintEvent({
+        report: meta.report ?? 'ratings-report',
+        rating_type: ratingType,
+        title: reportTitle,
+        school_year: meta.school_year ?? '',
+        record_count: printableRatings.length,
+        target_id: meta.target_id ?? null,
+    });
+
     reportWindow.document.write(buildRatingsReportDocument(printableRatings, ratingType, reportTitle));
     reportWindow.document.close();
 };
 
 const printRatingReport = (rating, ratingType) => {
-    printRatingsReport([rating], ratingType, rating?.subject_name || rating?.teacher_name || 'Rating Report');
+    printRatingsReport(
+        [rating],
+        ratingType,
+        rating?.subject_name || rating?.teacher_name || 'Rating Report',
+        {
+            report: 'rating-detail',
+            school_year: rating?.school_year ?? '',
+            target_id: rating?.rating_id ?? null,
+        },
+    );
 };
 
 const ROUTE_MAP = {
@@ -986,7 +1015,15 @@ export default function Ratings({
     }, [isSubjectRatings, ratings?.data, subjectSubjects]);
     const hasActiveTableRatings = activeTableRatings.length > 0;
     const printActiveTableRatings = () => {
-        printRatingsReport(activeTableRatings, ratingType, `${TITLE_MAP[ratingType] ?? 'Ratings'} - Active Table`);
+        printRatingsReport(
+            activeTableRatings,
+            ratingType,
+            `${TITLE_MAP[ratingType] ?? 'Ratings'} - Active Table`,
+            {
+                report: 'ratings-table',
+                school_year: selectedYear || selectedArchiveFolder?.label || '',
+            },
+        );
     };
     const subjectToolbarFilter = isSubjectRatings && (subjectEducationType === 'college' || subjectEducationType === 'shs') ? (
         <>

@@ -18,6 +18,7 @@ use App\Http\Controllers\Admin\ProgramController;
 use App\Http\Controllers\Admin\QuestionController;
 use App\Http\Controllers\Admin\QuestionnaireController;
 use App\Http\Controllers\Admin\RatingsController;
+use App\Http\Controllers\Admin\SubmissionLogController;
 use App\Http\Controllers\Admin\StrandController;
 use App\Http\Controllers\Admin\StudentController;
 use App\Http\Controllers\Admin\SubjectController;
@@ -40,7 +41,7 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', HomeController::class)->name('home');
 Route::post('/contact-us', [ContactMessageController::class, 'store'])->name('contact-us.store');
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'audit.admin'])->group(function () {
     Route::redirect('/admin', '/dashboard');
 
     // Dashboard
@@ -143,6 +144,10 @@ Route::middleware('auth')->group(function () {
     // Head & Branch ratings
     Route::get('/admin/head-ratings', [RatingsController::class, 'headRatings'])->name('admin.head-ratings');
     Route::get('/admin/branch-ratings', [RatingsController::class, 'branchRatings'])->name('admin.branch-ratings');
+    Route::get('/admin/submission-logs', [SubmissionLogController::class, 'index'])
+        ->middleware('role:superadmin,overalladmin')
+        ->name('admin.submission-logs');
+    Route::post('/admin/audit-logs/print', [AuditLogController::class, 'recordPrint'])->name('admin.audit-logs.print');
 
     // Archive / restore per rating type
     Route::post('/admin/ratings/{type}/{id}/archive', [RatingsController::class, 'archive'])

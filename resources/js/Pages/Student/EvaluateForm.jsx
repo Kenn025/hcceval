@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { router } from '@inertiajs/react';
 import ClientLayout from '@/Layouts/ClientLayout';
 import ConfirmDialog from '@/Components/ConfirmDialog';
+import EvaluationProgress from '@/Components/EvaluationProgress';
 
 const CATEGORY_LABELS = {
   teacher_subject: 'Subject Teacher Evaluation',
@@ -31,6 +32,7 @@ export default function EvaluateForm({
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const allAnswered = questions.length > 0 && questions.every((q) => answers[q.question_id]);
+  const answeredCount = questions.filter((q) => answers[q.question_id]).length;
   const ratingLabels = { 1: 'Poor', 2: 'Fair', 3: 'Good', 4: 'Very Good', 5: 'Excellent' };
   const tabs = [
     { key: 'subject', label: 'Subject Evaluation' },
@@ -108,10 +110,10 @@ export default function EvaluateForm({
         </button>
       </div>
 
-      <div className="mb-6 rounded-2xl bg-gradient-to-br from-[#0f3d24] to-[#1e6e40] p-5 text-white shadow-md">
-        <p className="mb-1 text-xs uppercase tracking-wider text-emerald-200">Evaluation Submissions</p>
+      <div className="mb-6 rounded-2xl bg-gradient-to-br from-blue-700 to-blue-950 p-5 text-white shadow-md shadow-blue-200/50">
+        <p className="mb-1 text-xs uppercase tracking-wider text-blue-100">Evaluation Submissions</p>
         <h2 className="text-xl font-bold">My Evaluation</h2>
-        <p className="mt-2 text-xs text-emerald-200">{cycle.school_year} - {cycle.semester}</p>
+        <p className="mt-2 text-xs text-blue-100">{cycle.school_year} - {cycle.semester}</p>
       </div>
 
       <div className="mb-5 flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
@@ -126,8 +128,8 @@ export default function EvaluateForm({
               className={[
                 'flex min-h-11 flex-1 items-center justify-center rounded-lg px-3 py-2 text-xs font-semibold transition sm:flex-none',
                 selected
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-blue-50 hover:text-blue-900',
               ].join(' ')}
             >
               {tab.label}
@@ -139,7 +141,7 @@ export default function EvaluateForm({
       {showCurrentForm && (
         <>
           <div className="mb-5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600">{CATEGORY_LABELS[category]}</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-blue-600">{CATEGORY_LABELS[category]}</p>
             <h3 className="mt-1 text-lg font-bold text-slate-900">{evaluatee?.name?.trim() || '-'}</h3>
             {subjectInfo && (
               <p className="mt-1 text-sm text-slate-500">{subjectInfo.code} - {subjectInfo.name}</p>
@@ -148,6 +150,7 @@ export default function EvaluateForm({
 
           <form onSubmit={submit} className="space-y-5">
             <p className="text-xs text-slate-500">Rate each item from <strong>1 (Poor)</strong> to <strong>5 (Excellent)</strong>.</p>
+            <EvaluationProgress answeredCount={answeredCount} totalCount={questions.length} sticky className="top-3" />
 
             {questions.map((q, idx) => (
               <div key={q.question_id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -163,8 +166,8 @@ export default function EvaluateForm({
                       className={[
                         'flex flex-col items-center justify-center rounded-xl border px-3 py-2 text-xs font-semibold transition-all',
                         answers[q.question_id] === value
-                          ? 'border-emerald-500 bg-emerald-500 text-white shadow'
-                          : 'border-slate-200 text-slate-600 hover:border-emerald-300 hover:bg-emerald-50',
+                          ? 'border-blue-600 bg-blue-600 text-white shadow'
+                          : 'border-blue-100 text-slate-600 hover:border-blue-300 hover:bg-blue-50',
                       ].join(' ')}
                     >
                       <span className="text-base font-bold">{value}</span>
@@ -184,7 +187,7 @@ export default function EvaluateForm({
                 rows={4}
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 p-3 text-sm focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                className="w-full rounded-lg border border-blue-100 p-3 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
                 placeholder="Share any additional feedback or observations..."
               />
             </div>
@@ -204,7 +207,7 @@ export default function EvaluateForm({
               <button
                 type="submit"
                 disabled={submitting || !allAnswered}
-                className="flex-1 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
+                className="flex-1 rounded-xl bg-blue-600 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
               >
                 {submitting ? 'Submitting...' : 'Submit Evaluation'}
               </button>
@@ -219,7 +222,7 @@ export default function EvaluateForm({
           <button
             type="button"
             onClick={() => router.visit(route('portal.student.dashboard'))}
-            className="mt-4 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
+            className="mt-4 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
           >
             Go to Dashboard
           </button>

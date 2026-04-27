@@ -1,4 +1,5 @@
 import ConfirmDialog from '@/Components/ConfirmDialog';
+import EvaluationProgress from '@/Components/EvaluationProgress';
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
 
@@ -50,6 +51,7 @@ export default function TeacherEvaluateForm({ category, questionnaireId, questio
     const [confirmOpen, setConfirmOpen] = useState(false);
 
     const allAnswered = questions.every((q) => answers[q.question_id]);
+    const answeredCount = questions.filter((q) => answers[q.question_id]).length;
 
     function setRating(questionId, rating) {
         setAnswers((prev) => ({ ...prev, [questionId]: rating }));
@@ -170,6 +172,8 @@ export default function TeacherEvaluateForm({ category, questionnaireId, questio
                     </p>
 
                     <form onSubmit={submit} className="space-y-4">
+                        <EvaluationProgress answeredCount={answeredCount} totalCount={questions.length} color="stone" sticky className="top-3" />
+
                         {questions.map((question, index) => (
                             <div
                                 key={question.question_id}
