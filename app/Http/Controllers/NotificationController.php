@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -25,20 +26,24 @@ class NotificationController extends Controller
         $query = DB::table('app_notifications')
             ->where('recipient_type', $type)
             ->where(function ($q) use ($id, $email) {
-                if ($id)    { $q->where('recipient_id', $id); }
-                if ($email) { $q->orWhere('recipient_email', $email); }
+                if ($id) {
+                    $q->where('recipient_id', $id);
+                }
+                if ($email) {
+                    $q->orWhere('recipient_email', $email);
+                }
             });
 
         $items = (clone $query)
             ->orderByDesc('created_at')
             ->limit(30)
             ->get(['id', 'type', 'title', 'body', 'action_url', 'read_at', 'created_at'])
-            ->map(fn ($r) => [
+            ->map(fn($r) => [
                 'id'         => $r->id,
                 'type'       => $r->type,
                 'title'      => $r->title,
                 'body'       => $r->body,
-                'action_url' => $r->action_url,
+                'action_url' => $this->sanitizeActionUrl($type, $r->action_url),
                 'read'       => (bool) $r->read_at,
                 'created_at' => $r->created_at,
             ]);
@@ -62,8 +67,12 @@ class NotificationController extends Controller
             ->where('id', $id)
             ->where('recipient_type', $type)
             ->where(function ($q) use ($rid, $email) {
-                if ($rid)   { $q->where('recipient_id', $rid); }
-                if ($email) { $q->orWhere('recipient_email', $email); }
+                if ($rid) {
+                    $q->where('recipient_id', $rid);
+                }
+                if ($email) {
+                    $q->orWhere('recipient_email', $email);
+                }
             })
             ->whereNull('read_at')
             ->update(['read_at' => now()]);
@@ -81,8 +90,12 @@ class NotificationController extends Controller
         DB::table('app_notifications')
             ->where('recipient_type', $type)
             ->where(function ($q) use ($rid, $email) {
-                if ($rid)   { $q->where('recipient_id', $rid); }
-                if ($email) { $q->orWhere('recipient_email', $email); }
+                if ($rid) {
+                    $q->where('recipient_id', $rid);
+                }
+                if ($email) {
+                    $q->orWhere('recipient_email', $email);
+                }
             })
             ->whereNull('read_at')
             ->update(['read_at' => now()]);
@@ -100,8 +113,12 @@ class NotificationController extends Controller
         DB::table('app_notifications')
             ->where('recipient_type', $type)
             ->where(function ($q) use ($rid, $email) {
-                if ($rid)   { $q->where('recipient_id', $rid); }
-                if ($email) { $q->orWhere('recipient_email', $email); }
+                if ($rid) {
+                    $q->where('recipient_id', $rid);
+                }
+                if ($email) {
+                    $q->orWhere('recipient_email', $email);
+                }
             })
             ->delete();
 
@@ -111,7 +128,7 @@ class NotificationController extends Controller
     private function currentRecipient(): array
     {
         if (session('admin_id')) {
-            return ['admin', (int) session('admin_id'), auth()->user()?->email];
+            return ['admin', (int) session('admin_id'), Auth::user()?->email];
         }
 
         if (session('client_id') && session('client_type')) {
@@ -124,5 +141,23 @@ class NotificationController extends Controller
         }
 
         return [null, null, null];
+    }
+
+    private function sanitizeActionUrl(string $recipientType, ?string $actionUrl): ?string
+    {
+        if (! $actionUrl) {
+            return null;
+        }
+
+        if ($recipientType !== 'admin') {
+            return $actionUrl;
+        }
+
+        $role = (string) session('admin_role', 'admin');
+        if ($role !== 'superadmin' && str_contains($actionUrl, '/admin/bug-reports')) {
+            return url('/dashboard');
+        }
+
+        return $actionUrl;
     }
 }

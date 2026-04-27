@@ -31,6 +31,8 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
+        $this->sanitizeIntendedUrlForAdmin($request);
+
         return match ($request->input('login_destination')) {
             '2fa'                 => redirect()->route('two-factor.challenge'),
             'student'             => redirect()->route('portal.student.dashboard'),
@@ -52,5 +54,15 @@ class AuthenticatedSessionController extends Controller
         $request->session()->regenerateToken();
 
         return redirect('/');
+    }
+
+    private function sanitizeIntendedUrlForAdmin(Request $request): void
+    {
+        $role = (string) $request->session()->get('admin_role', '');
+        $intendedUrl = (string) $request->session()->get('url.intended', '');
+
+        if ($role !== 'superadmin' && str_contains($intendedUrl, '/admin/bug-reports')) {
+            $request->session()->forget('url.intended');
+        }
     }
 }
