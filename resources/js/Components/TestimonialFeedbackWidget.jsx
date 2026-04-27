@@ -2,11 +2,22 @@ import { useEffect, useMemo, useState } from "react";
 
 function getCsrfToken() {
     if (typeof document === "undefined") return "";
-    return (
+    const metaToken =
         document
             .querySelector('meta[name="csrf-token"]')
-            ?.getAttribute("content") ?? ""
-    );
+            ?.getAttribute("content") ?? "";
+
+    if (metaToken) return metaToken;
+
+    const xsrfCookieRaw = document.cookie
+        .split("; ")
+        .find((value) => value.startsWith("XSRF-TOKEN="));
+
+    const xsrfCookie = xsrfCookieRaw
+        ? xsrfCookieRaw.slice("XSRF-TOKEN=".length)
+        : "";
+
+    return xsrfCookie ? decodeURIComponent(xsrfCookie) : "";
 }
 
 function statusBadgeClass(status) {
@@ -82,7 +93,9 @@ export default function TestimonialFeedbackWidget({
                 headers: {
                     "Content-Type": "application/json",
                     Accept: "application/json",
+                    "X-Requested-With": "XMLHttpRequest",
                     "X-CSRF-TOKEN": getCsrfToken(),
+                    "X-XSRF-TOKEN": getCsrfToken(),
                 },
                 body: JSON.stringify({ feedback: message }),
             });
@@ -183,7 +196,9 @@ export default function TestimonialFeedbackWidget({
                                 <textarea
                                     value={feedback}
                                     onChange={(event) =>
-                                        setFeedback(event.target.value.slice(0, 1000))
+                                        setFeedback(
+                                            event.target.value.slice(0, 1000),
+                                        )
                                     }
                                     rows={5}
                                     placeholder="Share your experience or suggestion..."
