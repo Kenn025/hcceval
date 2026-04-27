@@ -63,4 +63,24 @@ class DepartmentEvaluationWindow
             ->map(fn ($id) => (int) $id)
             ->all();
     }
+
+    public static function hasOpenWindow(?int $branchId = null): bool
+    {
+        if (! Schema::hasTable('department_evaluation_windows')) {
+            return false;
+        }
+
+        return DB::table('department_evaluation_windows')
+            ->where('status', 'active')
+            ->when($branchId, fn ($query) => $query->where('branch_id', $branchId))
+            ->where(function ($query) {
+                $query->whereNull('date_opened')
+                    ->orWhere('date_opened', '<=', now());
+            })
+            ->where(function ($query) {
+                $query->whereNull('date_closed')
+                    ->orWhere('date_closed', '>', now());
+            })
+            ->exists();
+    }
 }
