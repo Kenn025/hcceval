@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\EvaluationCycleRequest;
 use App\Services\AuditLogger;
+use App\Services\DepartmentEvaluationWindow;
 use App\Services\EvaluationNotifier;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -79,12 +80,17 @@ class EvaluationCycleController extends Controller
         return Inertia::render('Admin/EvaluationCycle', [
             'cycles'      => $cycles,
             'activeCycle' => $activeCycle,
+            'hasOpenEvaluationWindow' => DepartmentEvaluationWindow::hasOpenWindow($this->scopedBranchId()),
         ]);
     }
 
     public function store(EvaluationCycleRequest $request, EvaluationNotifier $notifier)
     {
         $validated = $request->validated();
+
+        if ($this->hasRunningEvaluationWindow()) {
+            return back()->with('error', 'Academic year cannot be changed while an evaluation is currently open. Close all running evaluations first.');
+        }
 
         if ($validated['status'] === 'active') {
             DB::table('academic_year')->update(['is_activated' => 0]);
@@ -118,6 +124,10 @@ class EvaluationCycleController extends Controller
     public function update(EvaluationCycleRequest $request, int $id, EvaluationNotifier $notifier)
     {
         $validated = $request->validated();
+
+        if ($this->hasRunningEvaluationWindow()) {
+            return back()->with('error', 'Academic year cannot be changed while an evaluation is currently open. Close all running evaluations first.');
+        }
 
         $previous = DB::table('academic_year')->where('id', $id)->first();
 
@@ -156,6 +166,10 @@ class EvaluationCycleController extends Controller
 
     public function destroy(int $id, EvaluationNotifier $notifier)
     {
+        if ($this->hasRunningEvaluationWindow()) {
+            return back()->with('error', 'Academic year cannot be changed while an evaluation is currently open. Close all running evaluations first.');
+        }
+
         $cycle = DB::table('academic_year')->where('id', $id)->first();
 
         DB::table('academic_year')->where('id', $id)->update([
@@ -176,6 +190,11 @@ class EvaluationCycleController extends Controller
         AuditLogger::record('evaluation_cycle.deleted', 'academic_year', $id);
 
         return back()->with('success', 'Evaluation cycle deleted.');
+    }
+
+    private function hasRunningEvaluationWindow(): bool
+    {
+        return DepartmentEvaluationWindow::hasOpenWindow($this->scopedBranchId());
     }
 
     private function submissionStatsByAcademicYear(): array

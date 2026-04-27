@@ -38,7 +38,7 @@ function localDateTimeValue(date = new Date()) {
     return offsetDate.toISOString().slice(0, 16);
 }
 
-export default function EvaluationCycle({ cycles = [], activeCycle = null }) {
+export default function EvaluationCycle({ cycles = [], activeCycle = null, hasOpenEvaluationWindow = false }) {
     const [slideOpen, setSlideOpen] = useState(false);
     const [startModalOpen, setStartModalOpen] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -73,6 +73,10 @@ export default function EvaluationCycle({ cycles = [], activeCycle = null }) {
     const activeTerm = activeCycle?.semester ?? 'No active term';
 
     const openChange = () => {
+        if (hasOpenEvaluationWindow) {
+            return;
+        }
+
         setData('cycle_id', activeCycle?.year_id ? String(activeCycle.year_id) : '');
         setSlideOpen(true);
     };
@@ -145,12 +149,19 @@ export default function EvaluationCycle({ cycles = [], activeCycle = null }) {
                     <button
                         type="button"
                         onClick={openChange}
-                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+                        disabled={hasOpenEvaluationWindow}
+                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                        title={hasOpenEvaluationWindow ? 'Close all running evaluations before changing the academic year.' : undefined}
                     >
                         <AppIcon name="edit" className="h-4 w-4" />
                         Change
                     </button>
                 </div>
+                {hasOpenEvaluationWindow ? (
+                    <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+                        Academic year changes are locked while an evaluation is currently open. Close all running evaluations first.
+                    </div>
+                ) : null}
             </div>
 
             <div>
