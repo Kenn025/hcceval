@@ -715,10 +715,6 @@ class AssignmentController extends Controller
             return 'junior-high';
         }
 
-        if (str_contains($name, 'elementary') || str_contains($name, 'grade school') || str_contains($code, 'elem')) {
-            return 'elementary';
-        }
-
         return 'other';
     }
 
@@ -737,7 +733,7 @@ class AssignmentController extends Controller
         return match ($this->getDepartmentKind($department)) {
             'college' => ['table' => 'program', 'items_key' => 'program_ids', 'label' => 'programs'],
             'senior-high' => ['table' => 'strand', 'items_key' => 'strand_ids', 'label' => 'strands'],
-            'junior-high', 'elementary' => ['table' => 'education_level', 'items_key' => 'year_level_ids', 'label' => 'grade levels'],
+            'junior-high' => ['table' => 'education_level', 'items_key' => 'year_level_ids', 'label' => 'grade levels'],
             default => null,
         };
     }

@@ -13,6 +13,7 @@ use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DepartmentController;
 use App\Http\Controllers\Admin\EmployeeController;
 use App\Http\Controllers\Admin\EvaluationCycleController;
+use App\Http\Controllers\Admin\EvaluationCommentReviewController;
 use App\Http\Controllers\Admin\OutstandingAwardsController;
 use App\Http\Controllers\Admin\ProgramController;
 use App\Http\Controllers\Admin\QuestionController;
@@ -55,15 +56,13 @@ Route::middleware(['auth', 'audit.admin'])->group(function () {
     Route::put('/admin/college/programs/{program}', [ProgramController::class, 'update']);
     Route::delete('/admin/college/programs/{program}', [ProgramController::class, 'destroy']);
 
-    // Subjects (college / SHS / JHS / grade-school)
+    // Subjects (college / SHS / JHS)
     Route::get('/admin/college/subjects', [SubjectController::class, 'index'])
         ->defaults('educationType', 'college')->name('admin.college.subjects');
     Route::get('/admin/senior-high/subjects', [SubjectController::class, 'index'])
         ->defaults('educationType', 'senior-high')->name('admin.senior-high.subjects');
     Route::get('/admin/junior-high/subjects', [SubjectController::class, 'index'])
         ->defaults('educationType', 'junior-high')->name('admin.junior-high.subjects');
-    Route::get('/admin/grade-school/subjects', [SubjectController::class, 'index'])
-        ->defaults('educationType', 'grade-school')->name('admin.grade-school.subjects');
     Route::post('/admin/subjects', [SubjectController::class, 'store']);
     Route::put('/admin/subjects/{subject}', [SubjectController::class, 'update']);
     Route::delete('/admin/subjects/{subject}', [SubjectController::class, 'destroy']);
@@ -75,8 +74,6 @@ Route::middleware(['auth', 'audit.admin'])->group(function () {
         ->defaults('educationType', 'senior-high')->name('admin.senior-high.year-levels');
     Route::get('/admin/junior-high/grade-levels', [YearLevelController::class, 'index'])
         ->defaults('educationType', 'junior-high')->name('admin.junior-high.grade-levels');
-    Route::get('/admin/grade-school/grade-levels', [YearLevelController::class, 'index'])
-        ->defaults('educationType', 'grade-school')->name('admin.grade-school.grade-levels');
     Route::post('/admin/year-levels', [YearLevelController::class, 'store']);
     Route::put('/admin/year-levels/{yearLevel}', [YearLevelController::class, 'update']);
     Route::delete('/admin/year-levels/{yearLevel}', [YearLevelController::class, 'destroy']);
@@ -156,6 +153,18 @@ Route::middleware(['auth', 'audit.admin'])->group(function () {
     Route::post('/admin/ratings/{type}/{id}/restore', [RatingsController::class, 'restore'])
         ->whereIn('type', ['subject', 'peer', 'employee', 'head', 'branch'])
         ->name('admin.ratings.restore');
+    Route::post('/admin/ratings/release-to-teacher', [RatingsController::class, 'releaseToTeacher'])
+        ->name('admin.ratings.release-to-teacher');
+    Route::post('/admin/ratings/release-department', [RatingsController::class, 'releaseDepartmentRatings'])
+        ->name('admin.ratings.release-department');
+    Route::get('/admin/ratings/comments-review', [EvaluationCommentReviewController::class, 'index'])
+        ->name('admin.ratings.comments-review');
+    Route::post('/admin/ratings/comments-review/program-reviewed', [EvaluationCommentReviewController::class, 'markProgramReviewed'])
+        ->name('admin.ratings.comments-review.program-reviewed');
+    Route::post('/admin/ratings/comments-review/{submission}/reviewed', [EvaluationCommentReviewController::class, 'markReviewed'])
+        ->name('admin.ratings.comments-review.reviewed');
+    Route::post('/admin/ratings/comments-review/{submission}/hidden', [EvaluationCommentReviewController::class, 'toggleHidden'])
+        ->name('admin.ratings.comments-review.hidden');
 
     // Exports & Printable Summary
     Route::get('/admin/subject-ratings/export', [RatingsController::class, 'exportSubject'])->name('admin.subject-ratings.export');
@@ -167,7 +176,6 @@ Route::middleware(['auth', 'audit.admin'])->group(function () {
 
     // Outstanding Awards
     Route::get('/admin/outstanding-awards', [OutstandingAwardsController::class, 'index'])->name('admin.outstanding-awards');
-    Route::post('/admin/outstanding-awards/recompute', [OutstandingAwardsController::class, 'recompute'])->name('admin.outstanding-awards.recompute');
 
     // System Controls — superadmin & overalladmin access
     Route::middleware('role:superadmin,overalladmin')->group(function () {

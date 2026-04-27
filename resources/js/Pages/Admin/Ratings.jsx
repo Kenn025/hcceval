@@ -23,10 +23,6 @@ const getDepartmentType = (departmentName) => {
         return 'jhs';
     }
 
-    if (name.includes('elementary')) {
-        return 'elem';
-    }
-
     return null;
 };
 
@@ -365,6 +361,7 @@ const PEER_COLUMNS = [
     { key: 'program_name', label: 'Program / Strand', render: (r) => r.program_name ?? r.strand_name ?? '-' },
     { key: 'overall_rating', label: 'Rating', render: (r) => r.overall_rating ? Number(r.overall_rating).toFixed(2) : '-' },
     { key: 'submission_count', label: 'Responses', render: (r) => r.submission_count ?? 0 },
+    { key: 'is_released', label: 'Portal', render: (r) => r.is_released ? 'Released' : 'Pending' },
     { key: 'school_year', label: 'School Year', render: (r) => r.school_year ?? '-' },
 ];
 
@@ -401,7 +398,7 @@ const COLUMNS_MAP = {
     branch: BRANCH_COLUMNS,
 };
 
-function SubjectRatingsList({ subjects = [], onTeacherClick, toolbarFilter = null }) {
+function SubjectRatingsList({ subjects = [], onTeacherClick, onReviewComments, toolbarFilter = null }) {
     const [search, setSearch] = useState('');
     const [perPage, setPerPage] = useState(15);
     const rows = subjects.flatMap((subject) => {
@@ -410,6 +407,7 @@ function SubjectRatingsList({ subjects = [], onTeacherClick, toolbarFilter = nul
         return teachers.map((teacher, index) => ({
             ...teacher,
             row_key: `${subject.id}-${teacher.teacher_id ?? 'teacher'}-${index}`,
+            subject_id: subject.id,
             subject_name: subject.name,
             subject_code: subject.code,
             program_name: subject.program_name,
@@ -480,13 +478,14 @@ function SubjectRatingsList({ subjects = [], onTeacherClick, toolbarFilter = nul
                     </div>
                 </div>
             </div>
-            <div className="hidden grid-cols-[64px_1.4fr_1fr_1fr_0.7fr_0.7fr_0.6fr] gap-4 border-b border-slate-100 bg-slate-50 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
+            <div className="hidden grid-cols-[64px_1.4fr_1fr_1fr_0.7fr_0.7fr_0.8fr_1fr] gap-4 border-b border-slate-100 bg-slate-50 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
                 <span>#</span>
                 <span>Subject</span>
                 <span>Program / Strand</span>
                 <span>Teacher</span>
                 <span>Rating</span>
                 <span>Responses</span>
+                <span>Portal</span>
                 <span className="text-right">Action</span>
             </div>
             <div className="divide-y divide-slate-100">
@@ -502,7 +501,7 @@ function SubjectRatingsList({ subjects = [], onTeacherClick, toolbarFilter = nul
                         <div
                             key={row.row_key}
                             onClick={() => hasRating && onTeacherClick(row)}
-                            className={`grid w-full gap-3 px-5 py-4 text-left transition lg:grid-cols-[64px_1.4fr_1fr_1fr_0.7fr_0.7fr_0.6fr] lg:items-center ${hasRating ? 'cursor-pointer hover:bg-slate-50' : 'cursor-default'}`}
+                            className={`grid w-full gap-3 px-5 py-4 text-left transition lg:grid-cols-[64px_1.4fr_1fr_1fr_0.7fr_0.7fr_0.8fr_1fr] lg:items-center ${hasRating ? 'cursor-pointer hover:bg-slate-50' : 'cursor-default'}`}
                         >
                             <p className="text-sm font-medium text-slate-500">{index + 1}</p>
                             <div>
@@ -518,7 +517,30 @@ function SubjectRatingsList({ subjects = [], onTeacherClick, toolbarFilter = nul
                                 {hasRating ? Number(row.overall_rating).toFixed(2) : 'No rating'}
                             </p>
                             <p className="text-sm text-slate-600">{row.submission_count ?? 0}</p>
-                            <div className="flex justify-start lg:justify-end">
+                            <div>
+                                <span className={[
+                                    'inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1',
+                                    row.is_released
+                                        ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+                                        : 'bg-amber-50 text-amber-700 ring-amber-200',
+                                ].join(' ')}>
+                                    {row.is_released ? 'Released' : 'Pending Release'}
+                                </span>
+                            </div>
+                            <div className="flex flex-wrap justify-start gap-2 lg:justify-end">
+                                <button
+                                    type="button"
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        if (hasRating) {
+                                            onReviewComments?.(row);
+                                        }
+                                    }}
+                                    disabled={!hasRating}
+                                    className="rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+                                >
+                                    Review Comments
+                                </button>
                                 <button
                                     type="button"
                                     onClick={(event) => {
@@ -924,6 +946,22 @@ export default function Ratings({
         setDetailOpen(true);
     };
 
+    const openCommentsReview = (row) => {
+        router.visit(route('admin.ratings.comments-review', {
+            rating_type: ratingType,
+            teacher_id: row.teacher_id ?? row.employee_id ?? '',
+            subject_id: ratingType === 'subject' ? row.subject_id ?? '' : '',
+            branch_id: ratingType === 'subject' ? selectedSubjectBranchId : selectedFilterBranchId,
+            department_id: ratingType === 'subject' ? selectedSubjectDepartmentId : '',
+            program_id: ratingType === 'subject' ? selectedSubjectProgramId : '',
+            strand_id: ratingType === 'subject' ? selectedSubjectStrandId : '',
+            department_group: ratingType === 'peer' ? selectedDepartmentGroup : '',
+            program_group: ratingType === 'peer' ? selectedProgramGroup : '',
+            strand_group: ratingType === 'peer' ? selectedStrandGroup : '',
+            school_year: row.school_year ?? selectedYear ?? '',
+        }));
+    };
+
     const printRatingDetail = () => {
         printRatingReport(viewing, ratingType);
     };
@@ -1014,6 +1052,32 @@ export default function Ratings({
         return (ratings?.data ?? []).filter((rating) => rating.overall_rating != null);
     }, [isSubjectRatings, ratings?.data, subjectSubjects]);
     const hasActiveTableRatings = activeTableRatings.length > 0;
+    const canReleaseDepartmentRatings = ['subject', 'peer'].includes(ratingType)
+        && !filters.archive_mode
+        && hasActiveTableRatings;
+    const releaseDepartmentRatings = () => {
+        router.post(route('admin.ratings.release-department'), {
+            rating_type: ratingType,
+            school_year: selectedYear,
+            branch_id: isSubjectRatings ? selectedSubjectBranchId : selectedFilterBranchId,
+            department_id: isSubjectRatings ? selectedSubjectDepartmentId : '',
+            program_id: isSubjectRatings ? selectedSubjectProgramId : '',
+            strand_id: isSubjectRatings ? selectedSubjectStrandId : '',
+            department_group: ratingType === 'peer' ? selectedDepartmentGroup : '',
+            program_group: ratingType === 'peer' ? selectedProgramGroup : '',
+            strand_group: ratingType === 'peer' ? selectedStrandGroup : '',
+        }, {
+            preserveScroll: true,
+        });
+    };
+    const askReleaseDepartmentRatings = () => setConfirmAction({
+        kind: 'release',
+        title: 'Release department ratings?',
+        message: `This will make ${activeTableRatings.length} ${ratingType === 'subject' ? 'subject' : 'peer'} rating${activeTableRatings.length === 1 ? '' : 's'} visible in the selected department teacher portals.`,
+        confirm: 'Release Ratings',
+        tone: 'success',
+        run: () => releaseDepartmentRatings(),
+    });
     const printActiveTableRatings = () => {
         printRatingsReport(
             activeTableRatings,
@@ -1123,6 +1187,19 @@ export default function Ratings({
                 </div>
                 {((!isSubjectArchive && !isPeerArchive && !isHeadArchive && !isEmployeeArchive) || selectedArchiveFolder) && (
                 <div className="flex flex-wrap items-center gap-2">
+                    {canReleaseDepartmentRatings && (
+                        <button
+                            type="button"
+                            onClick={askReleaseDepartmentRatings}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                        >
+                            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                                <path d="m9 11 3 3L22 4" />
+                            </svg>
+                            Release Department Ratings
+                        </button>
+                    )}
                     <button
                         type="button"
                         onClick={askPrintActiveTableRatings}
@@ -1259,7 +1336,7 @@ export default function Ratings({
             )}
 
             {(isSubjectArchive && !selectedSubjectArchiveFolder) || (isPeerArchive && !selectedPeerArchiveFolder) || (isHeadArchive && !selectedHeadArchiveFolder) || (isEmployeeArchive && !selectedEmployeeArchiveFolder) ? null : isSubjectRatings ? (
-                <SubjectRatingsList subjects={subjectSubjects} onTeacherClick={openView} toolbarFilter={subjectToolbarFilter} />
+                <SubjectRatingsList subjects={subjectSubjects} onTeacherClick={openView} onReviewComments={openCommentsReview} toolbarFilter={subjectToolbarFilter} />
             ) : (
                 <ResourceTable
                     columns={columns}
@@ -1277,13 +1354,24 @@ export default function Ratings({
                     }
                     onRowClick={openView}
                     rowActions={(row) => (
-                        <button
-                            type="button"
-                            onClick={() => openView(row)}
-                            className="rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50"
-                        >
-                            View
-                        </button>
+                        <div className="flex flex-wrap justify-end gap-2">
+                            {ratingType === 'peer' && row.overall_rating != null && (
+                                <button
+                                    type="button"
+                                    onClick={() => openCommentsReview(row)}
+                                    className="rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-50"
+                                >
+                                    Review Comments
+                                </button>
+                            )}
+                            <button
+                                type="button"
+                                onClick={() => openView(row)}
+                                className="rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                            >
+                                View
+                            </button>
+                        </div>
                     )}
                     extraHeaderActions={ratingType === 'peer' ? peerToolbarFilter : ratingType === 'employee' ? employeeToolbarFilter : null}
                     showPageIndicator={!['peer', 'employee', 'head'].includes(ratingType)}
@@ -1356,6 +1444,14 @@ export default function Ratings({
                                         : '-'}
                                 </p>
                             </div>
+                            {['subject', 'peer'].includes(ratingType) && (
+                                <div className={`rounded-lg border p-3 ${viewing.is_released ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Teacher Portal</p>
+                                    <p className={`mt-1 text-sm font-semibold ${viewing.is_released ? 'text-emerald-700' : 'text-amber-700'}`}>
+                                        {viewing.is_released ? 'Released' : 'Pending admin release'}
+                                    </p>
+                                </div>
+                            )}
                             <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">School Year</p><p className="mt-1 text-sm font-semibold text-slate-900">{viewing.school_year ?? '-'}</p></div>
                         </div>
 

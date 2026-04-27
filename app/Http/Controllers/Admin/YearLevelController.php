@@ -27,7 +27,6 @@ class YearLevelController extends Controller
         'college' => 'college',
         'senior-high' => 'shs',
         'junior-high' => 'jhs',
-        'grade-school' => 'elementary',
     ];
 
     public function index(Request $request, string $educationType = 'college')
@@ -42,7 +41,6 @@ class YearLevelController extends Controller
             'college' => 'College',
             'senior-high' => 'Senior High',
             'junior-high' => 'Junior High',
-            'grade-school' => 'Elementary',
         ];
 
         $levelName = $levelMap[$educationType] ?? 'College';
@@ -51,7 +49,7 @@ class YearLevelController extends Controller
             'college' => fn ($query) => $query->where('name', 'like', '%College%')->orWhere('code', 'like', '%COL%'),
             'senior-high' => fn ($query) => $query->where('name', 'like', '%Senior High%')->orWhere('code', 'like', '%SHS%'),
             'junior-high' => fn ($query) => $query->where('name', 'like', '%Junior High%')->orWhere('code', 'like', '%JHS%'),
-            default => fn ($query) => $query->where('name', 'like', '%Elementary%')->orWhere('code', 'like', '%ELEM%'),
+            default => fn ($query) => $query->where('name', 'like', '%College%')->orWhere('code', 'like', '%COL%'),
         };
 
         $branches = Branch::query()
@@ -229,7 +227,7 @@ class YearLevelController extends Controller
     {
         $scopedId = $this->scopedBranchId();
         $validated = $request->validate([
-            'education_type' => ['nullable', 'string', 'in:college,senior-high,junior-high,grade-school'],
+            'education_type' => ['nullable', 'string', 'in:college,senior-high,junior-high'],
             'branch_id' => [
                 'required',
                 'integer',
@@ -384,7 +382,7 @@ class YearLevelController extends Controller
                     $validated['subject_teacher_map'][(string) $subjectId] = $assignedTeacherId;
                 }
             }
-        } elseif (in_array(($validated['education_type'] ?? null), ['junior-high', 'grade-school'], true)) {
+        } elseif (($validated['education_type'] ?? null) === 'junior-high') {
             $validated['program_id'] = null;
             $validated['strand_id'] = null;
             $validated['department_id'] = $this->resolveDepartmentIdForEducationType((int) $validated['branch_id'], (string) ($validated['education_type'] ?? ''));
@@ -545,7 +543,6 @@ class YearLevelController extends Controller
                 match ($educationType) {
                     'senior-high' => $query->where('name', 'like', '%Senior High%')->orWhere('code', 'like', '%SHS%'),
                     'junior-high' => $query->where('name', 'like', '%Junior High%')->orWhere('code', 'like', '%JHS%'),
-                    'grade-school' => $query->where('name', 'like', '%Elementary%')->orWhere('code', 'like', '%ELEM%'),
                     default => $query->whereRaw('1 = 0'),
                 };
             })

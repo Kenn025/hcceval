@@ -35,7 +35,6 @@ class SubjectController extends Controller
             'college' => 'college',
             'senior-high' => 'shs',
             'junior-high' => 'jhs',
-            'grade-school' => 'elementary',
         ];
 
         $subjectType = $typeMap[$educationType] ?? 'college';
@@ -43,7 +42,7 @@ class SubjectController extends Controller
             'college' => fn ($query) => $query->where('name', 'like', '%College%')->orWhere('code', 'like', '%COL%'),
             'shs' => fn ($query) => $query->where('name', 'like', '%Senior High%')->orWhere('code', 'like', '%SHS%'),
             'jhs' => fn ($query) => $query->where('name', 'like', '%Junior High%')->orWhere('code', 'like', '%JHS%'),
-            default => fn ($query) => $query->where('name', 'like', '%Elementary%')->orWhere('code', 'like', '%ELEM%'),
+            default => fn ($query) => $query->where('name', 'like', '%College%')->orWhere('code', 'like', '%COL%'),
         };
 
         $branches = Branch::query()
@@ -119,7 +118,6 @@ class SubjectController extends Controller
             'college' => 'College',
             'senior-high' => 'Senior High',
             'junior-high' => 'Junior High',
-            'grade-school' => 'Grade School',
         ];
 
         return Inertia::render('Admin/Subjects', [
@@ -214,7 +212,7 @@ class SubjectController extends Controller
             'program_id' => 'nullable|exists:program,id',
             'strand_id' => 'nullable|exists:strand,id',
             'name' => 'required|string|max:150',
-            'type' => 'required|string|in:college,shs,jhs,elementary',
+            'type' => 'required|string|in:college,shs,jhs',
             'is_gened' => 'boolean',
             'is_activated' => 'boolean',
             'teacher_ids' => 'nullable|array',
@@ -329,7 +327,6 @@ class SubjectController extends Controller
                     'college' => $query->where('name', 'like', '%College%')->orWhere('code', 'like', '%COL%'),
                     'shs' => $query->where('name', 'like', '%Senior High%')->orWhere('code', 'like', '%SHS%'),
                     'jhs' => $query->where('name', 'like', '%Junior High%')->orWhere('code', 'like', '%JHS%'),
-                    'elementary' => $query->where('name', 'like', '%Elementary%')->orWhere('code', 'like', '%ELEM%'),
                     default => $query->whereRaw('1 = 0'),
                 };
             })
@@ -356,7 +353,6 @@ class SubjectController extends Controller
             'college' => 'COL',
             'shs' => 'SHS',
             'jhs' => 'JHS',
-            'elementary' => 'ELEM',
             default => 'SUB',
         };
 

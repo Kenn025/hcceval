@@ -15,7 +15,6 @@ const ROUTE_MAP = {
     college: 'admin.college.subjects',
     'senior-high': 'admin.senior-high.subjects',
     'junior-high': 'admin.junior-high.subjects',
-    'grade-school': 'admin.grade-school.subjects',
 };
 const hasValue = (value) => String(value ?? '').trim() !== '';
 
@@ -95,7 +94,6 @@ export default function Subjects({
         college: (department) => /college/i.test(department.name ?? '') || /col/i.test(department.code ?? ''),
         'senior-high': (department) => /senior high/i.test(department.name ?? '') || /shs/i.test(department.code ?? ''),
         'junior-high': (department) => /junior high/i.test(department.name ?? '') || /jhs/i.test(department.code ?? ''),
-        'grade-school': (department) => /elementary|grade school/i.test(department.name ?? '') || /elem/i.test(department.code ?? ''),
     };
 
     const blankFormData = () => ({
@@ -396,7 +394,6 @@ export default function Subjects({
         college: 'College Subjects',
         'senior-high': 'Senior High Subjects',
         'junior-high': 'Junior High Subjects',
-        'grade-school': 'Grade School Subjects',
     };
 
     return (

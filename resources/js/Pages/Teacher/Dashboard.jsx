@@ -986,6 +986,7 @@ function SubjectRatingsTab({ ratings = [], classes = [], cycle }) {
         && subject.overall_rating !== null
         && subject.overall_rating !== undefined
     ));
+    const hasReleasedSubjects = subjects.some((subject) => subject.is_released);
 
     if (!subjects.length) {
         return <EmptyState icon="ratings" message="No assigned subjects are available for the active evaluation cycle." />;
@@ -993,6 +994,13 @@ function SubjectRatingsTab({ ratings = [], classes = [], cycle }) {
 
     return (
         <div className="space-y-4">
+            {!hasReleasedSubjects && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    <p className="font-semibold">Ratings are pending admin review</p>
+                    <p className="mt-1 text-amber-800">Your subject ratings will appear here after an admin approves and releases them to your portal.</p>
+                </div>
+            )}
+
             <div className="grid gap-3 sm:grid-cols-3">
                 <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                     <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Subjects</p>
@@ -1076,6 +1084,9 @@ function SubjectRatingsTab({ ratings = [], classes = [], cycle }) {
                                         </p>
                                     )}
                                     <p className="text-xs text-slate-400">{hasRatings ? 'out of 5.00' : 'No ratings yet'}</p>
+                                    {!subject.is_released && (
+                                        <p className="text-xs font-medium text-amber-600">Pending admin release</p>
+                                    )}
                                     <button
                                         type="button"
                                         onClick={() => setSelectedSubject(subject)}
@@ -1119,9 +1130,17 @@ function PeerRatingsTab({ ratings = {} }) {
         ratings.inside ?? { label: 'Inside Faculty', questions: [] },
         ratings.outside ?? { label: 'Outside Faculty', questions: [] },
     ];
+    const hasReleasedPeerRatings = groups.some((group) => group.is_released);
 
     return (
         <>
+            {!hasReleasedPeerRatings && (
+                <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    <p className="font-semibold">Peer ratings are pending admin review</p>
+                    <p className="mt-1 text-amber-800">Your peer ratings will appear here after an admin approves and releases them to your portal.</p>
+                </div>
+            )}
+
             <div className="grid gap-4 xl:grid-cols-2">
                 {groups.map((group) => {
                 const hasRatings = Number(group.submission_count ?? 0) > 0 && group.overall_rating !== null && group.overall_rating !== undefined;

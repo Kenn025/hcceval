@@ -83,6 +83,12 @@ class AuditLogController extends Controller
             '2fa.failed' => 'Failed 2FA',
             'report.printed' => 'Printed / saved PDF',
             'report.exported' => 'Exported report',
+            'ratings.released' => 'Released rating',
+            'ratings.department_released' => 'Released department ratings',
+            'comment.reviewed' => 'Reviewed comment',
+            'comment.program_reviewed' => 'Reviewed program comments',
+            'comment.hidden' => 'Hid comment',
+            'comment.shown' => 'Restored comment',
             default => str($action)
                 ->replace(['admin.', '_', '.'], ['', ' ', ' '])
                 ->headline()
@@ -107,6 +113,38 @@ class AuditLogController extends Controller
                 $meta['school_year'] ?? null,
                 isset($meta['record_count']) ? $meta['record_count'] . ' record(s)' : null,
             ])->filter()->implode(' - ')) ?: 'Report exported';
+        }
+
+        if (($row->action ?? '') === 'ratings.released') {
+            return trim(collect([
+                $meta['teacher_name'] ?? null,
+                $meta['rating_type'] ?? null,
+                isset($meta['subject_id']) ? 'Subject #' . $meta['subject_id'] : null,
+                isset($meta['academic_year_id']) ? 'Academic year #' . $meta['academic_year_id'] : null,
+            ])->filter()->implode(' - ')) ?: 'Rating released to teacher portal';
+        }
+
+        if (($row->action ?? '') === 'ratings.department_released') {
+            return trim(collect([
+                $meta['rating_type'] ?? null,
+                $meta['department_group'] ?? (isset($meta['department_id']) ? 'Department #' . $meta['department_id'] : null),
+                $meta['program_group'] ?? (isset($meta['program_id']) ? 'Program #' . $meta['program_id'] : null),
+                $meta['strand_group'] ?? (isset($meta['strand_id']) ? 'Strand #' . $meta['strand_id'] : null),
+                isset($meta['released_count']) ? $meta['released_count'] . ' rating(s)' : null,
+            ])->filter()->implode(' - ')) ?: 'Department ratings released to teacher portals';
+        }
+
+        if (($row->action ?? '') === 'comment.program_reviewed') {
+            return trim(collect([
+                $meta['program_group'] ?? (isset($meta['program_id']) ? 'Program #' . $meta['program_id'] : null),
+                $meta['strand_group'] ?? (isset($meta['strand_id']) ? 'Strand #' . $meta['strand_id'] : null),
+                $meta['school_year'] ?? null,
+                isset($meta['reviewed_count']) ? $meta['reviewed_count'] . ' comment(s)' : null,
+            ])->filter()->implode(' - ')) ?: 'Program comments reviewed';
+        }
+
+        if (in_array(($row->action ?? ''), ['comment.reviewed', 'comment.hidden', 'comment.shown'], true)) {
+            return 'Evaluation submission #' . $row->target_id;
         }
 
         if (! empty($meta['route'])) {
