@@ -165,6 +165,7 @@ const normalizeSocialIconName = (value, fallback) => {
 function App({
     loginUrl = "/login",
     loginSubmitUrl = "/login",
+    contactSubmitUrl = "/contact-us",
     registerUrl = "/register",
     stats: homepageStats = [],
     headerLinks: customHeaderLinks = [],
@@ -189,6 +190,28 @@ function App({
     const [loginOpen, setLoginOpen] = useState(false);
     const [registerOpen, setRegisterOpen] = useState(false);
     const [selectedRole, setSelectedRole] = useState("");
+    const [contactSending, setContactSending] = useState(false);
+    const [contactSent, setContactSent] = useState(false);
+    const [contactEmailError, setContactEmailError] = useState("");
+    const contactEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+    const validateContactEmail = (value, shouldShowEmpty = false) => {
+        const email = String(value || "").trim();
+
+        if (!email) {
+            setContactEmailError(
+                shouldShowEmpty ? "Email address is required." : "",
+            );
+            return false;
+        }
+
+        if (!contactEmailPattern.test(email)) {
+            setContactEmailError("Please enter a valid email address.");
+            return false;
+        }
+
+        setContactEmailError("");
+        return true;
+    };
     const handleHeroVideoTimeUpdate = (event) => {
         const video = event.currentTarget;
         if (video.currentTime >= HERO_VIDEO_LOOP_SECONDS) {
@@ -215,6 +238,34 @@ function App({
             {
                 preserveScroll: true,
                 onSuccess: () => setLoginOpen(false),
+            },
+        );
+    };
+    const submitContact = (e) => {
+        e.preventDefault();
+        const form = e.currentTarget;
+        const formData = new FormData(form);
+        const email = String(formData.get("email") || "").trim();
+
+        if (!validateContactEmail(email, true)) {
+            return;
+        }
+
+        setContactSending(true);
+        router.post(
+            contactSubmitUrl,
+            {
+                name: String(formData.get("name") || "").trim(),
+                email,
+                message: String(formData.get("message") || "").trim(),
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    form.reset();
+                    setContactSent(true);
+                },
+                onFinish: () => setContactSending(false),
             },
         );
     };
@@ -2909,8 +2960,20 @@ function App({
                             /* @__PURE__ */ jsx(NeuCard, {
                                 children: /* @__PURE__ */ jsxs("form", {
                                     className: "space-y-6",
-                                    onSubmit: (e) => e.preventDefault(),
+                                    onSubmit: submitContact,
                                     children: [
+                                        contactSent &&
+                                            /* @__PURE__ */ jsx("div", {
+                                                className:
+                                                    "rounded-2xl px-4 py-3 text-sm font-bold",
+                                                style: {
+                                                    background:
+                                                        "rgba(16,185,129,.12)",
+                                                    color: "var(--accent)",
+                                                },
+                                                children:
+                                                    "Message sent. Thank you for reaching out.",
+                                            }),
                                         /* @__PURE__ */ jsxs("div", {
                                             children: [
                                                 /* @__PURE__ */ jsx("label", {
@@ -2925,6 +2988,8 @@ function App({
                                                 }),
                                                 /* @__PURE__ */ jsx("input", {
                                                     type: "text",
+                                                    name: "name",
+                                                    required: true,
                                                     placeholder:
                                                         contactSection.form_name_placeholder ||
                                                         "Enter your name",
@@ -2947,12 +3012,44 @@ function App({
                                                 }),
                                                 /* @__PURE__ */ jsx("input", {
                                                     type: "email",
+                                                    name: "email",
+                                                    required: true,
+                                                    pattern:
+                                                        "[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}",
+                                                    title: "Enter a valid email address.",
+                                                    onInput: (event) =>
+                                                        validateContactEmail(
+                                                            event.currentTarget
+                                                                .value,
+                                                        ),
+                                                    onBlur: (event) =>
+                                                        validateContactEmail(
+                                                            event.currentTarget
+                                                                .value,
+                                                            true,
+                                                        ),
+                                                    "aria-invalid":
+                                                        contactEmailError
+                                                            ? "true"
+                                                            : "false",
+                                                    "aria-describedby":
+                                                        contactEmailError
+                                                            ? "contact-email-error"
+                                                            : undefined,
                                                     placeholder:
                                                         contactSection.form_email_placeholder ||
                                                         "Enter your email",
                                                     className:
                                                         "neumorphic-input w-full",
                                                 }),
+                                                contactEmailError &&
+                                                    /* @__PURE__ */ jsx("p", {
+                                                        id: "contact-email-error",
+                                                        className:
+                                                            "mt-2 text-sm font-bold text-red-600",
+                                                        children:
+                                                            contactEmailError,
+                                                    }),
                                             ],
                                         }),
                                         /* @__PURE__ */ jsxs("div", {
@@ -2971,6 +3068,8 @@ function App({
                                                     "textarea",
                                                     {
                                                         rows: 4,
+                                                        name: "message",
+                                                        required: true,
                                                         placeholder:
                                                             contactSection.form_message_placeholder ||
                                                             "How can we help?",
@@ -2982,14 +3081,17 @@ function App({
                                         }),
                                         /* @__PURE__ */ jsx("button", {
                                             type: "submit",
+                                            disabled: contactSending,
                                             className:
-                                                "w-full neumorphic-btn py-4 font-bold text-white",
+                                                "w-full neumorphic-btn py-4 font-bold text-white disabled:opacity-70",
                                             style: {
                                                 background: "var(--accent)",
                                             },
                                             children:
-                                                contactSection.form_button_label ||
-                                                "Send Message",
+                                                contactSending
+                                                    ? "Sending..."
+                                                    : contactSection.form_button_label ||
+                                                      "Send Message",
                                         }),
                                     ],
                                 }),
