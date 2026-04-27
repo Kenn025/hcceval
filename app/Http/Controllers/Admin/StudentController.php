@@ -55,7 +55,6 @@ class StudentController extends Controller
                         'college' => $query->where('name', 'like', '%College%')->orWhere('code', 'like', '%COL%'),
                         'senior-high' => $query->where('name', 'like', '%Senior High%')->orWhere('code', 'like', '%SHS%'),
                         'junior-high' => $query->where('name', 'like', '%Junior High%')->orWhere('code', 'like', '%JHS%'),
-                        'elementary' => $query->where('name', 'like', '%Elementary%')->orWhere('code', 'like', '%ELEM%'),
                         default => $query->whereRaw('1 = 0'),
                     };
                 });

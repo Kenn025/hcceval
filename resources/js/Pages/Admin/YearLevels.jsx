@@ -18,7 +18,6 @@ const ROUTE_MAP = {
     college: 'admin.college.year-levels',
     'senior-high': 'admin.senior-high.year-levels',
     'junior-high': 'admin.junior-high.grade-levels',
-    'grade-school': 'admin.grade-school.grade-levels',
 };
 const hasValue = (value) => String(value ?? '').trim() !== '';
 
@@ -150,10 +149,6 @@ export default function YearLevels({
                 return departmentName.includes('junior high') || departmentName.includes('jhs');
             }
 
-            if (educationType === 'grade-school') {
-                return departmentName.includes('elementary') || departmentName.includes('grade school') || departmentName.includes('elem');
-            }
-
             return false;
         }) ?? null;
     }, [data.branch_id, departments, educationType]);
@@ -228,7 +223,7 @@ export default function YearLevels({
             return { major, minor };
         }
 
-        if (educationType === 'junior-high' || educationType === 'grade-school') {
+        if (educationType === 'junior-high') {
             const scoped = filteredSubjects.filter((subject) => matchesSearch(subject) && matchesGenEdFilter(subject));
 
             return { major: scoped, minor: [] };
@@ -271,7 +266,7 @@ export default function YearLevels({
             )).length;
         }
 
-        if (educationType === 'junior-high' || educationType === 'grade-school') {
+        if (educationType === 'junior-high') {
             return subjects.filter((subject) => (
                 String(subject.branch_id ?? '') === String(data.branch_id)
                 && String(subject.department_id ?? '') === String(resolvedDepartment?.id ?? '')
@@ -378,14 +373,6 @@ export default function YearLevels({
         { value: '8', label: 'Grade 8' },
         { value: '9', label: 'Grade 9' },
         { value: '10', label: 'Grade 10' },
-    ];
-    const gradeSchoolLevels = [
-        { value: '1', label: 'Grade 1' },
-        { value: '2', label: 'Grade 2' },
-        { value: '3', label: 'Grade 3' },
-        { value: '4', label: 'Grade 4' },
-        { value: '5', label: 'Grade 5' },
-        { value: '6', label: 'Grade 6' },
     ];
     const levelLabel = educationType === 'college' ? 'Year Level' : 'Grade Level';
     const levelPluralLabel = educationType === 'college' ? 'Year Levels' : 'Grade Levels';
@@ -606,7 +593,6 @@ export default function YearLevels({
         college: 'College Year Levels',
         'senior-high': 'Senior High Grade Levels',
         'junior-high': 'Junior High Grade Levels',
-        'grade-school': 'Grade School Grade Levels',
     };
 
     return (
@@ -674,7 +660,7 @@ export default function YearLevels({
                             <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</p><div className="mt-1"><StatusBadge active={viewing.is_activated} /></div></div>
                         </div>
 
-                        {['college', 'senior-high', 'junior-high', 'grade-school'].includes(educationType) && (
+                        {['college', 'senior-high', 'junior-high'].includes(educationType) && (
                             <div>
                                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Assigned Subjects</p>
                                 {viewingSubjects.length > 0 ? (
@@ -787,11 +773,6 @@ export default function YearLevels({
                                     <option value="">Select grade level...</option>
                                     {seniorHighGradeLevels.map((level) => <option key={level.value} value={level.value}>{level.label}</option>)}
                                 </SelectInput>
-                            ) : educationType === 'grade-school' ? (
-                                <SelectInput value={data.year_level} onChange={(e) => updateField('year_level', e.target.value)}>
-                                    <option value="">Select grade level...</option>
-                                    {gradeSchoolLevels.map((level) => <option key={level.value} value={level.value}>{level.label}</option>)}
-                                </SelectInput>
                             ) : (
                                 <SelectInput value={data.year_level} onChange={(e) => updateField('year_level', e.target.value)}>
                                     <option value="">Select grade level...</option>
@@ -815,7 +796,7 @@ export default function YearLevels({
                         </SelectInput>
                     </FormField>
 
-                    {['college', 'senior-high', 'junior-high', 'grade-school'].includes(educationType) && (
+                    {['college', 'senior-high', 'junior-high'].includes(educationType) && (
                         <FormField label="Assigned Subjects" error={errors.subject_ids}>
                             <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
                                 <div className="flex items-start justify-between gap-3">
@@ -988,7 +969,7 @@ export default function YearLevels({
                                     <option value="non-gened">Non-Gen Ed only</option>
                                 </SelectInput>
                             </div>
-                            {((educationType === 'college' && data.program_id) || (educationType === 'senior-high' && data.strand_id) || educationType === 'junior-high' || educationType === 'grade-school') && totalAvailableSubjects > 0 ? (
+                            {((educationType === 'college' && data.program_id) || (educationType === 'senior-high' && data.strand_id) || educationType === 'junior-high') && totalAvailableSubjects > 0 ? (
                                 <div className="mt-4 space-y-3">
                                     {[
                                         {

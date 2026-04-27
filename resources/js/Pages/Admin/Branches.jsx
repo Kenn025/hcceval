@@ -16,7 +16,6 @@ const DEPARTMENT_OPTIONS = [
     { value: 'college', label: 'College' },
     { value: 'senior_high', label: 'Senior High' },
     { value: 'junior_high', label: 'Junior High' },
-    { value: 'elementary', label: 'Elementary' },
 ];
 
 const buildBranchCodePreview = (name) => {
@@ -237,10 +236,6 @@ export default function Branches({ branches, filters }) {
                 .map((department) => {
                     const departmentName = String(department.name ?? '').toLowerCase();
                     const departmentCode = String(department.code ?? '').toLowerCase();
-
-                    if (departmentName.includes('elementary') || departmentCode.includes('elem')) {
-                        return 'elementary';
-                    }
 
                     if (departmentName.includes('junior high') || departmentCode.includes('jhs')) {
                         return 'junior_high';

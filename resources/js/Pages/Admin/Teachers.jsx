@@ -27,7 +27,6 @@ const DEPARTMENT_FILTERS = [
     { type: 'college', label: 'College Department' },
     { type: 'senior-high', label: 'Senior High Department' },
     { type: 'junior-high', label: 'Junior High Department' },
-    { type: 'elementary', label: 'Elementary Department' },
 ];
 
 const stripCampusSuffix = (value) => String(value ?? '').replace(/\s*-\s*(Santa Rosa|Concepcion)\s*$/i, '').trim();
@@ -104,7 +103,7 @@ const uniqueBy = (items, keyFn) => {
 const getProgramStrandLabel = (row) => {
     const departmentName = String(row.department?.name ?? '').toLowerCase();
 
-    if (departmentName.includes('junior high') || departmentName.includes('elementary')) {
+    if (departmentName.includes('junior high')) {
         return 'N/A';
     }
 
@@ -125,10 +124,6 @@ const getDepartmentType = (department) => {
 
     if (departmentName.includes('junior high') || departmentCode.includes('jhs')) {
         return 'junior-high';
-    }
-
-    if (departmentName.includes('elementary') || departmentCode.includes('elem')) {
-        return 'elementary';
     }
 
     return null;

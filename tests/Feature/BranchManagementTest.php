@@ -44,7 +44,7 @@ class BranchManagementTest extends TestCase
             'email' => 'admin.sanisidro@hcc.local',
         ]);
 
-        $this->assertSame(4, Department::query()->where('branch_id', $branch->id)->count());
+        $this->assertSame(3, Department::query()->where('branch_id', $branch->id)->count());
 
         $this->assertDatabaseHas('department', [
             'branch_id' => $branch->id,
@@ -54,7 +54,7 @@ class BranchManagementTest extends TestCase
 
         $this->assertDatabaseHas('department', [
             'branch_id' => $branch->id,
-            'name' => 'Elementary Department',
+            'name' => 'Junior High Department',
             'is_activated' => 0,
         ]);
     }

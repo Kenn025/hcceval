@@ -83,6 +83,31 @@ class RatingsController extends Controller
             ->first();
     }
 
+    private function teacherRatingReleaseMap(?int $academicYearId, string $ratingType, iterable $teacherIds, iterable $subjectIds = []): Collection
+    {
+        if (! $academicYearId || ! Schema::hasTable('teacher_rating_releases')) {
+            return collect();
+        }
+
+        $teacherIds = collect($teacherIds)->map(fn ($id) => (int) $id)->filter()->unique()->values();
+        $subjectIds = collect($subjectIds)->map(fn ($id) => (int) $id)->filter()->unique()->values();
+
+        if ($teacherIds->isEmpty()) {
+            return collect();
+        }
+
+        return DB::table('teacher_rating_releases')
+            ->select('teacher_id', 'subject_id', 'released_at')
+            ->where('academic_year_id', $academicYearId)
+            ->where('rating_type', $ratingType)
+            ->whereIn('teacher_id', $teacherIds->all())
+            ->when($ratingType === 'subject' && $subjectIds->isNotEmpty(), fn ($query) => $query->whereIn('subject_id', $subjectIds->all()))
+            ->get()
+            ->keyBy(fn (object $release) => $ratingType === 'subject'
+                ? ((int) $release->teacher_id) . ':' . ((int) $release->subject_id)
+                : (string) ((int) $release->teacher_id));
+    }
+
     private function peerQuestionnaireTypeId(): ?int
     {
         return $this->questionnaireTypeIdByCode('QTYPE-PEER');
@@ -197,6 +222,142 @@ class RatingsController extends Controller
         ]);
     }
 
+    public function releaseToTeacher(Request $request): RedirectResponse
+    {
+        if (! Schema::hasTable('teacher_rating_releases')) {
+            return back()->with('error', 'Rating release storage is not available. Please run the latest migrations.');
+        }
+
+        $data = $request->validate([
+            'rating_type' => 'required|in:subject,peer',
+            'teacher_id' => 'required|integer|exists:teacher,id',
+            'subject_id' => 'nullable|integer|exists:subject,id',
+            'school_year' => 'nullable|string|max:20',
+            'academic_year_id' => 'nullable|integer|exists:academic_year,id',
+        ]);
+
+        if ($data['rating_type'] === 'subject' && empty($data['subject_id'])) {
+            return back()->with('error', 'Select a subject rating before releasing it to the teacher portal.');
+        }
+
+        $teacher = DB::table('teacher')
+            ->select('id', 'branch_id', DB::raw("TRIM(CONCAT(firstname, ' ', COALESCE(middlename, ''), ' ', lastname)) as name"))
+            ->where('id', $data['teacher_id'])
+            ->where('is_deleted', 0)
+            ->first();
+
+        if (! $teacher) {
+            return back()->with('error', 'Teacher account was not found.');
+        }
+
+        $academicYearId = $data['academic_year_id'] ?? $this->academicYearFromLabel($data['school_year'] ?? null)?->id;
+
+        if (! $academicYearId) {
+            $academicYearId = $this->activeAcademicYear()?->id;
+        }
+
+        if (! $academicYearId) {
+            return back()->with('error', 'No active academic year was found for this rating release.');
+        }
+
+        DB::table('teacher_rating_releases')->updateOrInsert(
+            [
+                'academic_year_id' => $academicYearId,
+                'teacher_id' => (int) $data['teacher_id'],
+                'rating_type' => $data['rating_type'],
+                'subject_id' => $data['rating_type'] === 'subject' ? (int) $data['subject_id'] : null,
+            ],
+            [
+                'branch_id' => $teacher->branch_id,
+                'released_by_admin_id' => session('admin_id'),
+                'released_at' => now(),
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]
+        );
+
+        AuditLogger::record('ratings.released', 'teacher', (int) $data['teacher_id'], [
+            'rating_type' => $data['rating_type'],
+            'subject_id' => $data['rating_type'] === 'subject' ? (int) $data['subject_id'] : null,
+            'academic_year_id' => $academicYearId,
+            'teacher_name' => $teacher->name,
+        ], $request);
+
+        $label = $data['rating_type'] === 'subject' ? 'Subject rating' : 'Peer rating';
+
+        return back()->with('success', "{$label} released to {$teacher->name}'s teacher portal.");
+    }
+
+    public function releaseDepartmentRatings(Request $request): RedirectResponse
+    {
+        if (! Schema::hasTable('teacher_rating_releases')) {
+            return back()->with('error', 'Rating release storage is not available. Please run the latest migrations.');
+        }
+
+        $data = $request->validate([
+            'rating_type' => 'required|in:subject,peer',
+            'school_year' => 'nullable|string|max:20',
+            'branch_id' => 'nullable|integer|exists:branch,id',
+            'department_id' => 'nullable|integer|exists:department,id',
+            'program_id' => 'nullable|integer|exists:program,id',
+            'strand_id' => 'nullable|integer|exists:strand,id',
+            'department_group' => 'nullable|string|max:150',
+            'program_group' => 'nullable|string|max:150',
+            'strand_group' => 'nullable|string|max:150',
+        ]);
+
+        $academicYear = $this->academicYearFromLabel($data['school_year'] ?? null);
+
+        if (! $academicYear) {
+            return back()->with('error', 'No active academic year was found for this rating release.');
+        }
+
+        $releaseRows = $data['rating_type'] === 'subject'
+            ? $this->departmentSubjectReleaseRows($request, (int) $academicYear->id)
+            : $this->departmentPeerReleaseRows($request, $academicYear);
+
+        if ($releaseRows->isEmpty()) {
+            return back()->with('error', 'No reviewed ratings were found in the selected department scope.');
+        }
+
+        $now = now();
+
+        $releaseRows->each(function (array $row) use ($data, $now) {
+            DB::table('teacher_rating_releases')->updateOrInsert(
+                [
+                    'academic_year_id' => (int) $row['academic_year_id'],
+                    'teacher_id' => (int) $row['teacher_id'],
+                    'rating_type' => $data['rating_type'],
+                    'subject_id' => $data['rating_type'] === 'subject' ? (int) $row['subject_id'] : null,
+                ],
+                [
+                    'branch_id' => $row['branch_id'] ?? null,
+                    'released_by_admin_id' => session('admin_id'),
+                    'released_at' => $now,
+                    'updated_at' => $now,
+                    'created_at' => $now,
+                ]
+            );
+        });
+
+        AuditLogger::record('ratings.department_released', 'department', $request->integer('department_id') ?: null, [
+            'rating_type' => $data['rating_type'],
+            'academic_year_id' => (int) $academicYear->id,
+            'released_count' => $releaseRows->count(),
+            'branch_id' => $request->input('branch_id'),
+            'department_id' => $request->input('department_id'),
+            'department_group' => $request->input('department_group'),
+            'program_id' => $request->input('program_id'),
+            'program_group' => $request->input('program_group'),
+            'strand_id' => $request->input('strand_id'),
+            'strand_group' => $request->input('strand_group'),
+        ], $request);
+
+        $label = $data['rating_type'] === 'subject' ? 'subject ratings' : 'peer ratings';
+
+        return back()->with('success', "Released {$releaseRows->count()} {$label} to teacher portals.");
+    }
+
     public function employeeRatings(Request $request)
     {
         $scopedId = $this->scopedBranchId();
@@ -239,6 +400,46 @@ class RatingsController extends Controller
             'selectedBranchId' => $branchId ? (int) $branchId : null,
             'scopedBranchId' => $scopedId,
         ]);
+    }
+
+    private function departmentSubjectReleaseRows(Request $request, int $academicYearId): Collection
+    {
+        $context = $this->subjectRatingContext($request);
+
+        return collect($context['subjects'] ?? [])
+            ->flatMap(function (array $subject) use ($academicYearId, $context) {
+                return collect($subject['teachers'] ?? [])
+                    ->filter(fn (array $teacher) => ! empty($teacher['teacher_id']) && ! empty($subject['id']) && $teacher['overall_rating'] !== null)
+                    ->map(fn (array $teacher) => [
+                        'academic_year_id' => $academicYearId,
+                        'teacher_id' => (int) $teacher['teacher_id'],
+                        'subject_id' => (int) $subject['id'],
+                        'branch_id' => $context['selectedBranchId'] ? (int) $context['selectedBranchId'] : null,
+                    ]);
+            })
+            ->unique(fn (array $row) => $row['teacher_id'] . ':' . $row['subject_id'])
+            ->values();
+    }
+
+    private function departmentPeerReleaseRows(Request $request, object $academicYear): Collection
+    {
+        $rows = $this->peerQuery($request)->get();
+        $rows = $this->attachLatestPeerRatings(
+            $rows,
+            $academicYear,
+            $this->peerQuestionnaireTypeId(),
+        );
+
+        return collect($rows)
+            ->filter(fn ($row) => ! empty($row->teacher_id) && $row->overall_rating !== null)
+            ->map(fn ($row) => [
+                'academic_year_id' => (int) $academicYear->id,
+                'teacher_id' => (int) $row->teacher_id,
+                'subject_id' => null,
+                'branch_id' => $row->branch_id ? (int) $row->branch_id : null,
+            ])
+            ->unique(fn (array $row) => (string) $row['teacher_id'])
+            ->values();
     }
 
     public function subjectArchives(Request $request)
@@ -1454,7 +1655,15 @@ class RatingsController extends Controller
             ->get()
             ->keyBy('id');
 
-        $subjectItems = $subjects->map(function (object $subject) use ($ratings, $teacherNames) {
+        $releaseTeacherIds = $assignedTeacherIds
+            ->merge($ratings->flatMap(fn (Collection $subjectRatings) => $subjectRatings->pluck('employee_id')))
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+        $releaseMap = $this->teacherRatingReleaseMap($academicYearId, 'subject', $releaseTeacherIds, $subjects->pluck('id'));
+
+        $subjectItems = $subjects->map(function (object $subject) use ($ratings, $teacherNames, $releaseMap) {
             $teacherCards = collect();
             $subjectLevelRating = ($ratings[$subject->id] ?? collect())->firstWhere('employee_id', null);
 
@@ -1462,7 +1671,10 @@ class RatingsController extends Controller
                 $matchingRating = ($ratings[$subject->id] ?? collect())->firstWhere('employee_id', $teacherId) ?? $subjectLevelRating;
                 $teacher = $teacherNames[$teacherId] ?? null;
 
-                $teacherCards->push($this->subjectTeacherCard($teacherId, $teacher?->name, $teacher?->role, $matchingRating));
+                $card = $this->subjectTeacherCard($teacherId, $teacher?->name, $teacher?->role, $matchingRating);
+                $card['is_released'] = $releaseMap->has(((int) $teacherId) . ':' . ((int) $subject->id));
+                $card['released_at'] = $releaseMap->get(((int) $teacherId) . ':' . ((int) $subject->id))?->released_at;
+                $teacherCards->push($card);
             }
 
             foreach (($ratings[$subject->id] ?? collect()) as $rating) {
@@ -1474,7 +1686,10 @@ class RatingsController extends Controller
                     continue;
                 }
 
-                $teacherCards->push($this->subjectTeacherCard($rating->employee_id, $rating->teacher_name, $rating->teacher_role, $rating));
+                $card = $this->subjectTeacherCard($rating->employee_id, $rating->teacher_name, $rating->teacher_role, $rating);
+                $card['is_released'] = $releaseMap->has(((int) $rating->employee_id) . ':' . ((int) $subject->id));
+                $card['released_at'] = $releaseMap->get(((int) $rating->employee_id) . ':' . ((int) $subject->id))?->released_at;
+                $teacherCards->push($card);
             }
 
             return [
@@ -1667,7 +1882,6 @@ class RatingsController extends Controller
         return match (true) {
             str_contains($label, 'senior high') || str_contains($label, 'shs') => 'shs',
             str_contains($label, 'junior high') || str_contains($label, 'jhs') => 'jhs',
-            str_contains($label, 'elementary') || str_contains($label, 'elem') || str_contains($label, 'grade school') => 'elementary',
             default => 'college',
         };
     }
@@ -1677,7 +1891,6 @@ class RatingsController extends Controller
         return match ($type) {
             'shs' => 'Senior High',
             'jhs' => 'Junior High',
-            'elementary' => 'Elementary',
             default => 'College',
         };
     }
@@ -1775,8 +1988,13 @@ class RatingsController extends Controller
         );
         $questionAverages = $this->peerQuestionAverages($teacherAssignments, $academicYear, $questionnaireTypeId);
         $schoolYearLabel = $academicYear ? $academicYear->from_year . '-' . $academicYear->to_year : null;
+        $releaseMap = $this->teacherRatingReleaseMap(
+            $academicYear ? (int) $academicYear->id : null,
+            'peer',
+            $rows->pluck('teacher_id')
+        );
 
-        return $rows->map(function ($row) use ($teacherAssignments, $latestRatings, $questionnaireDetails, $questionAverages, $schoolYearLabel) {
+        return $rows->map(function ($row) use ($teacherAssignments, $latestRatings, $questionnaireDetails, $questionAverages, $schoolYearLabel, $releaseMap) {
             $teacherId = (int) ($row->teacher_id ?? 0);
             $assignment = $teacherAssignments[$teacherId] ?? null;
             $questionnaireId = $assignment['questionnaire_id'] ?? null;
@@ -1792,6 +2010,8 @@ class RatingsController extends Controller
             $row->questionnaire_id = $questionnaireId;
             $row->questionnaire = $questionnaire;
             $row->question_ratings = $questionRatings;
+            $row->is_released = $releaseMap->has((string) $teacherId);
+            $row->released_at = $releaseMap->get((string) $teacherId)?->released_at;
 
             return $row;
         });
@@ -1927,7 +2147,7 @@ class RatingsController extends Controller
             return 'junior-high';
         }
 
-        return 'elementary';
+        return 'other';
     }
 
     private function latestPeerSubmissionRatings(array $teacherAssignments, ?object $academicYear, ?int $questionnaireTypeId): array

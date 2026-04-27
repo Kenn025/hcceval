@@ -14,7 +14,6 @@ const DEPARTMENT_LAYER_TABS = [
     { key: 'college', label: 'College Department' },
     { key: 'senior-high', label: 'Senior High Department' },
     { key: 'junior-high', label: 'Junior High Department' },
-    { key: 'elementary', label: 'Elementary Department' },
 ];
 
 const getDepartmentKind = (department) => {
@@ -31,10 +30,6 @@ const getDepartmentKind = (department) => {
 
     if (name.includes('junior high') || code.includes('jhs')) {
         return 'junior-high';
-    }
-
-    if (name.includes('elementary') || name.includes('grade school') || code.includes('elem')) {
-        return 'elementary';
     }
 
     return 'other';
@@ -175,10 +170,6 @@ const getSubjectTeacherStatusCards = ({
     const juniorHighLevels = departments
         .filter((department) => getDepartmentKind(department) === 'junior-high')
         .flatMap((department) => getUniqueGradeLevelScopes(yearLevels, department.id));
-    const elementaryLevels = departments
-        .filter((department) => getDepartmentKind(department) === 'elementary')
-        .flatMap((department) => getUniqueGradeLevelScopes(yearLevels, department.id));
-
     const collegeStatus = count(
         collegePrograms,
         (program, subjectIds) => {
@@ -231,18 +222,11 @@ const getSubjectTeacherStatusCards = ({
         levelHasQuestionnaire,
         levelSubjectIds,
     );
-    const elementaryStatus = count(
-        elementaryLevels,
-        levelHasQuestionnaire,
-        levelSubjectIds,
-    );
-
     return DEPARTMENT_LAYER_TABS.map((tab) => {
         const status = {
             college: collegeStatus,
             'senior-high': seniorHighStatus,
             'junior-high': juniorHighStatus,
-            elementary: elementaryStatus,
         }[tab.key];
         const scopePercent = status.total > 0 ? Math.round((status.loaded / status.total) * 100) : 0;
         const subjectPercent = status.subjectTotal > 0 ? Math.round((status.subjectLoaded / status.subjectTotal) * 100) : 0;

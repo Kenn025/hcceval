@@ -14,7 +14,7 @@ use Inertia\Inertia;
 
 class BranchController extends Controller
 {
-    private const DEPARTMENT_LEVELS = ['elementary', 'junior_high', 'senior_high', 'college'];
+    private const DEPARTMENT_LEVELS = ['junior_high', 'senior_high', 'college'];
 
     public function index(Request $request)
     {
@@ -58,7 +58,7 @@ class BranchController extends Controller
             'is_main' => 'boolean',
             'is_active' => 'boolean',
             'department_levels' => 'required|array|min:1',
-            'department_levels.*' => 'in:elementary,junior_high,senior_high,college',
+            'department_levels.*' => 'in:junior_high,senior_high,college',
             'admin_email' => 'required|email|max:150',
             'admin_password' => 'required|string|min:6|max:100',
         ]);
@@ -123,7 +123,7 @@ class BranchController extends Controller
             'code' => "required|string|max:50|unique:branch,code,{$branch->id},id",
             'name' => 'required|string|max:150',
             'department_levels' => 'required|array|min:1',
-            'department_levels.*' => 'in:elementary,junior_high,senior_high,college',
+            'department_levels.*' => 'in:junior_high,senior_high,college',
             'address' => 'nullable|string',
         ]);
 
@@ -177,7 +177,7 @@ class BranchController extends Controller
 
     private function resolveHighestDepartment(array $departmentLevels): ?string
     {
-        $priority = ['elementary', 'junior_high', 'senior_high', 'college'];
+        $priority = ['junior_high', 'senior_high', 'college'];
         $selected = array_values(array_intersect($priority, $departmentLevels));
 
         return empty($selected) ? null : end($selected);
@@ -186,7 +186,6 @@ class BranchController extends Controller
     private function departmentLabel(string $departmentLevel): string
     {
         return match ($departmentLevel) {
-            'elementary' => 'Elementary Department',
             'junior_high' => 'Junior High Department',
             'senior_high' => 'Senior High Department',
             default => 'College Department',
@@ -196,7 +195,6 @@ class BranchController extends Controller
     private function departmentSuffix(string $departmentLevel): string
     {
         return match ($departmentLevel) {
-            'elementary' => 'ELEM',
             'junior_high' => 'JHS',
             'senior_high' => 'SHS',
             default => 'COL',

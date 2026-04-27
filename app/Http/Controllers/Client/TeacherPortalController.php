@@ -32,6 +32,36 @@ class TeacherPortalController extends Controller
             ->first();
     }
 
+    private function releasedSubjectIdsForTeacher(Teacher $teacher, object $cycle): Collection
+    {
+        if (! Schema::hasTable('teacher_rating_releases')) {
+            return collect();
+        }
+
+        return DB::table('teacher_rating_releases')
+            ->where('teacher_id', $teacher->id)
+            ->where('academic_year_id', $cycle->id)
+            ->where('rating_type', 'subject')
+            ->whereNotNull('subject_id')
+            ->pluck('subject_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+    }
+
+    private function hasReleasedTeacherRatings(Teacher $teacher, ?object $cycle, string $ratingType): bool
+    {
+        if (! $cycle || ! Schema::hasTable('teacher_rating_releases')) {
+            return false;
+        }
+
+        return DB::table('teacher_rating_releases')
+            ->where('teacher_id', $teacher->id)
+            ->where('academic_year_id', $cycle->id)
+            ->where('rating_type', $ratingType)
+            ->exists();
+    }
+
     private function termOptions(?string $term): array
     {
         return match (strtolower(trim((string) $term))) {
@@ -287,8 +317,10 @@ class TeacherPortalController extends Controller
         }
 
         $ratingsBySubject = collect();
+        $releasedSubjectIds = $this->releasedSubjectIdsForTeacher($teacher, $cycle);
 
         if (
+            $releasedSubjectIds->isNotEmpty() &&
             Schema::hasTable('evaluation_submissions') &&
             Schema::hasColumn('evaluation_submissions', 'subject_id') &&
             Schema::hasColumn('evaluation_submissions', 'academic_year_id')
@@ -306,7 +338,12 @@ class TeacherPortalController extends Controller
                 ->select($selects)
                 ->where('academic_year_id', (int) $cycle->id)
                 ->whereIn('subject_id', $subjects->pluck('subject_id')->all())
+                ->whereIn('subject_id', $releasedSubjectIds->all())
                 ->when($subjectTypeId, fn ($query) => $query->where('questionnaire_type_id', $subjectTypeId));
+
+            if (Schema::hasColumn('evaluation_submissions', 'teacher_id')) {
+                $query->where('teacher_id', $teacher->id);
+            }
 
             $ratingsBySubject = $query
                 ->get()
@@ -407,7 +444,7 @@ class TeacherPortalController extends Controller
         }
 
         return $subjects
-            ->map(function (array $subject) use ($ratingsBySubject, $schoolYear, $cycle) {
+            ->map(function (array $subject) use ($ratingsBySubject, $schoolYear, $cycle, $releasedSubjectIds) {
                 $rating = $ratingsBySubject->get((int) $subject['subject_id'], []);
 
                 return $subject + [
@@ -422,6 +459,7 @@ class TeacherPortalController extends Controller
                     'questions' => $rating['questions'] ?? [],
                     'class_ratings' => $rating['class_ratings'] ?? [],
                     'latest_submitted_at' => $rating['latest_submitted_at'] ?? null,
+                    'is_released' => $releasedSubjectIds->contains((int) $subject['subject_id']),
                 ];
             })
             ->sortBy('course_name')
@@ -446,6 +484,7 @@ class TeacherPortalController extends Controller
 
         if (
             ! $cycle
+            || ! $this->hasReleasedTeacherRatings($teacher, $cycle, 'peer')
             || ! Schema::hasTable('evaluation_submissions')
             || ! Schema::hasColumn('evaluation_submissions', 'teacher_id')
             || ! Schema::hasColumn('evaluation_submissions', 'academic_year_id')
@@ -541,6 +580,7 @@ class TeacherPortalController extends Controller
                 'overall_rating' => $overall,
                 'overall_percentage' => $overall !== null ? round(($overall / 5) * 100, 2) : null,
                 'questions' => $questions,
+                'is_released' => true,
             ];
         })->all();
     }
@@ -622,8 +662,22 @@ class TeacherPortalController extends Controller
                 ->whereNotNull('academic_year_id')
                 ->when($this->questionnaireTypeIdByKeyword('subject'), fn ($query, $typeId) => $query->where('questionnaire_type_id', $typeId))
                 ->when($activeAcademicYearId, fn ($query) => $query->where('academic_year_id', '!=', $activeAcademicYearId))
-                ->orderByDesc('created_at')
-                ->get();
+                ->when(Schema::hasColumn('evaluation_submissions', 'teacher_id'), fn ($query) => $query->where('teacher_id', $teacher->id));
+
+            if (Schema::hasTable('teacher_rating_releases')) {
+                $subjectRatingRows->whereExists(function ($query) use ($teacher) {
+                    $query->selectRaw('1')
+                        ->from('teacher_rating_releases as trr')
+                        ->whereColumn('trr.academic_year_id', 'evaluation_submissions.academic_year_id')
+                        ->whereColumn('trr.subject_id', 'evaluation_submissions.subject_id')
+                        ->where('trr.teacher_id', $teacher->id)
+                        ->where('trr.rating_type', 'subject');
+                });
+            } else {
+                $subjectRatingRows->whereRaw('1 = 0');
+            }
+
+            $subjectRatingRows = $subjectRatingRows->orderByDesc('created_at')->get();
 
             $periodIds = $periodIds->merge($subjectRatingRows->pluck('academic_year_id'));
         }
@@ -645,6 +699,18 @@ class TeacherPortalController extends Controller
 
             if ($peerTypeId = $this->questionnaireTypeIdByKeyword('peer')) {
                 $peerQuery->where('questionnaire_type_id', $peerTypeId);
+            }
+
+            if (Schema::hasTable('teacher_rating_releases')) {
+                $peerQuery->whereExists(function ($query) use ($teacher) {
+                    $query->selectRaw('1')
+                        ->from('teacher_rating_releases as trr')
+                        ->whereColumn('trr.academic_year_id', 'evaluation_submissions.academic_year_id')
+                        ->where('trr.teacher_id', $teacher->id)
+                        ->where('trr.rating_type', 'peer');
+                });
+            } else {
+                $peerQuery->whereRaw('1 = 0');
             }
 
             $peerRatingRows = $peerQuery->orderByDesc('created_at')->get();

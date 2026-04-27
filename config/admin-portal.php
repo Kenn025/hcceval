@@ -42,14 +42,6 @@ return [
                         ['label' => 'Subjects', 'route' => 'admin.junior-high.subjects', 'icon' => 'subjects'],
                     ],
                 ],
-                [
-                    'title' => 'Grade School',
-                    'icon' => 'school',
-                    'items' => [
-                        ['label' => 'Grade Levels', 'route' => 'admin.grade-school.grade-levels', 'icon' => 'layers'],
-                        ['label' => 'Subjects', 'route' => 'admin.grade-school.subjects', 'icon' => 'subjects'],
-                    ],
-                ],
             ],
         ],
         [
@@ -76,6 +68,7 @@ return [
                 ['label' => 'School Heads Ratings', 'route' => 'admin.head-ratings', 'icon' => 'shield'],
                 ['label' => 'Employee Ratings', 'route' => 'admin.employee-ratings', 'icon' => 'briefcase'],
                 ['label' => 'Branch Ratings', 'route' => 'admin.branch-ratings', 'icon' => 'branches'],
+                ['label' => 'Outstanding Rating', 'route' => 'admin.outstanding-awards', 'icon' => 'star'],
             ],
         ],
         [
@@ -155,20 +148,6 @@ return [
         'admin.junior-high.subjects' => [
             'title' => 'Junior High Subjects',
             'description' => 'Subject catalog and evaluation availability for junior high classes.',
-            'eyebrow' => 'Academic Setup',
-            'icon' => 'subjects',
-            'source' => ['admin/course_management.php'],
-        ],
-        'admin.grade-school.grade-levels' => [
-            'title' => 'Grade School Grade Levels',
-            'description' => 'Grade school level hierarchy for enrollment, sections, and subject assignment.',
-            'eyebrow' => 'Academic Setup',
-            'icon' => 'layers',
-            'source' => ['admin/grade_level.php'],
-        ],
-        'admin.grade-school.subjects' => [
-            'title' => 'Grade School Subjects',
-            'description' => 'Grade school subject setup for curriculum delivery and evaluation scheduling.',
             'eyebrow' => 'Academic Setup',
             'icon' => 'subjects',
             'source' => ['admin/course_management.php'],
@@ -306,8 +285,8 @@ return [
             'icon' => 'logs',
         ],
         'admin.outstanding-awards' => [
-            'title' => 'Outstanding Awards',
-            'description' => 'Top performers per branch and academic year — outstanding teachers, chairs, programs, and strands.',
+            'title' => 'Outstanding Rating',
+            'description' => 'Branch-based outstanding ratings for program chairs, overall teachers, and top teachers per program.',
             'eyebrow' => 'Ratings & Reports',
             'icon' => 'star',
         ],

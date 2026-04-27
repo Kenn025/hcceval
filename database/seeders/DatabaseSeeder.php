@@ -607,6 +607,57 @@ class DatabaseSeeder extends Seeder
         $this->seedLandingPageTestimonialsFromSeedAccounts();
 
         $this->call(EvaluationSubmissionArchiveSeeder::class);
+        $this->call(OutstandingRatingEvaluationSubmissionSeeder::class);
+        $this->disableElementaryScopeSeedData();
+    }
+
+    private function disableElementaryScopeSeedData(): void
+    {
+        $departmentIds = DB::table('department')
+            ->where(function ($query) {
+                $query->where('name', 'like', '%Elementary%')
+                    ->orWhere('code', 'like', '%ELEM%');
+            })
+            ->pluck('id');
+
+        if ($departmentIds->isEmpty()) {
+            return;
+        }
+
+        $teacherIds = DB::table('teacher')->whereIn('department_id', $departmentIds)->pluck('id');
+        $studentIds = DB::table('student')->whereIn('department_id', $departmentIds)->pluck('id');
+        $employeeIds = DB::table('employee')->whereIn('department_id', $departmentIds)->pluck('id');
+        $subjectIds = DB::table('subject')
+            ->whereIn('department_id', $departmentIds)
+            ->orWhere('type', 'elementary')
+            ->pluck('id');
+        $levelIds = DB::table('education_level')->whereIn('department_id', $departmentIds)->pluck('id');
+        $softDeleted = ['is_activated' => 0, 'is_deleted' => 1, 'updated_at' => now()];
+
+        DB::table('evaluation_submissions')
+            ->whereIn('teacher_id', $teacherIds)
+            ->orWhereIn('employee_id', $employeeIds)
+            ->orWhereIn('subject_id', $subjectIds)
+            ->delete();
+        DB::table('ratings_subject')
+            ->whereIn('employee_id', $employeeIds)
+            ->orWhereIn('subject_id', $subjectIds)
+            ->delete();
+        DB::table('ratings_head')->whereIn('employee_id', $employeeIds)->delete();
+        DB::table('ratings_employee')->whereIn('employee_id', $employeeIds)->delete();
+        DB::table('ratings_peer')->whereIn('teacher_id', $teacherIds)->delete();
+        DB::table('teacher_rating_releases')
+            ->whereIn('teacher_id', $teacherIds)
+            ->orWhereIn('subject_id', $subjectIds)
+            ->delete();
+        DB::table('department_evaluation_windows')->whereIn('department_id', $departmentIds)->delete();
+
+        DB::table('teacher')->whereIn('id', $teacherIds)->update($softDeleted);
+        DB::table('student')->whereIn('id', $studentIds)->update($softDeleted);
+        DB::table('employee')->whereIn('id', $employeeIds)->update($softDeleted);
+        DB::table('subject')->whereIn('id', $subjectIds)->update($softDeleted);
+        DB::table('education_level')->whereIn('id', $levelIds)->update($softDeleted);
+        DB::table('department')->whereIn('id', $departmentIds)->update($softDeleted);
     }
 
     private function seedLandingPageTestimonialsFromSeedAccounts(): void

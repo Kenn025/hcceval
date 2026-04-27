@@ -29,7 +29,6 @@ const DEPARTMENT_FILTERS = [
     { type: 'college', label: 'College Department' },
     { type: 'senior-high', label: 'Senior High Department' },
     { type: 'junior-high', label: 'Junior High Department' },
-    { type: 'elementary', label: 'Elementary Department' },
 ];
 
 const LEVEL_FILTER_PRESETS = {
@@ -49,14 +48,6 @@ const LEVEL_FILTER_PRESETS = {
         { value: '8', label: 'Grade 8' },
         { value: '9', label: 'Grade 9' },
         { value: '10', label: 'Grade 10' },
-    ],
-    elementary: [
-        { value: '1', label: 'Grade 1' },
-        { value: '2', label: 'Grade 2' },
-        { value: '3', label: 'Grade 3' },
-        { value: '4', label: 'Grade 4' },
-        { value: '5', label: 'Grade 5' },
-        { value: '6', label: 'Grade 6' },
     ],
 };
 
@@ -189,7 +180,7 @@ const getProgramStrandLabel = (row) => {
 
     const departmentName = String(row.department?.name ?? '').toLowerCase();
 
-    if (departmentName.includes('junior high') || departmentName.includes('elementary')) {
+    if (departmentName.includes('junior high')) {
         return 'N/A';
     }
 
@@ -210,10 +201,6 @@ const getDepartmentType = (department) => {
 
     if (departmentName.includes('junior high') || departmentCode.includes('jhs')) {
         return 'junior-high';
-    }
-
-    if (departmentName.includes('elementary') || departmentCode.includes('elem')) {
-        return 'elementary';
     }
 
     return null;
@@ -502,10 +489,9 @@ export default function Students({
     const isCollegeDepartment = selectedDepartmentType === 'college';
     const isSeniorHighDepartment = selectedDepartmentType === 'senior-high';
     const isJuniorHighDepartment = selectedDepartmentType === 'junior-high';
-    const isElementaryDepartment = selectedDepartmentType === 'elementary';
     const supportsProgram = isCollegeDepartment;
     const supportsStrand = isSeniorHighDepartment;
-    const showYearLevelOnly = isJuniorHighDepartment || isElementaryDepartment;
+    const showYearLevelOnly = isJuniorHighDepartment;
     const generatedStudentCode = editing ? data.student_no : buildStudentCode(selectedBranch, nextStudentCodes);
     const canShowIrregularControls = supportsProgram && Boolean(data.department_id);
     const requiredStudentFieldsComplete = useMemo(() => {
@@ -1307,7 +1293,7 @@ export default function Students({
                     ))}
                 </SelectInput>
             )}
-            {['college', 'senior-high', 'junior-high', 'elementary'].includes(selectedFilterDepartmentType) && (
+            {['college', 'senior-high', 'junior-high'].includes(selectedFilterDepartmentType) && (
                 <SelectInput
                     value={selectedFilterYearLevel}
                     onChange={(e) => changeYearLevelFilter(e.target.value)}
