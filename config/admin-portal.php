@@ -95,6 +95,7 @@ return [
                 ['label' => 'Branches', 'route' => 'admin.branches', 'icon' => 'branches'],
                 ['label' => 'Academic Year', 'route' => 'admin.evaluation-cycle', 'icon' => 'calendar'],
                 ['label' => 'Admin Users', 'route' => 'admin.admin-users', 'icon' => 'shield'],
+                ['label' => 'Submission Logs', 'route' => 'admin.submission-logs', 'icon' => 'logs', 'roles' => ['superadmin', 'overalladmin']],
                 ['label' => 'Audit Logs', 'route' => 'admin.audit-logs', 'icon' => 'logs'],
                 ['label' => 'Bug Reports', 'route' => 'admin.bug-reports', 'icon' => 'bug', 'roles' => ['superadmin']],
                 ['label' => 'Landing Page', 'route' => 'admin.landing-page', 'icon' => 'dashboard', 'roles' => ['superadmin']],
@@ -297,6 +298,12 @@ return [
             'description' => 'Branch-level rating roll-up for cross-campus comparison and accreditation reporting.',
             'eyebrow' => 'Ratings & Reports',
             'icon' => 'branches',
+        ],
+        'admin.submission-logs' => [
+            'title' => 'Submission Logs',
+            'description' => 'Read-only log of submitted evaluations saved from student, faculty, and employee portals.',
+            'eyebrow' => 'Ratings & Reports',
+            'icon' => 'logs',
         ],
         'admin.outstanding-awards' => [
             'title' => 'Outstanding Awards',

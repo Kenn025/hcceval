@@ -173,7 +173,7 @@ function NavGroup({ group, activeRoute, collapsed, onItemClick }) {
     );
 }
 
-function SignOutButton({ collapsed, onClick }) {
+function SignOutButton({ collapsed, isDarkMode, onClick }) {
     const tooltipRef = useSystemTooltip("Sign out", collapsed);
 
     return (
@@ -182,7 +182,10 @@ function SignOutButton({ collapsed, onClick }) {
             type="button"
             onClick={onClick}
             className={[
-                "flex items-center gap-2.5 rounded-xl border border-red-400/55 bg-red-600 px-3.5 py-2.5 text-sm font-bold text-white shadow-[0_10px_24px_-12px_rgba(220,38,38,0.9)] transition-all hover:border-red-300 hover:bg-red-500",
+                "flex items-center gap-2.5 rounded-xl border px-3.5 py-2.5 text-sm font-bold shadow-[0_10px_24px_-12px_rgba(220,38,38,0.75)] transition-all",
+                isDarkMode
+                    ? "border-rose-300/35 bg-rose-500/18 text-rose-50 hover:border-rose-200/55 hover:bg-rose-500/28"
+                    : "border-rose-200 bg-white/95 text-rose-700 hover:border-rose-300 hover:bg-rose-50",
                 collapsed ? "h-10 w-10 justify-center px-0" : "w-full",
             ].join(" ")}
         >
@@ -539,6 +542,7 @@ export default function AdminLayout({
             <div className="flex items-center justify-center border-t border-white/10 p-3">
                 <SignOutButton
                     collapsed={sidebarCollapsed}
+                    isDarkMode={isDarkMode}
                     onClick={() => setShowLogoutConfirm(true)}
                 />
             </div>
@@ -579,7 +583,9 @@ export default function AdminLayout({
                     ].join(" ")}
                     style={{
                         backgroundImage:
-                            "linear-gradient(170deg, #0d2454 0%, #0b1f47 40%, #091a3e 100%)",
+                            isDarkMode
+                                ? "linear-gradient(170deg, #0b3a8f 0%, #0d2454 48%, #08162f 100%)"
+                                : "linear-gradient(170deg, #2563eb 0%, #1d4ed8 50%, #1e3a8a 100%)",
                     }}
                 >
                     {/* Mobile close */}
@@ -598,7 +604,12 @@ export default function AdminLayout({
                         ref={collapseTooltipRef}
                         type="button"
                         onClick={() => setCollapsed((v) => !v)}
-                        className="absolute -right-3.5 top-5 hidden h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-md transition hover:bg-slate-50 hover:text-slate-900 lg:flex"
+                        className={[
+                            "absolute -right-3.5 top-5 hidden h-7 w-7 items-center justify-center rounded-full border shadow-md transition lg:flex",
+                            isDarkMode
+                                ? "border-blue-400/25 bg-[#152a4e] text-blue-100 hover:bg-[#1a3562] hover:text-white"
+                                : "border-blue-100 bg-white text-slate-600 hover:bg-blue-50 hover:text-blue-900",
+                        ].join(" ")}
                     >
                         <svg
                             viewBox="0 0 24 24"
@@ -629,8 +640,8 @@ export default function AdminLayout({
                         className={[
                             "sticky top-0 z-20 border-b shadow-sm transition-colors duration-300",
                             isDarkMode
-                                ? "border-slate-700/70 bg-[#1f293d]"
-                                : "border-slate-200 bg-white",
+                                ? "border-blue-400/15 bg-[#1d2f49]"
+                                : "border-blue-100 bg-white/95",
                         ].join(" ")}
                     >
                         <div className="flex items-center justify-between gap-2 px-4 py-3 sm:gap-4 sm:px-6">
@@ -824,7 +835,12 @@ export default function AdminLayout({
                                                     setShowUserMenu(false);
                                                     setShowLogoutConfirm(true);
                                                 }}
-                                                className="flex w-full items-center gap-2.5 px-3 py-2.5 text-sm text-rose-600 transition hover:bg-rose-50"
+                                                className={[
+                                                    "flex w-full items-center gap-2.5 px-3 py-2.5 text-sm font-medium transition",
+                                                    isDarkMode
+                                                        ? "text-rose-300 hover:bg-rose-500/10"
+                                                        : "text-rose-600 hover:bg-rose-50",
+                                                ].join(" ")}
                                             >
                                                 <AppIcon
                                                     name="logout"

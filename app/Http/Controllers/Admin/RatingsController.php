@@ -8,6 +8,7 @@ use App\Models\Department;
 use App\Models\EmployeeDepartment;
 use App\Models\Program;
 use App\Models\Strand;
+use App\Services\AuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -552,6 +553,8 @@ class RatingsController extends Controller
     public function exportHead(Request $request): StreamedResponse
     {
         $rows = $this->schoolHeadSubmissionRatings($request, false);
+        $this->recordExport($request, 'school-head-ratings', $rows->count());
+
         return $this->streamCsv('school-head-ratings', ['#', 'School Head', 'Rating', 'Responses', 'School Year'], $rows, fn ($r) => [
             $r->rating_id, $r->teacher_name,
             $r->overall_rating ? number_format((float) $r->overall_rating, 2) : '',
@@ -563,6 +566,8 @@ class RatingsController extends Controller
     public function exportBranch(Request $request): StreamedResponse
     {
         $rows = $this->branchQuery($request)->orderByDesc('rb.id')->get();
+        $this->recordExport($request, 'branch-ratings', $rows->count());
+
         return $this->streamCsv('branch-ratings', ['#', 'Branch', 'Rating', 'Submissions', 'School Year'], $rows, fn ($r) => [
             $r->rating_id, $r->branch_name,
             $r->overall_rating ? number_format((float) $r->overall_rating, 2) : '',
@@ -857,6 +862,8 @@ class RatingsController extends Controller
     public function exportSubject(Request $request): StreamedResponse
     {
         $rows = $this->subjectQuery($request)->orderByDesc('rs.id')->get();
+        $this->recordExport($request, 'subject-ratings', $rows->count());
+
         return $this->streamCsv('subject-ratings', [
             '#', 'Teacher', 'Subject', 'Rating', 'School Year', 'Semester',
         ], $rows, fn ($r) => [
@@ -873,6 +880,7 @@ class RatingsController extends Controller
             $this->academicYearFromLabel($request->input('school_year')),
             $this->peerQuestionnaireTypeId(),
         );
+        $this->recordExport($request, 'peer-ratings', $rows->count());
 
         return $this->streamCsv('peer-ratings', [
             '#', 'Teacher', 'Department', 'Program / Strand', 'Rating', 'Responses', 'School Year',
@@ -887,6 +895,8 @@ class RatingsController extends Controller
     public function exportEmployee(Request $request): StreamedResponse
     {
         $rows = $this->employeeQuery($request)->orderByDesc('re.id')->get();
+        $this->recordExport($request, 'employee-ratings', $rows->count());
+
         return $this->streamCsv('employee-ratings', [
             '#', 'Employee', 'Rating', 'School Year',
         ], $rows, fn ($r) => [
@@ -943,6 +953,13 @@ class RatingsController extends Controller
             ->groupBy('e.id', 'e.firstname', 'e.lastname')
             ->orderByDesc('avg_rating')
             ->get();
+
+        AuditLogger::record('report.printed', 'ratings_summary', null, [
+            'report' => 'ratings-summary',
+            'title' => 'Ratings Summary',
+            'school_year' => $schoolYear ?: 'All School Years',
+            'record_count' => $subject->count() + $peer->count() + $employee->count(),
+        ], $request);
 
         return view('reports.summary', [
             'schoolYear' => $schoolYear ?: 'All School Years',
@@ -2293,5 +2310,22 @@ class RatingsController extends Controller
             }
             fclose($out);
         }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    private function recordExport(Request $request, string $report, int $recordCount): void
+    {
+        AuditLogger::record('report.exported', $report, null, [
+            'report' => $report,
+            'school_year' => $request->input('school_year') ?: 'All School Years',
+            'record_count' => $recordCount,
+            'filters' => $request->only([
+                'search',
+                'branch_id',
+                'department_group',
+                'program_group',
+                'strand_group',
+                'employee_department_id',
+            ]),
+        ], $request);
     }
 }

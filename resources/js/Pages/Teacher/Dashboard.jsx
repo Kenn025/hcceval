@@ -1,5 +1,6 @@
 import AppIcon from '@/Components/AppIcon';
 import ConfirmDialog from '@/Components/ConfirmDialog';
+import EvaluationProgress from '@/Components/EvaluationProgress';
 import Modal from '@/Components/Modal';
 import PortalLayout from '@/Layouts/PortalLayout';
 import { router } from '@inertiajs/react';
@@ -822,7 +823,7 @@ function SubjectRatingModal({ subject, open, onClose }) {
     return (
         <Modal show={open} maxWidth="2xl" onClose={onClose}>
             {subject && (
-                <div className="max-h-[86vh] overflow-hidden bg-white">
+                <div className="portal-modal max-h-[86vh] overflow-hidden bg-white">
                     <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
                         <div className="flex items-start justify-between gap-4">
                             <div className="min-w-0">
@@ -1573,7 +1574,7 @@ function ArchiveSubmissionModal({ submission, open, onClose }) {
     return (
         <Modal show={open} maxWidth="2xl" onClose={onClose}>
             {submission && (
-                <div className="max-h-[86vh] overflow-hidden bg-white">
+                <div className="portal-modal max-h-[86vh] overflow-hidden bg-white">
                     <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
                         <div className="flex items-start justify-between gap-4">
                             <div className="min-w-0">
@@ -1658,7 +1659,7 @@ function ArchiveRatingFileModal({ ratingFile, open, onClose }) {
     return (
         <Modal show={open} maxWidth="2xl" onClose={onClose}>
             {ratingFile && (
-                <div className="max-h-[86vh] overflow-hidden bg-white">
+                <div className="portal-modal max-h-[86vh] overflow-hidden bg-white">
                     <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
                         <div className="flex items-start justify-between gap-4">
                             <div className="min-w-0">
@@ -1766,6 +1767,7 @@ function TeacherEvaluationModal({ form, open, onClose, readOnly = false }) {
     const submittedAnswers = form?.submission?.submitted_answers ?? {};
     const submittedComment = form?.submission?.submitted_comment ?? '';
     const allAnswered = questions.length > 0 && questions.every((q) => answers[q.question_id]);
+    const answeredCount = questions.filter((q) => answers[q.question_id]).length;
     const ratingLabels = { 1: 'Poor', 2: 'Fair', 3: 'Good', 4: 'Very Good', 5: 'Excellent' };
 
     useEffect(() => {
@@ -1881,6 +1883,15 @@ function TeacherEvaluationModal({ form, open, onClose, readOnly = false }) {
                                 </button>
                             </div>
                             <p className="mt-2 text-xs text-slate-400">{form.cycle.school_year} · {form.cycle.semester}</p>
+                            {!readOnly && (
+                                <EvaluationProgress
+                                    answeredCount={answeredCount}
+                                    totalCount={questions.length}
+                                    color="blue"
+                                    bare
+                                    className="mt-3"
+                                />
+                            )}
                         </div>
 
                         <form onSubmit={submit} className="max-h-[calc(86vh-108px)] overflow-y-auto px-5 py-4">
@@ -1889,7 +1900,6 @@ function TeacherEvaluationModal({ form, open, onClose, readOnly = false }) {
                                     ? 'This is a read-only view of the assigned questionnaire for this submitted evaluation.'
                                     : <>Rate each item from <strong>1 (Poor)</strong> to <strong>5 (Excellent)</strong>.</>}
                             </p>
-
                             <div className="space-y-3">
                                 {questions.map((q, index) => {
                                     const previousClass = questions[index - 1]?.class_name ?? '';

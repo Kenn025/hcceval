@@ -1,5 +1,6 @@
 import AppIcon from '@/Components/AppIcon';
 import ConfirmDialog from '@/Components/ConfirmDialog';
+import EvaluationProgress from '@/Components/EvaluationProgress';
 import Modal from '@/Components/Modal';
 import PortalLayout from '@/Layouts/PortalLayout';
 import { router } from '@inertiajs/react';
@@ -23,7 +24,7 @@ const CATEGORY_LABELS = {
 
 function Badge({ children, color = 'blue' }) {
     const map = {
-        green:  'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
+        green:  'bg-blue-50 text-blue-700 ring-1 ring-blue-200',
         blue:   'bg-blue-50 text-blue-700 ring-1 ring-blue-200',
         slate:  'bg-slate-100 text-slate-600 ring-1 ring-slate-200',
         amber:  'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
@@ -86,8 +87,8 @@ function printSubmittedEvaluationReport(evaluation) {
                 <style>
                     * { box-sizing: border-box; }
                     body { font-family: Arial, sans-serif; color: #0f172a; margin: 32px; }
-                    .header { border-bottom: 2px solid #059669; padding-bottom: 16px; margin-bottom: 20px; }
-                    .eyebrow { color: #047857; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+                    .header { border-bottom: 2px solid #2563eb; padding-bottom: 16px; margin-bottom: 20px; }
+                    .eyebrow { color: #1d4ed8; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
                     h1 { font-size: 24px; margin: 8px 0 4px; }
                     .muted { color: #64748b; font-size: 13px; }
                     .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 18px 0; }
@@ -96,7 +97,7 @@ function printSubmittedEvaluationReport(evaluation) {
                     .box-value { font-size: 18px; font-weight: 800; margin-top: 6px; }
                     table { width: 100%; border-collapse: collapse; margin-top: 18px; }
                     th, td { border: 1px solid #cbd5e1; padding: 10px; text-align: left; vertical-align: top; font-size: 13px; }
-                    th { background: #ecfdf5; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: #334155; }
+                    th { background: #eff6ff; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: #334155; }
                     .comments { margin-top: 18px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; }
                     @media print {
                         body { margin: 18mm; }
@@ -183,7 +184,7 @@ function SubjectStatusCard({ subjects }) {
     const colors = {
         blue: 'bg-blue-50 text-blue-700 ring-blue-100',
         purple: 'bg-violet-50 text-violet-700 ring-violet-100',
-        emerald: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
+        emerald: 'bg-blue-50 text-blue-700 ring-blue-100',
         amber: 'bg-amber-50 text-amber-700 ring-amber-100',
     };
 
@@ -357,7 +358,7 @@ function SubjectsTab({ subjects, cycle, onStartEvaluation, onViewEvaluation }) {
                                 <button
                                     type="button"
                                     onClick={() => onStartEvaluation?.(s)}
-                                    className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                                    className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
                                 >
                                     Start Evaluation
                                 </button>
@@ -394,14 +395,14 @@ function ProgramChairEvaluationTab({ targets = [], onStartEvaluation }) {
                     target.done ? 'border-slate-100' : 'border-slate-200'
                 }`}
             >
-                <div className={`mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg ${target.done ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                <div className={`mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg ${target.done ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
                     <AppIcon name={target.done ? 'check-circle' : 'school'} className="h-4 w-4" />
                 </div>
                 <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                         <p className="truncate text-sm font-semibold text-slate-800">{target.name}</p>
                         <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium ring-1 ${
-                            target.done ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-slate-100 text-slate-700 ring-slate-200'
+                            target.done ? 'bg-blue-50 text-blue-700 ring-blue-200' : 'bg-slate-100 text-slate-700 ring-slate-200'
                         }`}>
                             {target.done ? 'Submitted' : 'Pending'}
                         </span>
@@ -620,6 +621,7 @@ function EvaluationModal({ form, open, onClose, readOnly = false }) {
 
     const questions = form?.questions ?? [];
     const allAnswered = questions.length > 0 && questions.every((q) => answers[q.question_id]);
+    const answeredCount = questions.filter((q) => answers[q.question_id]).length;
     const ratingLabels = { 1: 'Poor', 2: 'Fair', 3: 'Good', 4: 'Very Good', 5: 'Excellent' };
     const submittedAnswers = (form?.submission?.answers ?? []).reduce((lookup, answer) => ({
         ...lookup,
@@ -718,19 +720,19 @@ function EvaluationModal({ form, open, onClose, readOnly = false }) {
         <>
             <Modal show={open} maxWidth="2xl" closeable={!submitting && !confirmOpen} onClose={onClose}>
                 {form && (
-                    <div className="max-h-[86vh] overflow-hidden bg-white">
-                        <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
+                    <div className="portal-modal max-h-[86vh] overflow-hidden bg-blue-50/40">
+                        <div className="border-b border-blue-200 bg-gradient-to-br from-blue-100 via-blue-50 to-white px-5 py-4">
                             <div className="flex items-start justify-between gap-4">
                                 <div className="min-w-0">
-                                    <p className="text-xs font-semibold uppercase text-emerald-600">{CATEGORY_LABELS[form.category] ?? 'Evaluation Form'}</p>
+                                    <p className="text-xs font-semibold uppercase text-blue-700">{CATEGORY_LABELS[form.category] ?? 'Evaluation Form'}</p>
                                     <h3 className="mt-1 truncate text-lg font-bold text-slate-900">{form.evaluatee?.name?.trim() || 'Teacher'}</h3>
-                                    <p className="mt-1 text-sm text-slate-500">
+                                    <p className="mt-1 text-sm text-blue-900/65">
                                         {form.subjectInfo
                                             ? `${form.subjectInfo?.code} · ${form.subjectInfo?.name}`
                                             : [form.evaluatee?.role, form.evaluatee?.scope].filter(Boolean).join(' · ')}
                                     </p>
                                     {form.questionnaireTitle && (
-                                        <p className="mt-1 text-xs text-slate-500">
+                                            <p className="mt-1 text-xs text-blue-900/60">
                                             Questionnaire: {form.questionnaireTitle}
                                         </p>
                                     )}
@@ -744,16 +746,24 @@ function EvaluationModal({ form, open, onClose, readOnly = false }) {
                                     Close
                                 </button>
                             </div>
-                            <p className="mt-2 text-xs text-slate-400">{form.cycle.school_year} · {form.cycle.semester}</p>
+                            <p className="mt-2 text-xs text-blue-700/60">{form.cycle.school_year} · {form.cycle.semester}</p>
+                            {!readOnly && (
+                                <EvaluationProgress
+                                    answeredCount={answeredCount}
+                                    totalCount={questions.length}
+                                    color="blue"
+                                    bare
+                                    className="mt-3"
+                                />
+                            )}
                         </div>
 
                         <form onSubmit={submit} className="max-h-[calc(86vh-108px)] overflow-y-auto px-5 py-4">
-                            <p className="mb-4 text-xs text-slate-500">
+                            <p className="mb-4 text-xs text-blue-900/65">
                                 {readOnly
                                     ? 'This is a read-only view of your submitted evaluation.'
                                     : <>Rate each item from <strong>1 (Poor)</strong> to <strong>5 (Excellent)</strong>.</>}
                             </p>
-
                             <div className="space-y-3">
                                 {questions.map((q, index) => {
                                     const previousClass = questions[index - 1]?.class_name ?? '';
@@ -764,17 +774,17 @@ function EvaluationModal({ form, open, onClose, readOnly = false }) {
                                     <Fragment key={q.question_id}>
                                         {showDivider && (
                                             <div className="flex items-center gap-3 pt-2">
-                                                <div className="h-px flex-1 bg-slate-200" />
-                                                <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                                <div className="h-px flex-1 bg-blue-100" />
+                                                <div className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-blue-800 ring-1 ring-blue-200">
                                                     {currentClass}
                                                     {q.weight_percentage != null ? ` (${q.weight_percentage}%)` : ''}
                                                 </div>
-                                                <div className="h-px flex-1 bg-slate-200" />
+                                                <div className="h-px flex-1 bg-blue-100" />
                                             </div>
                                         )}
-                                    <div className="rounded-lg border border-slate-200 bg-white p-4">
-                                        <p className="mb-3 text-sm text-slate-700">
-                                            <span className="mr-1 font-semibold text-slate-500">{index + 1}.</span>{q.question_text}
+                                    <div className="rounded-lg border border-blue-200 bg-white p-4 shadow-sm shadow-blue-100/70">
+                                        <p className="mb-3 text-sm text-blue-950">
+                                            <span className="mr-1 font-semibold text-blue-500">{index + 1}.</span>{q.question_text}
                                         </p>
                                         <div className="grid grid-cols-5 gap-2">
                                             {[1, 2, 3, 4, 5].map((value) => (
@@ -784,7 +794,7 @@ function EvaluationModal({ form, open, onClose, readOnly = false }) {
                                                         className={[
                                                             'flex min-h-[54px] items-center justify-center rounded-lg border px-2 py-2 text-center text-xs font-semibold',
                                                             Number(submittedAnswers[q.question_id]) === value
-                                                                ? 'border-emerald-500 bg-emerald-500 text-white shadow'
+                                                                ? 'border-blue-600 bg-blue-600 text-white shadow'
                                                                 : 'border-slate-200 bg-slate-50 text-slate-500',
                                                         ].join(' ')}
                                                     >
@@ -801,8 +811,8 @@ function EvaluationModal({ form, open, onClose, readOnly = false }) {
                                                         className={[
                                                             'min-h-[54px] rounded-lg border px-2 py-2 text-xs font-semibold transition',
                                                             answers[q.question_id] === value
-                                                                ? 'border-emerald-500 bg-emerald-500 text-white shadow'
-                                                                : 'border-slate-200 text-slate-600 hover:border-emerald-300 hover:bg-emerald-50',
+                                                                ? 'border-blue-600 bg-blue-600 text-white shadow'
+                                                                : 'border-blue-200 bg-blue-50/30 text-blue-900/70 hover:border-blue-400 hover:bg-blue-100',
                                                         ].join(' ')}
                                                     >
                                                         <span className="block text-base font-bold">{value}</span>
@@ -821,7 +831,7 @@ function EvaluationModal({ form, open, onClose, readOnly = false }) {
                             </div>
 
                             {readOnly ? (
-                                <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
+                                <div className="mt-4 rounded-lg border border-blue-200 bg-white p-4 shadow-sm shadow-blue-100/70">
                                     <div className="flex items-center justify-between gap-3">
                                         <label className="block text-sm font-medium text-slate-700">Comments</label>
                                         {form?.submission?.submitted_at && (
@@ -835,13 +845,13 @@ function EvaluationModal({ form, open, onClose, readOnly = false }) {
                                     </p>
                                 </div>
                             ) : (
-                                <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
-                                    <label className="mb-2 block text-sm font-medium text-slate-700">Comments <span className="font-normal text-slate-400">(optional)</span></label>
+                                <div className="mt-4 rounded-lg border border-blue-200 bg-white p-4 shadow-sm shadow-blue-100/70">
+                                    <label className="mb-2 block text-sm font-medium text-blue-950">Comments <span className="font-normal text-blue-400">(optional)</span></label>
                                     <textarea
                                         rows={3}
                                         value={comment}
                                         onChange={(event) => setComment(event.target.value)}
-                                        className="w-full rounded-lg border border-slate-200 p-3 text-sm focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                        className="w-full rounded-lg border border-blue-200 bg-blue-50/30 p-3 text-sm text-blue-950 placeholder:text-blue-300 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                                         placeholder="Share any additional feedback or observations..."
                                     />
                                 </div>
@@ -851,7 +861,7 @@ function EvaluationModal({ form, open, onClose, readOnly = false }) {
                                 <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{errors.message}</p>
                             )}
 
-                            <div className="sticky bottom-0 mt-5 flex gap-3 border-t border-slate-100 bg-white py-4">
+                            <div className="sticky bottom-0 mt-5 flex gap-3 border-t border-blue-200 bg-blue-50/95 py-4 backdrop-blur">
                                 {readOnly ? (
                                     <button
                                         type="button"
@@ -866,14 +876,14 @@ function EvaluationModal({ form, open, onClose, readOnly = false }) {
                                             type="button"
                                             onClick={onClose}
                                             disabled={submitting}
-                                            className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                                            className="flex-1 rounded-xl border border-blue-200 bg-white py-3 text-sm font-medium text-blue-800 hover:bg-blue-50 disabled:opacity-50"
                                         >
                                             Cancel
                                         </button>
                                         <button
                                             type="submit"
                                             disabled={submitting || !allAnswered}
-                                            className="flex-1 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                                            className="flex-1 rounded-xl bg-blue-700 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-200 transition hover:bg-blue-800 disabled:opacity-50"
                                         >
                                             {submitting ? 'Submitting...' : 'Submit Evaluation'}
                                         </button>
@@ -937,7 +947,7 @@ function SubmittedEvaluationModal({ evaluation, open, onClose }) {
         : typeId === 3
             ? 'School Head Evaluation'
             : 'Subject Evaluation';
-    const typeColor = typeId === 4 ? 'text-emerald-600' : 'text-blue-600';
+    const typeColor = 'text-blue-600';
     const headerName = evaluation?.evaluatee_name || evaluation?.course_name || 'Submitted Evaluation';
     const headerInfo = [
         evaluation?.evaluatee_role,
@@ -952,7 +962,7 @@ function SubmittedEvaluationModal({ evaluation, open, onClose }) {
     return (
         <Modal show={open} maxWidth="5xl" onClose={onClose}>
             {evaluation && (
-                <div className="flex h-[92vh] max-h-[92vh] flex-col overflow-hidden bg-white">
+                <div className="portal-modal flex h-[92vh] max-h-[92vh] flex-col overflow-hidden bg-white">
                     <div className="shrink-0 border-b border-slate-200 bg-white px-5 py-4">
                         <div className="flex items-start justify-between gap-4">
                             <div className="min-w-0">
@@ -982,7 +992,7 @@ function SubmittedEvaluationModal({ evaluation, open, onClose }) {
                             </div>
                             <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                                 <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Overall Rating</p>
-                                <p className="mt-1 text-sm font-bold text-emerald-700">{formattedRating(evaluation.overall_average)} / 5</p>
+                                <p className="mt-1 text-sm font-bold text-blue-700">{formattedRating(evaluation.overall_average)} / 5</p>
                             </div>
                             <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                                 <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Category</p>
@@ -1312,7 +1322,7 @@ function ArchiveTab({ archive, onView }) {
         const colors = {
             1: 'purple',
             3: 'amber',
-            4: 'green',
+            4: 'blue',
         };
 
         return colors[Number(typeId)] ?? 'slate';

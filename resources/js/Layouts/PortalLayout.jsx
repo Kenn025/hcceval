@@ -8,52 +8,60 @@ import { Moon, Sun } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 const PORTAL_SIDEBAR_SCROLL_KEY = "portal-sidebar-scroll";
+const THEME_MODE_KEY = "hcceval-theme-mode";
+const THEME_MODE_EVENT = "hcceval-theme-mode-change";
 
 const THEMES = {
     student: {
         gradient:
-            "linear-gradient(170deg, #0d2454 0%, #0b1f47 40%, #091a3e 100%)",
-        activeText: "text-[#0d2454]",
+            "linear-gradient(170deg, #2563eb 0%, #1d4ed8 50%, #1e3a8a 100%)",
+        darkGradient:
+            "linear-gradient(170deg, #0b3a8f 0%, #0d2454 48%, #08162f 100%)",
+        activeText: "text-blue-900",
         activeDot: "bg-blue-400",
         activeIconBg: "bg-blue-600",
-        avatarGradient: "from-blue-400 to-blue-600",
-        topAvatarBg: "from-blue-600 to-blue-900",
+        avatarGradient: "from-blue-400 to-blue-700",
+        topAvatarBg: "from-blue-500 to-blue-800",
         portalLabel: "Student Portal",
-        mainBg: "bg-[#f0f4f9]",
-        headerBg: "bg-white",
-        headerBorder: "border-slate-200",
-        headerLabel: "text-slate-400",
-        headerTitle: "text-slate-800",
+        mainBg: "bg-blue-50/50",
+        headerBg: "bg-white/95",
+        headerBorder: "border-blue-100",
+        headerLabel: "text-blue-500/70",
+        headerTitle: "text-blue-950",
     },
     teacher: {
         gradient:
-            "linear-gradient(170deg, #0d2454 0%, #0b1f47 40%, #091a3e 100%)",
+            "linear-gradient(170deg, #2563eb 0%, #1d4ed8 50%, #1e3a8a 100%)",
+        darkGradient:
+            "linear-gradient(170deg, #0b3a8f 0%, #0d2454 48%, #08162f 100%)",
         activeText: "text-[#0d2454]",
         activeDot: "bg-blue-400",
         activeIconBg: "bg-blue-600",
         avatarGradient: "from-blue-400 to-blue-600",
         topAvatarBg: "from-blue-600 to-blue-900",
         portalLabel: "Faculty Portal",
-        mainBg: "bg-[#f0f4f9]",
-        headerBg: "bg-white",
-        headerBorder: "border-slate-200",
-        headerLabel: "text-slate-400",
-        headerTitle: "text-slate-800",
+        mainBg: "bg-[#f4f7fb]",
+        headerBg: "bg-white/95",
+        headerBorder: "border-blue-100",
+        headerLabel: "text-blue-500/65",
+        headerTitle: "text-slate-900",
     },
     employee: {
         gradient:
-            "linear-gradient(170deg, #0d2454 0%, #0b1f47 40%, #091a3e 100%)",
+            "linear-gradient(170deg, #2563eb 0%, #1d4ed8 50%, #1e3a8a 100%)",
+        darkGradient:
+            "linear-gradient(170deg, #0b3a8f 0%, #0d2454 48%, #08162f 100%)",
         activeText: "text-[#0d2454]",
         activeDot: "bg-blue-400",
         activeIconBg: "bg-blue-600",
         avatarGradient: "from-blue-400 to-blue-600",
         topAvatarBg: "from-blue-600 to-blue-900",
         portalLabel: "Employee Portal",
-        mainBg: "bg-[#f0f4f9]",
-        headerBg: "bg-white",
-        headerBorder: "border-slate-200",
-        headerLabel: "text-slate-400",
-        headerTitle: "text-slate-800",
+        mainBg: "bg-[#f4f7fb]",
+        headerBg: "bg-white/95",
+        headerBorder: "border-blue-100",
+        headerLabel: "text-blue-500/65",
+        headerTitle: "text-slate-900",
     },
 };
 
@@ -107,7 +115,7 @@ function keepActiveSidebarItemVisible(nav) {
     sessionStorage.setItem(PORTAL_SIDEBAR_SCROLL_KEY, String(nav.scrollTop));
 }
 
-function SignOutButton({ collapsed, onClick }) {
+function SignOutButton({ collapsed, isDarkMode, onClick }) {
     const tooltipRef = useSystemTooltip("Sign out", collapsed);
 
     return (
@@ -116,7 +124,10 @@ function SignOutButton({ collapsed, onClick }) {
             type="button"
             onClick={onClick}
             className={[
-                "flex items-center gap-2.5 rounded-xl border border-red-400/55 bg-red-600 px-3.5 py-2.5 text-sm font-bold text-white shadow-[0_10px_24px_-12px_rgba(220,38,38,0.9)] transition-all hover:border-red-300 hover:bg-red-500",
+                "flex items-center gap-2.5 rounded-xl border px-3.5 py-2.5 text-sm font-bold shadow-[0_10px_24px_-12px_rgba(220,38,38,0.75)] transition-all",
+                isDarkMode
+                    ? "border-rose-300/35 bg-rose-500/18 text-rose-50 hover:border-rose-200/55 hover:bg-rose-500/28"
+                    : "border-rose-200 bg-white/95 text-rose-700 hover:border-rose-300 hover:bg-rose-50",
                 collapsed ? "h-10 w-10 justify-center px-0" : "w-full",
             ].join(" ")}
         >
@@ -265,7 +276,7 @@ export default function PortalLayout({
     const [mobileOpen, setMobileOpen] = useState(false);
     const [isDarkMode, setIsDarkMode] = useState(() => {
         if (typeof window === "undefined") return false;
-        return localStorage.getItem("hcceval-theme-mode") === "dark";
+        return localStorage.getItem(THEME_MODE_KEY) === "dark";
     });
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
     const [showUserMenu, setShowUserMenu] = useState(false);
@@ -287,12 +298,32 @@ export default function PortalLayout({
         document.body.classList.toggle("dark-mode", isDarkMode);
         document.body.classList.toggle("light-mode", !isDarkMode);
         if (typeof window !== "undefined") {
-            localStorage.setItem(
-                "hcceval-theme-mode",
-                isDarkMode ? "dark" : "light",
-            );
+            const mode = isDarkMode ? "dark" : "light";
+            localStorage.setItem(THEME_MODE_KEY, mode);
+            window.dispatchEvent(new CustomEvent(THEME_MODE_EVENT, { detail: mode }));
         }
     }, [isDarkMode]);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return undefined;
+
+        const syncThemeMode = (event) => {
+            const nextMode = event.type === "storage"
+                ? event.newValue
+                : event.detail;
+
+            if (nextMode !== "dark" && nextMode !== "light") return;
+            setIsDarkMode(nextMode === "dark");
+        };
+
+        window.addEventListener("storage", syncThemeMode);
+        window.addEventListener(THEME_MODE_EVENT, syncThemeMode);
+
+        return () => {
+            window.removeEventListener("storage", syncThemeMode);
+            window.removeEventListener(THEME_MODE_EVENT, syncThemeMode);
+        };
+    }, []);
 
     useEffect(() => {
         if (!showUserMenu) return;
@@ -487,6 +518,7 @@ export default function PortalLayout({
             <div className="flex items-center justify-center border-t border-white/10 p-3">
                 <SignOutButton
                     collapsed={sidebarCollapsed}
+                    isDarkMode={isDarkMode}
                     onClick={() => setShowLogoutConfirm(true)}
                 />
             </div>
@@ -499,9 +531,9 @@ export default function PortalLayout({
             <FlashNotification />
             <div
                 className={[
-                    "portal-shell min-h-screen overflow-x-hidden transition-colors duration-300",
+                    `portal-shell portal-${userType} min-h-screen overflow-x-hidden transition-colors duration-300`,
                     isDarkMode
-                        ? "bg-[#172033] text-slate-100"
+                        ? "bg-[#071426] text-slate-100"
                         : `text-slate-900 ${theme.mainBg ?? "bg-slate-50"}`,
                 ].join(" ")}
             >
@@ -525,7 +557,7 @@ export default function PortalLayout({
                             ? "translate-x-0"
                             : "-translate-x-full lg:translate-x-0",
                     ].join(" ")}
-                    style={{ backgroundImage: theme.gradient }}
+                    style={{ backgroundImage: isDarkMode ? (theme.darkGradient ?? theme.gradient) : theme.gradient }}
                 >
                     <button
                         type="button"
@@ -780,7 +812,12 @@ export default function PortalLayout({
                                                     setShowUserMenu(false);
                                                     setShowLogoutConfirm(true);
                                                 }}
-                                                className="flex w-full items-center gap-2.5 px-3 py-2.5 text-sm text-rose-600 transition hover:bg-rose-50"
+                                                className={[
+                                                    "flex w-full items-center gap-2.5 px-3 py-2.5 text-sm font-medium transition",
+                                                    isDarkMode
+                                                        ? "text-rose-300 hover:bg-rose-500/10"
+                                                        : "text-rose-600 hover:bg-rose-50",
+                                                ].join(" ")}
                                             >
                                                 <AppIcon
                                                     name="logout"
@@ -856,7 +893,7 @@ export default function PortalLayout({
                     >
                         {bugSuccess ? (
                             <div className="text-center py-6">
-                                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+                                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-blue-100 text-blue-600">
                                     <svg
                                         viewBox="0 0 24 24"
                                         className="h-7 w-7"

@@ -1,4 +1,5 @@
 import ConfirmDialog from '@/Components/ConfirmDialog';
+import EvaluationProgress from '@/Components/EvaluationProgress';
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
 
@@ -42,6 +43,7 @@ export default function EmployeeEvaluateForm({ category, evaluatee, questions, c
     const [confirmOpen, setConfirmOpen] = useState(false);
 
     const allAnswered = questions.length > 0 && questions.every((q) => answers[q.question_id]);
+    const answeredCount = questions.filter((q) => answers[q.question_id]).length;
 
     const setRating = (qid, rating) => {
         setAnswers((prev) => ({ ...prev, [qid]: rating }));
@@ -118,6 +120,8 @@ export default function EmployeeEvaluateForm({ category, evaluatee, questions, c
                         </div>
                     ) : (
                         <form onSubmit={submit} className="space-y-4">
+                            <EvaluationProgress answeredCount={answeredCount} totalCount={questions.length} color="blue" sticky className="top-3" />
+
                             {questions.map((q, idx) => (
                                 <div key={q.question_id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                                     <p className="mb-4 text-sm leading-relaxed text-slate-700">
