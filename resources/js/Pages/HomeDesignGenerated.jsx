@@ -3863,10 +3863,10 @@ function BackToTop() {
     }, []);
     return /* @__PURE__ */ jsx("button", {
         onClick: () => window.scrollTo({ top: 0, behavior: "smooth" }),
-        className: `fixed bottom-8 right-8 w-12 h-12 neumorphic-btn flex items-center justify-center z-40 transition-all duration-300 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10 pointer-events-none"}`,
+        className: `fixed bottom-4 right-4 h-10 w-10 sm:bottom-8 sm:right-8 sm:h-12 sm:w-12 neumorphic-btn flex items-center justify-center z-40 transition-all duration-300 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10 pointer-events-none"}`,
         style: { color: "var(--accent)" },
         children: /* @__PURE__ */ jsx("svg", {
-            className: "w-6 h-6",
+            className: "h-5 w-5 sm:h-6 sm:w-6",
             fill: "none",
             stroke: "currentColor",
             viewBox: "0 0 24 24",
