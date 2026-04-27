@@ -175,6 +175,57 @@ function normalizeBottomCtaSection(bottomCtaSection = {}) {
     };
 }
 
+function normalizeFooterSection(footerSection = {}) {
+    return {
+        logo_path: String(footerSection.logo_path ?? "").trim(),
+        logo_file: footerSection.logo_file
+            ? String(footerSection.logo_file.name ?? "")
+            : "",
+        title_text: String(footerSection.title_text ?? "").trim(),
+        subtitle_text: String(footerSection.subtitle_text ?? "").trim(),
+        quick_links_heading: String(
+            footerSection.quick_links_heading ?? "",
+        ).trim(),
+        link_1_label: String(footerSection.link_1_label ?? "").trim(),
+        link_1_target: String(footerSection.link_1_target ?? "").trim(),
+        link_2_label: String(footerSection.link_2_label ?? "").trim(),
+        link_2_target: String(footerSection.link_2_target ?? "").trim(),
+        link_3_label: String(footerSection.link_3_label ?? "").trim(),
+        link_3_target: String(footerSection.link_3_target ?? "").trim(),
+        link_4_label: String(footerSection.link_4_label ?? "").trim(),
+        link_4_target: String(footerSection.link_4_target ?? "").trim(),
+        contact_heading: String(footerSection.contact_heading ?? "").trim(),
+        contact_line_1: String(footerSection.contact_line_1 ?? "").trim(),
+        contact_line_2: String(footerSection.contact_line_2 ?? "").trim(),
+        contact_line_3: String(footerSection.contact_line_3 ?? "").trim(),
+        social_1_label: String(footerSection.social_1_label ?? "").trim(),
+        social_1_link: String(footerSection.social_1_link ?? "").trim(),
+        social_2_label: String(footerSection.social_2_label ?? "").trim(),
+        social_2_link: String(footerSection.social_2_link ?? "").trim(),
+        social_3_label: String(footerSection.social_3_label ?? "").trim(),
+        social_3_link: String(footerSection.social_3_link ?? "").trim(),
+        copyright_suffix_text: String(
+            footerSection.copyright_suffix_text ?? "",
+        ).trim(),
+    };
+}
+
+function normalizeSocialIconLabel(value, fallback) {
+    const normalized = String(value ?? "")
+        .trim()
+        .toLowerCase();
+    const aliases = {
+        md: "facebook",
+        td: "instagram",
+        gd: "linkedin",
+        facebook: "facebook",
+        instagram: "instagram",
+        linkedin: "linkedin",
+    };
+
+    return aliases[normalized] ?? fallback;
+}
+
 function normalizeStatKey(value) {
     return String(value ?? "")
         .trim()
@@ -282,6 +333,31 @@ export default function LandingPage({
         secondary_button_label: "",
         secondary_button_target: "",
     },
+    footerSection = {
+        logo_path: "",
+        title_text: "",
+        subtitle_text: "",
+        quick_links_heading: "",
+        link_1_label: "",
+        link_1_target: "",
+        link_2_label: "",
+        link_2_target: "",
+        link_3_label: "",
+        link_3_target: "",
+        link_4_label: "",
+        link_4_target: "",
+        contact_heading: "",
+        contact_line_1: "",
+        contact_line_2: "",
+        contact_line_3: "",
+        social_1_label: "",
+        social_1_link: "",
+        social_2_label: "",
+        social_2_link: "",
+        social_3_label: "",
+        social_3_link: "",
+        copyright_suffix_text: "",
+    },
 }) {
     const canEditStats =
         (statsSection ?? []).length > 0 &&
@@ -308,6 +384,7 @@ export default function LandingPage({
     const [faqModalOpen, setFaqModalOpen] = useState(false);
     const [contactModalOpen, setContactModalOpen] = useState(false);
     const [bottomCtaModalOpen, setBottomCtaModalOpen] = useState(false);
+    const [footerModalOpen, setFooterModalOpen] = useState(false);
     const [pendingFaqScrollToIndex, setPendingFaqScrollToIndex] =
         useState(null);
     const [testimonialAction, setTestimonialAction] = useState({
@@ -330,6 +407,7 @@ export default function LandingPage({
     const initialFaqSnapshotRef = useRef("{}");
     const initialContactSnapshotRef = useRef("{}");
     const initialBottomCtaSnapshotRef = useRef("{}");
+    const initialFooterSnapshotRef = useRef("{}");
 
     const { data, setData, errors, processing, reset, clearErrors } = useForm({
         headers: [],
@@ -470,6 +548,39 @@ export default function LandingPage({
         primary_button_target: "",
         secondary_button_label: "",
         secondary_button_target: "",
+    });
+    const {
+        data: footerData,
+        setData: setFooterData,
+        errors: footerErrors,
+        processing: footerProcessing,
+        reset: resetFooter,
+        clearErrors: clearFooterErrors,
+    } = useForm({
+        logo_path: "",
+        logo_file: null,
+        title_text: "",
+        subtitle_text: "",
+        quick_links_heading: "",
+        link_1_label: "",
+        link_1_target: "",
+        link_2_label: "",
+        link_2_target: "",
+        link_3_label: "",
+        link_3_target: "",
+        link_4_label: "",
+        link_4_target: "",
+        contact_heading: "",
+        contact_line_1: "",
+        contact_line_2: "",
+        contact_line_3: "",
+        social_1_label: "",
+        social_1_link: "",
+        social_2_label: "",
+        social_2_link: "",
+        social_3_label: "",
+        social_3_link: "",
+        copyright_suffix_text: "",
     });
 
     const openEdit = () => {
@@ -723,6 +834,49 @@ export default function LandingPage({
         );
         setBottomCtaModalOpen(true);
     };
+    const openFooterEdit = () => {
+        clearFooterErrors();
+        const nextFooterData = {
+            logo_path: footerSection?.logo_path ?? "",
+            logo_file: null,
+            title_text: footerSection?.title_text ?? "",
+            subtitle_text: footerSection?.subtitle_text ?? "",
+            quick_links_heading: footerSection?.quick_links_heading ?? "",
+            link_1_label: footerSection?.link_1_label ?? "",
+            link_1_target: footerSection?.link_1_target ?? "",
+            link_2_label: footerSection?.link_2_label ?? "",
+            link_2_target: footerSection?.link_2_target ?? "",
+            link_3_label: footerSection?.link_3_label ?? "",
+            link_3_target: footerSection?.link_3_target ?? "",
+            link_4_label: footerSection?.link_4_label ?? "",
+            link_4_target: footerSection?.link_4_target ?? "",
+            contact_heading: footerSection?.contact_heading ?? "",
+            contact_line_1: footerSection?.contact_line_1 ?? "",
+            contact_line_2: footerSection?.contact_line_2 ?? "",
+            contact_line_3: footerSection?.contact_line_3 ?? "",
+            social_1_label: normalizeSocialIconLabel(
+                footerSection?.social_1_label,
+                "facebook",
+            ),
+            social_1_link: footerSection?.social_1_link ?? "",
+            social_2_label: normalizeSocialIconLabel(
+                footerSection?.social_2_label,
+                "instagram",
+            ),
+            social_2_link: footerSection?.social_2_link ?? "",
+            social_3_label: normalizeSocialIconLabel(
+                footerSection?.social_3_label,
+                "linkedin",
+            ),
+            social_3_link: footerSection?.social_3_link ?? "",
+            copyright_suffix_text: footerSection?.copyright_suffix_text ?? "",
+        };
+        setFooterData(nextFooterData);
+        initialFooterSnapshotRef.current = JSON.stringify(
+            normalizeFooterSection(nextFooterData),
+        );
+        setFooterModalOpen(true);
+    };
     const closeHowItWorksModal = () => {
         resetHowItWorks();
         setHowItWorksModalOpen(false);
@@ -751,6 +905,11 @@ export default function LandingPage({
         resetBottomCta();
         setBottomCtaModalOpen(false);
         clearBottomCtaErrors();
+    };
+    const closeFooterModal = () => {
+        resetFooter();
+        setFooterModalOpen(false);
+        clearFooterErrors();
     };
 
     const updateRow = (index, key, value) => {
@@ -1519,6 +1678,63 @@ export default function LandingPage({
             route("admin.landing-page.bottom-cta-section.update"),
             bottomCtaData,
             { onSuccess: closeBottomCtaModal },
+        );
+    };
+    const hasEmptyFooterRequiredFields = useMemo(() => {
+        const hasLogoSource =
+            String(footerData.logo_path ?? "").trim() !== "" ||
+            Boolean(footerData.logo_file);
+        const requiredFields = [
+            footerData.title_text,
+            footerData.subtitle_text,
+            footerData.quick_links_heading,
+            footerData.link_1_label,
+            footerData.link_1_target,
+            footerData.link_2_label,
+            footerData.link_2_target,
+            footerData.link_3_label,
+            footerData.link_3_target,
+            footerData.link_4_label,
+            footerData.link_4_target,
+            footerData.contact_heading,
+            footerData.contact_line_1,
+            footerData.contact_line_2,
+            footerData.contact_line_3,
+            footerData.social_1_label,
+            footerData.social_1_link,
+            footerData.social_2_label,
+            footerData.social_2_link,
+            footerData.social_3_label,
+            footerData.social_3_link,
+            footerData.copyright_suffix_text,
+        ];
+        return (
+            !hasLogoSource ||
+            requiredFields.some((value) => String(value ?? "").trim() === "")
+        );
+    }, [footerData]);
+    const hasFooterSectionChanges = useMemo(() => {
+        const currentSnapshot = JSON.stringify(
+            normalizeFooterSection(footerData),
+        );
+        return currentSnapshot !== initialFooterSnapshotRef.current;
+    }, [footerData]);
+    const submitFooterSection = (event) => {
+        event.preventDefault();
+        if (hasEmptyFooterRequiredFields || !hasFooterSectionChanges) {
+            return;
+        }
+
+        router.post(
+            route("admin.landing-page.footer-section.update"),
+            {
+                _method: "put",
+                ...footerData,
+            },
+            {
+                forceFormData: true,
+                onSuccess: closeFooterModal,
+            },
         );
     };
     const updateTestimonialStatus = (testimonialId, status) => {
@@ -2336,6 +2552,156 @@ export default function LandingPage({
                                     {bottomCtaSection?.secondary_button_target ||
                                         "-"}
                                     )
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section className="mb-4 rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-5">
+                    <h2 className="text-base font-semibold text-slate-900">
+                        Footer
+                    </h2>
+                    <button
+                        type="button"
+                        onClick={openFooterEdit}
+                        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                    >
+                        Edit
+                    </button>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="min-w-full">
+                        <thead>
+                            <tr className="border-b border-slate-100 bg-slate-50/70 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                <th className="px-4 py-3 sm:px-5">Field</th>
+                                <th className="px-4 py-3 sm:px-5">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody className="text-sm text-slate-700">
+                            <tr className="border-b border-slate-100">
+                                <td className="px-4 py-3 font-medium sm:px-5">
+                                    Logo
+                                </td>
+                                <td className="px-4 py-3 sm:px-5">
+                                    {footerSection?.logo_path ? (
+                                        <a
+                                            href={footerSection.logo_path}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="text-blue-600 hover:underline"
+                                        >
+                                            {footerSection.logo_path}
+                                        </a>
+                                    ) : (
+                                        "-"
+                                    )}
+                                </td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                                <td className="px-4 py-3 font-medium sm:px-5">
+                                    Title
+                                </td>
+                                <td className="px-4 py-3 sm:px-5">
+                                    {footerSection?.title_text || "-"}
+                                </td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                                <td className="px-4 py-3 font-medium sm:px-5">
+                                    Subtitle
+                                </td>
+                                <td className="px-4 py-3 sm:px-5">
+                                    {footerSection?.subtitle_text || "-"}
+                                </td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                                <td className="px-4 py-3 font-medium sm:px-5">
+                                    Quick Links
+                                </td>
+                                <td className="space-y-1 px-4 py-3 sm:px-5">
+                                    <p>
+                                        {footerSection?.quick_links_heading ||
+                                            "Quick Links"}
+                                    </p>
+                                    <p>
+                                        {footerSection?.link_1_label ||
+                                            "Link 1"}{" "}
+                                        ({footerSection?.link_1_target || "-"})
+                                    </p>
+                                    <p>
+                                        {footerSection?.link_2_label ||
+                                            "Link 2"}{" "}
+                                        ({footerSection?.link_2_target || "-"})
+                                    </p>
+                                    <p>
+                                        {footerSection?.link_3_label ||
+                                            "Link 3"}{" "}
+                                        ({footerSection?.link_3_target || "-"})
+                                    </p>
+                                    <p>
+                                        {footerSection?.link_4_label ||
+                                            "Link 4"}{" "}
+                                        ({footerSection?.link_4_target || "-"})
+                                    </p>
+                                </td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                                <td className="px-4 py-3 font-medium sm:px-5">
+                                    Contact
+                                </td>
+                                <td className="space-y-1 px-4 py-3 sm:px-5">
+                                    <p>
+                                        {footerSection?.contact_heading ||
+                                            "Contact"}
+                                    </p>
+                                    <p>
+                                        {footerSection?.contact_line_1 || "-"}
+                                    </p>
+                                    <p>
+                                        {footerSection?.contact_line_2 || "-"}
+                                    </p>
+                                    <p>
+                                        {footerSection?.contact_line_3 || "-"}
+                                    </p>
+                                </td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                                <td className="px-4 py-3 font-medium sm:px-5">
+                                    Social Icons
+                                </td>
+                                <td className="space-y-1 px-4 py-3 sm:px-5">
+                                    <p>
+                                        {normalizeSocialIconLabel(
+                                            footerSection?.social_1_label,
+                                            "facebook",
+                                        )}{" "}
+                                        ({footerSection?.social_1_link || "-"})
+                                    </p>
+                                    <p>
+                                        {normalizeSocialIconLabel(
+                                            footerSection?.social_2_label,
+                                            "instagram",
+                                        )}{" "}
+                                        ({footerSection?.social_2_link || "-"})
+                                    </p>
+                                    <p>
+                                        {normalizeSocialIconLabel(
+                                            footerSection?.social_3_label,
+                                            "linkedin",
+                                        )}{" "}
+                                        ({footerSection?.social_3_link || "-"})
+                                    </p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td className="px-4 py-3 font-medium sm:px-5">
+                                    Copyright Text
+                                </td>
+                                <td className="px-4 py-3 sm:px-5">
+                                    {footerSection?.copyright_suffix_text ||
+                                        "-"}
                                 </td>
                             </tr>
                         </tbody>
@@ -4384,6 +4750,489 @@ export default function LandingPage({
                                     <button
                                         type="button"
                                         onClick={closeBottomCtaModal}
+                                        className="w-full rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700 md:w-[180px]"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {footerModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div
+                        className="absolute inset-0 bg-slate-950/40"
+                        onClick={closeFooterModal}
+                    />
+                    <div
+                        className="relative w-full max-w-4xl rounded-xl bg-white p-6 shadow-2xl"
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div className="mb-4 flex items-center justify-between">
+                            <h3 className="text-base font-semibold text-slate-900">
+                                Edit Footer Section
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={closeFooterModal}
+                                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                                aria-label="Close modal"
+                            >
+                                <svg
+                                    className="h-5 w-5"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={2}
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M6 18L18 6M6 6l12 12"
+                                    />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <form
+                            onSubmit={submitFooterSection}
+                            className="space-y-4"
+                        >
+                            <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
+                                <div className="grid gap-3 md:grid-cols-2">
+                                    <FormField
+                                        label="Logo File"
+                                        error={footerErrors.logo_file}
+                                        required
+                                    >
+                                        <div className="space-y-2">
+                                            <input
+                                                type="file"
+                                                accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
+                                                onChange={(event) =>
+                                                    setFooterData(
+                                                        "logo_file",
+                                                        event.target.files?.[0] ??
+                                                            null,
+                                                    )
+                                                }
+                                                className="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-slate-900 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white hover:file:bg-slate-800"
+                                            />
+                                            <p className="text-xs text-slate-500">
+                                                Current:{" "}
+                                                {footerData.logo_path || "-"}
+                                            </p>
+                                        </div>
+                                    </FormField>
+                                    <FormField
+                                        label="Title"
+                                        error={footerErrors.title_text}
+                                        required
+                                    >
+                                        <TextInput
+                                            value={footerData.title_text}
+                                            onChange={(event) =>
+                                                setFooterData(
+                                                    "title_text",
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                    </FormField>
+                                </div>
+
+                                <FormField
+                                    label="Subtitle"
+                                    error={footerErrors.subtitle_text}
+                                    required
+                                >
+                                    <TextareaInput
+                                        value={footerData.subtitle_text}
+                                        onChange={(event) =>
+                                            setFooterData(
+                                                "subtitle_text",
+                                                event.target.value,
+                                            )
+                                        }
+                                        rows={2}
+                                    />
+                                </FormField>
+
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                                    <h4 className="mb-3 text-sm font-semibold text-slate-900">
+                                        Quick Links
+                                    </h4>
+                                    <FormField
+                                        label="Quick Links Heading"
+                                        error={footerErrors.quick_links_heading}
+                                        required
+                                    >
+                                        <TextInput
+                                            value={
+                                                footerData.quick_links_heading
+                                            }
+                                            onChange={(event) =>
+                                                setFooterData(
+                                                    "quick_links_heading",
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                    </FormField>
+                                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                                        <FormField
+                                            label="Link 1 Label"
+                                            error={footerErrors.link_1_label}
+                                            required
+                                        >
+                                            <TextInput
+                                                value={footerData.link_1_label}
+                                                onChange={(event) =>
+                                                    setFooterData(
+                                                        "link_1_label",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </FormField>
+                                        <FormField
+                                            label="Link 1 Target"
+                                            error={footerErrors.link_1_target}
+                                            required
+                                        >
+                                            <TextInput
+                                                value={footerData.link_1_target}
+                                                onChange={(event) =>
+                                                    setFooterData(
+                                                        "link_1_target",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                placeholder="home"
+                                            />
+                                        </FormField>
+                                    </div>
+                                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                                        <FormField
+                                            label="Link 2 Label"
+                                            error={footerErrors.link_2_label}
+                                            required
+                                        >
+                                            <TextInput
+                                                value={footerData.link_2_label}
+                                                onChange={(event) =>
+                                                    setFooterData(
+                                                        "link_2_label",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </FormField>
+                                        <FormField
+                                            label="Link 2 Target"
+                                            error={footerErrors.link_2_target}
+                                            required
+                                        >
+                                            <TextInput
+                                                value={footerData.link_2_target}
+                                                onChange={(event) =>
+                                                    setFooterData(
+                                                        "link_2_target",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                placeholder="features"
+                                            />
+                                        </FormField>
+                                    </div>
+                                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                                        <FormField
+                                            label="Link 3 Label"
+                                            error={footerErrors.link_3_label}
+                                            required
+                                        >
+                                            <TextInput
+                                                value={footerData.link_3_label}
+                                                onChange={(event) =>
+                                                    setFooterData(
+                                                        "link_3_label",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </FormField>
+                                        <FormField
+                                            label="Link 3 Target"
+                                            error={footerErrors.link_3_target}
+                                            required
+                                        >
+                                            <TextInput
+                                                value={footerData.link_3_target}
+                                                onChange={(event) =>
+                                                    setFooterData(
+                                                        "link_3_target",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                placeholder="roles"
+                                            />
+                                        </FormField>
+                                    </div>
+                                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                                        <FormField
+                                            label="Link 4 Label"
+                                            error={footerErrors.link_4_label}
+                                            required
+                                        >
+                                            <TextInput
+                                                value={footerData.link_4_label}
+                                                onChange={(event) =>
+                                                    setFooterData(
+                                                        "link_4_label",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </FormField>
+                                        <FormField
+                                            label="Link 4 Target"
+                                            error={footerErrors.link_4_target}
+                                            required
+                                        >
+                                            <TextInput
+                                                value={footerData.link_4_target}
+                                                onChange={(event) =>
+                                                    setFooterData(
+                                                        "link_4_target",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                placeholder="contact"
+                                            />
+                                        </FormField>
+                                    </div>
+                                </div>
+
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                                    <h4 className="mb-3 text-sm font-semibold text-slate-900">
+                                        Contact Block
+                                    </h4>
+                                    <FormField
+                                        label="Contact Heading"
+                                        error={footerErrors.contact_heading}
+                                        required
+                                    >
+                                        <TextInput
+                                            value={footerData.contact_heading}
+                                            onChange={(event) =>
+                                                setFooterData(
+                                                    "contact_heading",
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                    </FormField>
+                                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                                        <FormField
+                                            label="Contact Line 1"
+                                            error={footerErrors.contact_line_1}
+                                            required
+                                        >
+                                            <TextInput
+                                                value={
+                                                    footerData.contact_line_1
+                                                }
+                                                onChange={(event) =>
+                                                    setFooterData(
+                                                        "contact_line_1",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </FormField>
+                                        <FormField
+                                            label="Contact Line 2"
+                                            error={footerErrors.contact_line_2}
+                                            required
+                                        >
+                                            <TextInput
+                                                value={
+                                                    footerData.contact_line_2
+                                                }
+                                                onChange={(event) =>
+                                                    setFooterData(
+                                                        "contact_line_2",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </FormField>
+                                    </div>
+                                    <div className="mt-3">
+                                        <FormField
+                                            label="Contact Line 3"
+                                            error={footerErrors.contact_line_3}
+                                            required
+                                        >
+                                            <TextInput
+                                                value={
+                                                    footerData.contact_line_3
+                                                }
+                                                onChange={(event) =>
+                                                    setFooterData(
+                                                        "contact_line_3",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </FormField>
+                                    </div>
+                                </div>
+
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                                    <h4 className="mb-3 text-sm font-semibold text-slate-900">
+                                        Social Icons
+                                    </h4>
+                                    <div className="grid gap-3 md:grid-cols-2">
+                                        <FormField
+                                            label="Icon 1"
+                                            error={footerErrors.social_1_label}
+                                            required
+                                        >
+                                            <TextInput
+                                                value={footerData.social_1_label}
+                                                onChange={(event) =>
+                                                    setFooterData(
+                                                        "social_1_label",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                placeholder="facebook"
+                                            />
+                                        </FormField>
+                                        <FormField
+                                            label="Icon 1 Link"
+                                            error={footerErrors.social_1_link}
+                                            required
+                                        >
+                                            <TextInput
+                                                value={footerData.social_1_link}
+                                                onChange={(event) =>
+                                                    setFooterData(
+                                                        "social_1_link",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                placeholder="https://facebook.com/your-page"
+                                            />
+                                        </FormField>
+                                    </div>
+                                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                                        <FormField
+                                            label="Icon 2"
+                                            error={footerErrors.social_2_label}
+                                            required
+                                        >
+                                            <TextInput
+                                                value={footerData.social_2_label}
+                                                onChange={(event) =>
+                                                    setFooterData(
+                                                        "social_2_label",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                placeholder="instagram"
+                                            />
+                                        </FormField>
+                                        <FormField
+                                            label="Icon 2 Link"
+                                            error={footerErrors.social_2_link}
+                                            required
+                                        >
+                                            <TextInput
+                                                value={footerData.social_2_link}
+                                                onChange={(event) =>
+                                                    setFooterData(
+                                                        "social_2_link",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                placeholder="https://instagram.com/your-account"
+                                            />
+                                        </FormField>
+                                    </div>
+                                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                                        <FormField
+                                            label="Icon 3"
+                                            error={footerErrors.social_3_label}
+                                            required
+                                        >
+                                            <TextInput
+                                                value={footerData.social_3_label}
+                                                onChange={(event) =>
+                                                    setFooterData(
+                                                        "social_3_label",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                placeholder="linkedin"
+                                            />
+                                        </FormField>
+                                        <FormField
+                                            label="Icon 3 Link"
+                                            error={footerErrors.social_3_link}
+                                            required
+                                        >
+                                            <TextInput
+                                                value={footerData.social_3_link}
+                                                onChange={(event) =>
+                                                    setFooterData(
+                                                        "social_3_link",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                placeholder="https://linkedin.com/company/your-company"
+                                            />
+                                        </FormField>
+                                    </div>
+                                </div>
+
+                                <FormField
+                                    label="Copyright Suffix"
+                                    error={footerErrors.copyright_suffix_text}
+                                    required
+                                >
+                                    <TextInput
+                                        value={footerData.copyright_suffix_text}
+                                        onChange={(event) =>
+                                            setFooterData(
+                                                "copyright_suffix_text",
+                                                event.target.value,
+                                            )
+                                        }
+                                        placeholder="All rights reserved. Thesis Project."
+                                    />
+                                </FormField>
+                            </div>
+
+                            <div className="pt-2">
+                                <div className="flex w-full flex-col gap-3 md:flex-row-reverse md:justify-start">
+                                    <SubmitButton
+                                        processing={footerProcessing}
+                                        disabled={
+                                            hasEmptyFooterRequiredFields ||
+                                            !hasFooterSectionChanges
+                                        }
+                                        className="w-full md:w-[180px]"
+                                    >
+                                        Save Changes
+                                    </SubmitButton>
+                                    <button
+                                        type="button"
+                                        onClick={closeFooterModal}
                                         className="w-full rounded-lg border border-slate-200 py-2 text-sm font-medium text-slate-700 md:w-[180px]"
                                     >
                                         Cancel

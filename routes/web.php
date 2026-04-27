@@ -199,6 +199,7 @@ Route::middleware('auth')->group(function () {
             Route::put('/admin/landing-page/faq-section', [LandingPageHeaderController::class, 'updateFaqSection'])->name('admin.landing-page.faq-section.update');
             Route::put('/admin/landing-page/contact-section', [LandingPageHeaderController::class, 'updateContactSection'])->name('admin.landing-page.contact-section.update');
             Route::put('/admin/landing-page/bottom-cta-section', [LandingPageHeaderController::class, 'updateBottomCtaSection'])->name('admin.landing-page.bottom-cta-section.update');
+            Route::put('/admin/landing-page/footer-section', [LandingPageHeaderController::class, 'updateFooterSection'])->name('admin.landing-page.footer-section.update');
             Route::put('/admin/landing-page/testimonials/{landingPageTestimonial}/status', [LandingPageHeaderController::class, 'updateTestimonialStatus'])->name('admin.landing-page.testimonials.status.update');
             Route::put('/admin/landing-page/{landingPageHeader}', [LandingPageHeaderController::class, 'update']);
             Route::delete('/admin/landing-page/{landingPageHeader}', [LandingPageHeaderController::class, 'destroy']);

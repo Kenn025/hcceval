@@ -9,6 +9,7 @@ use App\Models\LandingPageFeatureSection;
 use App\Models\LandingPageContactSection;
 use App\Models\LandingPageFaq;
 use App\Models\LandingPageFaqSection;
+use App\Models\LandingPageFooterSection;
 use App\Models\LandingPageHeader;
 use App\Models\LandingPageHomeSection;
 use App\Models\LandingPageHowItWorksSection;
@@ -87,6 +88,32 @@ class LandingPageHeaderController extends Controller
         'primary_button_target' => 'login',
         'secondary_button_label' => 'Contact Us',
         'secondary_button_target' => 'contact',
+    ];
+    private const DEFAULT_FOOTER_SECTION = [
+        'logo_icon' => 'graduation',
+        'logo_path' => null,
+        'title_text' => 'MCH-PEMS',
+        'subtitle_text' => 'Multicampus Holistic Computerized Faculty-Peer-Student-Admin Performance Evaluation Management System.',
+        'quick_links_heading' => 'Quick Links',
+        'link_1_label' => 'Home',
+        'link_1_target' => 'home',
+        'link_2_label' => 'Features',
+        'link_2_target' => 'features',
+        'link_3_label' => 'Roles',
+        'link_3_target' => 'roles',
+        'link_4_label' => 'Contact',
+        'link_4_target' => 'contact',
+        'contact_heading' => 'Contact',
+        'contact_line_1' => 'mchpems@university.edu',
+        'contact_line_2' => '+63 912 345 6789',
+        'contact_line_3' => 'University Campus',
+        'social_1_label' => 'facebook',
+        'social_1_link' => 'https://facebook.com',
+        'social_2_label' => 'instagram',
+        'social_2_link' => 'https://instagram.com',
+        'social_3_label' => 'linkedin',
+        'social_3_link' => 'https://linkedin.com',
+        'copyright_suffix_text' => 'All rights reserved. Thesis Project.',
     ];
     private const DEFAULT_ROLES = [
         [
@@ -265,6 +292,7 @@ class LandingPageHeaderController extends Controller
             'faqSection' => $this->faqSectionData(),
             'contactSection' => $this->contactSectionData(),
             'bottomCtaSection' => $this->bottomCtaSectionData(),
+            'footerSection' => $this->footerSectionData(),
             'filters' => [
                 'search' => $search,
                 'per_page' => $perPage,
@@ -1156,6 +1184,79 @@ class LandingPageHeaderController extends Controller
         return back()->with('success', 'Bottom CTA section updated successfully.');
     }
 
+    public function updateFooterSection(Request $request)
+    {
+        if (! Schema::hasTable('landing_page_footer_sections')) {
+            return back()->withErrors([
+                'footer_section' => 'Footer section table is not available yet. Please run migrations first.',
+            ]);
+        }
+        if (! Schema::hasColumn('landing_page_footer_sections', 'logo_path')) {
+            return back()->withErrors([
+                'footer_section' => 'Footer logo upload column is missing. Please run migrations first.',
+            ]);
+        }
+
+        $validated = $request->validate([
+            'logo_path' => 'nullable|string|max:255',
+            'logo_file' => 'nullable|image|max:3072',
+            'title_text' => 'required|string|max:150',
+            'subtitle_text' => 'required|string|max:1000',
+            'quick_links_heading' => 'required|string|max:120',
+            'link_1_label' => 'required|string|max:120',
+            'link_1_target' => 'required|string|max:150',
+            'link_2_label' => 'required|string|max:120',
+            'link_2_target' => 'required|string|max:150',
+            'link_3_label' => 'required|string|max:120',
+            'link_3_target' => 'required|string|max:150',
+            'link_4_label' => 'required|string|max:120',
+            'link_4_target' => 'required|string|max:150',
+            'contact_heading' => 'required|string|max:120',
+            'contact_line_1' => 'required|string|max:255',
+            'contact_line_2' => 'required|string|max:120',
+            'contact_line_3' => 'required|string|max:255',
+            'social_1_label' => 'nullable|string|max:20',
+            'social_1_link' => 'nullable|string|max:255',
+            'social_2_label' => 'nullable|string|max:20',
+            'social_2_link' => 'nullable|string|max:255',
+            'social_3_label' => 'nullable|string|max:20',
+            'social_3_link' => 'nullable|string|max:255',
+            'copyright_suffix_text' => 'required|string|max:255',
+        ]);
+
+        $section = LandingPageFooterSection::query()->first();
+        if (! $section) {
+            $section = LandingPageFooterSection::query()->create(self::DEFAULT_FOOTER_SECTION);
+        }
+
+        $payload = collect($validated)->except('logo_file')->all();
+        $nextLogoPath = $section->logo_path;
+
+        $payload['social_1_label'] = $this->normalizeFooterSocialIconLabel(
+            $payload['social_1_label'] ?? self::DEFAULT_FOOTER_SECTION['social_1_label'],
+            self::DEFAULT_FOOTER_SECTION['social_1_label'],
+        );
+        $payload['social_2_label'] = $this->normalizeFooterSocialIconLabel(
+            $payload['social_2_label'] ?? self::DEFAULT_FOOTER_SECTION['social_2_label'],
+            self::DEFAULT_FOOTER_SECTION['social_2_label'],
+        );
+        $payload['social_3_label'] = $this->normalizeFooterSocialIconLabel(
+            $payload['social_3_label'] ?? self::DEFAULT_FOOTER_SECTION['social_3_label'],
+            self::DEFAULT_FOOTER_SECTION['social_3_label'],
+        );
+
+        if ($request->hasFile('logo_file')) {
+            $this->deleteManagedLogoIfExists($section->logo_path);
+            $nextLogoPath = $this->storeLogoFile($request->file('logo_file'));
+        }
+
+        $payload['logo_path'] = $nextLogoPath;
+
+        $section->update($payload);
+
+        return back()->with('success', 'Footer section updated successfully.');
+    }
+
     private function rolesSectionData(): array
     {
         $defaultRoles = collect(self::DEFAULT_ROLES)
@@ -1410,10 +1511,65 @@ class LandingPageHeaderController extends Controller
         ];
     }
 
+    private function footerSectionData(): array
+    {
+        if (! Schema::hasTable('landing_page_footer_sections')) {
+            return self::DEFAULT_FOOTER_SECTION;
+        }
+
+        $section = LandingPageFooterSection::query()->first();
+        if (! $section) {
+            return self::DEFAULT_FOOTER_SECTION;
+        }
+
+        return [
+            'logo_icon' => $section->logo_icon ?: self::DEFAULT_FOOTER_SECTION['logo_icon'],
+            'logo_path' => $section->logo_path,
+            'title_text' => $section->title_text ?: self::DEFAULT_FOOTER_SECTION['title_text'],
+            'subtitle_text' => $section->subtitle_text ?: self::DEFAULT_FOOTER_SECTION['subtitle_text'],
+            'quick_links_heading' => $section->quick_links_heading ?: self::DEFAULT_FOOTER_SECTION['quick_links_heading'],
+            'link_1_label' => $section->link_1_label ?: self::DEFAULT_FOOTER_SECTION['link_1_label'],
+            'link_1_target' => $section->link_1_target ?: self::DEFAULT_FOOTER_SECTION['link_1_target'],
+            'link_2_label' => $section->link_2_label ?: self::DEFAULT_FOOTER_SECTION['link_2_label'],
+            'link_2_target' => $section->link_2_target ?: self::DEFAULT_FOOTER_SECTION['link_2_target'],
+            'link_3_label' => $section->link_3_label ?: self::DEFAULT_FOOTER_SECTION['link_3_label'],
+            'link_3_target' => $section->link_3_target ?: self::DEFAULT_FOOTER_SECTION['link_3_target'],
+            'link_4_label' => $section->link_4_label ?: self::DEFAULT_FOOTER_SECTION['link_4_label'],
+            'link_4_target' => $section->link_4_target ?: self::DEFAULT_FOOTER_SECTION['link_4_target'],
+            'contact_heading' => $section->contact_heading ?: self::DEFAULT_FOOTER_SECTION['contact_heading'],
+            'contact_line_1' => $section->contact_line_1 ?: self::DEFAULT_FOOTER_SECTION['contact_line_1'],
+            'contact_line_2' => $section->contact_line_2 ?: self::DEFAULT_FOOTER_SECTION['contact_line_2'],
+            'contact_line_3' => $section->contact_line_3 ?: self::DEFAULT_FOOTER_SECTION['contact_line_3'],
+            'social_1_label' => $section->social_1_label ?: self::DEFAULT_FOOTER_SECTION['social_1_label'],
+            'social_1_link' => $section->social_1_link ?: self::DEFAULT_FOOTER_SECTION['social_1_link'],
+            'social_2_label' => $section->social_2_label ?: self::DEFAULT_FOOTER_SECTION['social_2_label'],
+            'social_2_link' => $section->social_2_link ?: self::DEFAULT_FOOTER_SECTION['social_2_link'],
+            'social_3_label' => $section->social_3_label ?: self::DEFAULT_FOOTER_SECTION['social_3_label'],
+            'social_3_link' => $section->social_3_link ?: self::DEFAULT_FOOTER_SECTION['social_3_link'],
+            'copyright_suffix_text' => $section->copyright_suffix_text ?: self::DEFAULT_FOOTER_SECTION['copyright_suffix_text'],
+        ];
+    }
+
     private function storeLogoFile(UploadedFile $file): string
     {
         $path = $file->store('landing-page/logos', 'public');
         return Storage::url($path);
+    }
+
+    private function normalizeFooterSocialIconLabel(?string $value, string $fallback): string
+    {
+        $normalized = Str::of((string) $value)
+            ->trim()
+            ->lower()
+            ->value();
+
+        return match ($normalized) {
+            'md' => 'facebook',
+            'td' => 'instagram',
+            'gd' => 'linkedin',
+            'facebook', 'instagram', 'linkedin' => $normalized,
+            default => $fallback,
+        };
     }
 
     private function storeBackgroundVideo(UploadedFile $file): string

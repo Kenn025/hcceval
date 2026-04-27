@@ -148,6 +148,20 @@ const isImageTarget = (value) => {
         /\.(png|jpe?g|gif|webp|svg|bmp|ico)(\?.*)?$/i.test(target)
     );
 };
+const normalizeSocialIconName = (value, fallback) => {
+    const normalized = String(value ?? "")
+        .trim()
+        .toLowerCase();
+    const aliases = {
+        md: "facebook",
+        td: "instagram",
+        gd: "linkedin",
+        facebook: "facebook",
+        instagram: "instagram",
+        linkedin: "linkedin",
+    };
+    return aliases[normalized] ?? fallback;
+};
 function App({
     loginUrl = "/login",
     loginSubmitUrl = "/login",
@@ -162,6 +176,7 @@ function App({
     faqSection: customFaqSection = null,
     contactSection: customContactSection = null,
     bottomCtaSection: customBottomCtaSection = null,
+    footerSection: customFooterSection = null,
 }) {
     const [isDarkMode, setIsDarkMode] = useState(() => {
         if (typeof window === "undefined") return false;
@@ -629,6 +644,135 @@ function App({
         customBottomCtaSection && typeof customBottomCtaSection === "object"
             ? { ...defaultBottomCtaSection, ...customBottomCtaSection }
             : defaultBottomCtaSection;
+    const defaultFooterSection = {
+        logo_icon: "graduation",
+        logo_path: "",
+        title_text: "MCH-PEMS",
+        subtitle_text:
+            "Multicampus Holistic Computerized Faculty-Peer-Student-Admin Performance Evaluation Management System.",
+        quick_links_heading: "Quick Links",
+        link_1_label: "Home",
+        link_1_target: "home",
+        link_2_label: "Features",
+        link_2_target: "features",
+        link_3_label: "Roles",
+        link_3_target: "roles",
+        link_4_label: "Contact",
+        link_4_target: "contact",
+        contact_heading: "Contact",
+        contact_line_1: "mchpems@university.edu",
+        contact_line_2: "+63 912 345 6789",
+        contact_line_3: "University Campus",
+        social_1_label: "facebook",
+        social_1_link: "https://facebook.com",
+        social_2_label: "instagram",
+        social_2_link: "https://instagram.com",
+        social_3_label: "linkedin",
+        social_3_link: "https://linkedin.com",
+        copyright_suffix_text: "All rights reserved. Thesis Project.",
+    };
+    const footerSection =
+        customFooterSection && typeof customFooterSection === "object"
+            ? { ...defaultFooterSection, ...customFooterSection }
+            : defaultFooterSection;
+    const footerLinks = [
+        {
+            label: String(
+                footerSection.link_1_label || defaultFooterSection.link_1_label,
+            ).trim(),
+            target: String(
+                footerSection.link_1_target ||
+                    defaultFooterSection.link_1_target,
+            ).trim(),
+        },
+        {
+            label: String(
+                footerSection.link_2_label || defaultFooterSection.link_2_label,
+            ).trim(),
+            target: String(
+                footerSection.link_2_target ||
+                    defaultFooterSection.link_2_target,
+            ).trim(),
+        },
+        {
+            label: String(
+                footerSection.link_3_label || defaultFooterSection.link_3_label,
+            ).trim(),
+            target: String(
+                footerSection.link_3_target ||
+                    defaultFooterSection.link_3_target,
+            ).trim(),
+        },
+        {
+            label: String(
+                footerSection.link_4_label || defaultFooterSection.link_4_label,
+            ).trim(),
+            target: String(
+                footerSection.link_4_target ||
+                    defaultFooterSection.link_4_target,
+            ).trim(),
+        },
+    ];
+    const footerSocialItems = [
+        {
+            icon: normalizeSocialIconName(
+                footerSection.social_1_label,
+                "facebook",
+            ),
+            href: String(
+                footerSection.social_1_link || "https://facebook.com",
+            ).trim(),
+        },
+        {
+            icon: normalizeSocialIconName(
+                footerSection.social_2_label,
+                "instagram",
+            ),
+            href: String(
+                footerSection.social_2_link || "https://instagram.com",
+            ).trim(),
+        },
+        {
+            icon: normalizeSocialIconName(
+                footerSection.social_3_label,
+                "linkedin",
+            ),
+            href: String(
+                footerSection.social_3_link || "https://linkedin.com",
+            ).trim(),
+        },
+    ];
+    const footerContactLines = [
+        String(
+            footerSection.contact_line_1 || defaultFooterSection.contact_line_1,
+        ).trim(),
+        String(
+            footerSection.contact_line_2 || defaultFooterSection.contact_line_2,
+        ).trim(),
+        String(
+            footerSection.contact_line_3 || defaultFooterSection.contact_line_3,
+        ).trim(),
+    ];
+    const currentYear = new Date().getFullYear();
+    const handleFooterLinkClick = (target) => {
+        const normalizedTarget = String(target || "").trim();
+        if (!normalizedTarget) {
+            return;
+        }
+        if (normalizedTarget.toLowerCase() === "login") {
+            goToLogin();
+            return;
+        }
+        if (
+            normalizedTarget.startsWith("http://") ||
+            normalizedTarget.startsWith("https://") ||
+            normalizedTarget.startsWith("/")
+        ) {
+            window.location.assign(normalizedTarget);
+            return;
+        }
+        scrollTo(normalizedTarget);
+    };
     const defaultTestimonialsSection = {
         badge_text: "Testimonials",
         title_text: "What Users Say",
@@ -2930,20 +3074,39 @@ function App({
                                                 className:
                                                     "flex items-center gap-3 mb-4",
                                                 children: [
-                                                    /* @__PURE__ */ jsx("div", {
-                                                        className:
-                                                            "w-12 h-12 neumorphic-circle flex items-center justify-center",
-                                                        children:
-                                                            /* @__PURE__ */ jsx(
-                                                                AppIcon,
-                                                                {
-                                                                    name: "graduation",
-                                                                    className:
-                                                                        "h-6 w-6",
-                                                                    strokeWidth: 1.9,
-                                                                },
-                                                            ),
-                                                    }),
+                                                    footerSection.logo_path
+                                                        ? /* @__PURE__ */ jsx(
+                                                              "img",
+                                                              {
+                                                                  src: String(
+                                                                      footerSection.logo_path,
+                                                                  ),
+                                                                  alt: String(
+                                                                      footerSection.title_text ||
+                                                                          defaultFooterSection.title_text,
+                                                                  ),
+                                                                  className:
+                                                                      "w-12 h-12 rounded-full object-cover border border-[color:var(--shadow-dark)]",
+                                                              },
+                                                          )
+                                                        : /* @__PURE__ */ jsx(
+                                                              "div",
+                                                              {
+                                                                  className:
+                                                                      "w-12 h-12 neumorphic-circle flex items-center justify-center",
+                                                                  children:
+                                                                      /* @__PURE__ */ jsx(
+                                                                          AppIcon,
+                                                                          {
+                                                                              name: "graduation",
+                                                                              className:
+                                                                                  "h-6 w-6",
+                                                                              strokeWidth:
+                                                                                  1.9,
+                                                                          },
+                                                                      ),
+                                                              },
+                                                          ),
                                                     /* @__PURE__ */ jsx(
                                                         "span",
                                                         {
@@ -2953,7 +3116,10 @@ function App({
                                                                 color: "var(--text-primary)",
                                                             },
                                                             children:
-                                                                "MCH-PEMS",
+                                                                String(
+                                                                    footerSection.title_text ||
+                                                                        defaultFooterSection.title_text,
+                                                                ),
                                                         },
                                                     ),
                                                 ],
@@ -2964,25 +3130,36 @@ function App({
                                                     color: "var(--text-secondary)",
                                                 },
                                                 children:
-                                                    "Multicampus Holistic Computerized Faculty-Peer-Student-Admin Performance Evaluation Management System.",
+                                                    String(
+                                                        footerSection.subtitle_text ||
+                                                            defaultFooterSection.subtitle_text,
+                                                    ),
                                             }),
                                             /* @__PURE__ */ jsx("div", {
                                                 className: "flex gap-3",
-                                                children: [
-                                                    "M",
-                                                    "T",
-                                                    "G",
-                                                    "L",
-                                                ].map((letter, i) =>
+                                                children: footerSocialItems.map((item, i) =>
                                                     /* @__PURE__ */ jsx(
-                                                        "div",
+                                                        "a",
                                                         {
+                                                            href: item.href || "#",
+                                                            target: "_blank",
+                                                            rel: "noreferrer",
                                                             className:
                                                                 "w-10 h-10 neumorphic-btn flex items-center justify-center font-bold",
                                                             style: {
                                                                 color: "var(--accent)",
                                                             },
-                                                            children: letter,
+                                                            children:
+                                                                /* @__PURE__ */ jsx(
+                                                                    AppIcon,
+                                                                    {
+                                                                        name: item.icon,
+                                                                        className:
+                                                                            "h-5 w-5",
+                                                                        strokeWidth:
+                                                                            1.9,
+                                                                    },
+                                                                ),
                                                         },
                                                         i,
                                                     ),
@@ -2997,17 +3174,14 @@ function App({
                                                 style: {
                                                     color: "var(--text-primary)",
                                                 },
-                                                children: "Quick Links",
+                                                children: String(
+                                                    footerSection.quick_links_heading ||
+                                                        defaultFooterSection.quick_links_heading,
+                                                ),
                                             }),
                                             /* @__PURE__ */ jsx("ul", {
                                                 className: "space-y-2",
-                                                children: [
-                                                    "Home",
-                                                    "Features",
-                                                    "Roles",
-                                                    "FAQ",
-                                                    "Contact",
-                                                ].map((link) =>
+                                                children: footerLinks.map((link, index) =>
                                                     /* @__PURE__ */ jsx(
                                                         "li",
                                                         {
@@ -3017,8 +3191,8 @@ function App({
                                                                     {
                                                                         onClick:
                                                                             () =>
-                                                                                scrollTo(
-                                                                                    link.toLowerCase(),
+                                                                                handleFooterLinkClick(
+                                                                                    link.target,
                                                                                 ),
                                                                         className:
                                                                             "hover:underline",
@@ -3026,11 +3200,12 @@ function App({
                                                                             color: "var(--text-secondary)",
                                                                         },
                                                                         children:
-                                                                            link,
+                                                                            link.label ||
+                                                                            `Link ${index + 1}`,
                                                                     },
                                                                 ),
                                                         },
-                                                        link,
+                                                        `footer-link-${index}`,
                                                     ),
                                                 ),
                                             }),
@@ -3043,27 +3218,26 @@ function App({
                                                 style: {
                                                     color: "var(--text-primary)",
                                                 },
-                                                children: "Contact",
+                                                children: String(
+                                                    footerSection.contact_heading ||
+                                                        defaultFooterSection.contact_heading,
+                                                ),
                                             }),
                                             /* @__PURE__ */ jsxs("ul", {
                                                 className: "space-y-2",
                                                 style: {
                                                     color: "var(--text-secondary)",
                                                 },
-                                                children: [
-                                                    /* @__PURE__ */ jsx("li", {
-                                                        children:
-                                                            "mchpems@university.edu",
-                                                    }),
-                                                    /* @__PURE__ */ jsx("li", {
-                                                        children:
-                                                            "+63 912 345 6789",
-                                                    }),
-                                                    /* @__PURE__ */ jsx("li", {
-                                                        children:
-                                                            "University Campus",
-                                                    }),
-                                                ],
+                                                children: footerContactLines.map(
+                                                    (line, index) =>
+                                                        /* @__PURE__ */ jsx(
+                                                            "li",
+                                                            {
+                                                                children: line,
+                                                            },
+                                                            `footer-contact-${index}`,
+                                                        ),
+                                                ),
                                             }),
                                         ],
                                     }),
@@ -3075,8 +3249,13 @@ function App({
                                 children: /* @__PURE__ */ jsx("p", {
                                     className: "text-sm",
                                     style: { color: "var(--text-secondary)" },
-                                    children:
-                                        "\xA9 2025 MCH-PEMS. All rights reserved. Thesis Project.",
+                                    children: `\xA9 ${currentYear} ${String(
+                                        footerSection.title_text ||
+                                            defaultFooterSection.title_text,
+                                    )}. ${String(
+                                        footerSection.copyright_suffix_text ||
+                                            defaultFooterSection.copyright_suffix_text,
+                                    )}`,
                                 }),
                             }),
                         ],

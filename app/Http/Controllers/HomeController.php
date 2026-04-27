@@ -8,6 +8,7 @@ use App\Models\LandingPageBottomCtaSection;
 use App\Models\LandingPageContactSection;
 use App\Models\LandingPageFaq;
 use App\Models\LandingPageFaqSection;
+use App\Models\LandingPageFooterSection;
 use App\Models\LandingPageHeader;
 use App\Models\LandingPageHomeSection;
 use App\Models\LandingPageHowItWorksSection;
@@ -38,6 +39,7 @@ class HomeController extends Controller
             'faqSection' => $this->faqSection(),
             'contactSection' => $this->contactSection(),
             'bottomCtaSection' => $this->bottomCtaSection(),
+            'footerSection' => $this->footerSection(),
         ]);
     }
 
@@ -511,6 +513,72 @@ class HomeController extends Controller
             'primary_button_target' => $section->primary_button_target ?: $defaults['primary_button_target'],
             'secondary_button_label' => $section->secondary_button_label ?: $defaults['secondary_button_label'],
             'secondary_button_target' => $section->secondary_button_target ?: $defaults['secondary_button_target'],
+        ];
+    }
+
+    private function footerSection(): array
+    {
+        $defaults = [
+            'logo_icon' => 'graduation',
+            'logo_path' => null,
+            'title_text' => 'MCH-PEMS',
+            'subtitle_text' => 'Multicampus Holistic Computerized Faculty-Peer-Student-Admin Performance Evaluation Management System.',
+            'quick_links_heading' => 'Quick Links',
+            'link_1_label' => 'Home',
+            'link_1_target' => 'home',
+            'link_2_label' => 'Features',
+            'link_2_target' => 'features',
+            'link_3_label' => 'Roles',
+            'link_3_target' => 'roles',
+            'link_4_label' => 'Contact',
+            'link_4_target' => 'contact',
+            'contact_heading' => 'Contact',
+            'contact_line_1' => 'mchpems@university.edu',
+            'contact_line_2' => '+63 912 345 6789',
+            'contact_line_3' => 'University Campus',
+            'social_1_label' => 'facebook',
+            'social_1_link' => 'https://facebook.com',
+            'social_2_label' => 'instagram',
+            'social_2_link' => 'https://instagram.com',
+            'social_3_label' => 'linkedin',
+            'social_3_link' => 'https://linkedin.com',
+            'copyright_suffix_text' => 'All rights reserved. Thesis Project.',
+        ];
+
+        if (! Schema::hasTable('landing_page_footer_sections')) {
+            return $defaults;
+        }
+
+        $section = LandingPageFooterSection::query()->first();
+        if (! $section) {
+            return $defaults;
+        }
+
+        return [
+            'logo_icon' => $section->logo_icon ?: $defaults['logo_icon'],
+            'logo_path' => $section->logo_path,
+            'title_text' => $section->title_text ?: $defaults['title_text'],
+            'subtitle_text' => $section->subtitle_text ?: $defaults['subtitle_text'],
+            'quick_links_heading' => $section->quick_links_heading ?: $defaults['quick_links_heading'],
+            'link_1_label' => $section->link_1_label ?: $defaults['link_1_label'],
+            'link_1_target' => $section->link_1_target ?: $defaults['link_1_target'],
+            'link_2_label' => $section->link_2_label ?: $defaults['link_2_label'],
+            'link_2_target' => $section->link_2_target ?: $defaults['link_2_target'],
+            'link_3_label' => $section->link_3_label ?: $defaults['link_3_label'],
+            'link_3_target' => $section->link_3_target ?: $defaults['link_3_target'],
+            'link_4_label' => $section->link_4_label ?: $defaults['link_4_label'],
+            'link_4_target' => $section->link_4_target ?: $defaults['link_4_target'],
+            'contact_heading' => $section->contact_heading ?: $defaults['contact_heading'],
+            'contact_line_1' => $section->contact_line_1 ?: $defaults['contact_line_1'],
+            'contact_line_2' => $section->contact_line_2 ?: $defaults['contact_line_2'],
+            'contact_line_3' => $section->contact_line_3 ?: $defaults['contact_line_3'],
+            'social_1_label' => $section->social_1_label ?: $defaults['social_1_label'],
+            'social_1_link' => $section->social_1_link ?: $defaults['social_1_link'],
+            'social_2_label' => $section->social_2_label ?: $defaults['social_2_label'],
+            'social_2_link' => $section->social_2_link ?: $defaults['social_2_link'],
+            'social_3_label' => $section->social_3_label ?: $defaults['social_3_label'],
+            'social_3_link' => $section->social_3_link ?: $defaults['social_3_link'],
+            'copyright_suffix_text' => $section->copyright_suffix_text ?: $defaults['copyright_suffix_text'],
         ];
     }
 }
